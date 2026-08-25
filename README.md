@@ -132,10 +132,10 @@ How to Arrange Development Environment
 
 ### Requirements
 
-* [Node.js + npm](https://nodejs.org/en/)
-    - [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/).
-    - Or [Downloads](https://nodejs.org/en/download/)
-* Windows development requires additional tools(Python + Visual C++ Build Environment). For more information consult the [documentation](https://github.com/nodejs/node-gyp#on-windows)
+* [Bun](https://bun.sh/)
+    - [Installation](https://bun.sh/docs/installation/).
+    - Bun bundles its own JavaScript/TypeScript runtime and package manager, so Node.js is not required. (No native build tools like Python / Visual C++ are needed, either.)
+* Note for Windows: this repository renames the local build tool directory `zzz...` (named so in the upstream repository) to `zzz`, because trailing dots are not a valid directory name on Windows/NTFS.
 
 
 
@@ -143,21 +143,21 @@ How to Arrange Development Environment
 
 1. Clone [this repository](https://github.com/satorumurmur/bibi/). 
 2. $ `cd <the local repository>`
-3. $ `npm install`
+3. $ `bun install`
 
 
 
 ### How to Develop
 
-1. $ `npm start`
+1. $ `bun start`
     1. webpack generates development version of Bibi to `__dist` folder, and start to watch changes of the files in `__src` folder.
     2. BrowserSync webserver launches and navigate your browser to `http://localhost:61671/bibi/?book=`.
 2. Edit source files.
     1. If you modify source files in `__src` folder, development version of the file(s) are updated in `__dist` folder automaticaly.
     2. BrowserSync reloads your browser(s) or inject changes of CSS.
 
-Files in `__dist` folder generated with `npm start` are development version.
-Please don't forget to run `npm run build` and build production version before you upload.
+Files in `__dist` folder generated with `bun start` are development version.
+Please don't forget to run `bun run build` and build production version before you upload.
 
 | Distribution                            | Source                                                                                                |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -169,20 +169,20 @@ Please don't forget to run `npm run build` and build production version before y
 | `__dist/bibi/resources/styles/bibi.css` | `__src/bibi/resources/styles/*.scss`                                                                  |
 | `__dist/bibi/wardrobe/**/*.css`         | Read documents in `__src/bibi/wardrobe/README-DRESS_ja` (Sorry..., currently README is Japanese only) |
 
-Files in the `Distribution` column of the table are overwritten with the files updated by `npm start` or `npm run build`.
+Files in the `Distribution` column of the table are overwritten with the files updated by `bun start` or `bun run build`.
 If you want to modify them, please edit files in the `Source` column instead of editing these files in `__dist` directly.
 
 
 ### How to Build to publish
 
-* $ `npm run build`
+* $ `bun run build`
     - The production version of Bibi is generated in `__dist` folder.
     - You can upload them to your online webserver.
 
 
 ### How to Make a Ditribution Package (Zip Archive)
 
-* $ `npm run make:package`
+* $ `bun run archive`
     1. A zipped archive of the production version of Bibi is generated in `__archives` folder.
 
 

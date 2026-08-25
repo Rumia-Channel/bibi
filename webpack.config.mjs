@@ -4,7 +4,7 @@
  *
  */ ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import zzZ from 'zzz.../as.composer.mjs';
+import zzZ from 'zzz/as.composer.mjs';
 
 const { PACKAGE, WEBSITE_ADDRESS, LICENSE_ADDRESS, SRC, SRC_BC, DIST, ARCHIVES, ARCHIVES_TMP, ARCHIVES_TMP_DIST, LOG_CHARM, LOG_HEADER, ARGUMENTS, ENVARS, Composer, Conductor } = zzZ;
 
@@ -17,11 +17,11 @@ import MiniCSSExtractPlugin from 'mini-css-extract-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 
 import BrowserSyncPlugin from 'browser-sync-webpack-plugin';
-import BSConfig from './bs-config.mjs';
+import BSConfig from './bs-config.cjs';
 
 import Path from 'node:path';
 const resolvePath = (...PathSteps) => Path.resolve(import.meta.dirname, ...PathSteps);
-const normalizePath = (...PathSteps) => Path.normalize(PathSteps.filter(Boolean).join('/'));
+const normalizePath = (...PathSteps) => Path.normalize(PathSteps.filter(Boolean).join('/')).replaceAll('\\', '/');
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
