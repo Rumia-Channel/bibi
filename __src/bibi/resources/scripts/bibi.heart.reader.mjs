@@ -185,6 +185,7 @@ R.layOutItem = async (Item) => {
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
+    if(Item.Spread && (Item.OnlySingleSVG || Item.OnlySingleImg)) { const SoloMedia = R.renderPrePaginatedItem.getSingleMediaElement(Item); if(SoloMedia && /^img$/i.test(SoloMedia.tagName) && !(SoloMedia.naturalWidth > 0)) SoloMedia.addEventListener('load', () => R.requestTwoPaneRegroup(), { once: true }); } // late image dimensions can flip the solo/pair verdict
     await E.dispatch('bibi:laid-out-item', Item);
     return Item;
 };
@@ -414,7 +415,15 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
         });
     })).then(resolve);
 }).then(() => Item);
-    R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { const FE = Item.Body.firstElementChild; return (/^(svg|img)$/i.test(FE.tagName)) ? FE : (FE.querySelector ? FE.querySelector(':scope > svg, :scope > img') : null); };
+    R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { // dives through single-child wrappers (div > p > img); null-safe
+        let El = Item.Body ? Item.Body.firstElementChild : null, Guard = 0;
+        while(El && Guard++ < 8) {
+            if(/^(svg|img)$/i.test(El.tagName)) return El;
+            if(!/^(div|p|figure|section|article|span)$/i.test(El.tagName) || !El.firstElementChild || El.firstElementChild.nextElementSibling) return null;
+            El = El.firstElementChild;
+        }
+        return null;
+    };
 
     R.renderPrePaginatedItem.getViewport = (Item) => Promise.resolve().then(() =>
           Item.Viewport ? Item.Viewport
@@ -453,6 +462,21 @@ R.isBlankPageContent = (Item) => { // true only when the document is present and
         return !Media;
     } catch(Err) { return false; }
 };
+R.getSingleMediaAspect = (Item) => { // [w, h] from the media element itself when Item.Viewport is unresolved (e.g. bare <img> pages)
+    try {
+        const El = R.renderPrePaginatedItem.getSingleMediaElement(Item);
+        if(!El) return null;
+        if(/^svg$/i.test(El.tagName)) {
+            const VB = O.getViewportByViewBox(El.getAttribute('viewBox'));
+            if(VB) return [VB.Width, VB.Height];
+            const W = El.getAttribute('width') * 1, H = El.getAttribute('height') * 1;
+            if(W > 0 && H > 0) return [W, H];
+            return null;
+        }
+        if(/^img$/i.test(El.tagName) && El.naturalWidth > 0 && El.naturalHeight > 0) return [El.naturalWidth, El.naturalHeight];
+        return null;
+    } catch(Err) { return null; }
+};
 R.TwoPane = false;
 R.TwoPaneGroupSignature = '';
 R.TwoPaneRelaying = false;
@@ -467,7 +491,8 @@ R.updateTwoPaneGrouping = () => {
         const Solo = (Sp.Items.length == 1) ? Sp.Items[0] : null;
         const pairable = R.isPairableSpread(Sp) && !R.isBlankPageContent(Solo);
         const Vp = Solo && Solo.Viewport;
-        return { pairable: pairable, soloLandscape: !!(pairable && Vp && !Vp.IsSubstitute && R.shouldSoloLandscapeSpread(Vp.Width, Vp.Height, R.Stage.Width, R.Stage.Height)) };
+        const Aspect = (Vp && !Vp.IsSubstitute) ? [Vp.Width, Vp.Height] : (Solo ? R.getSingleMediaAspect(Solo) : null);
+        return { pairable: pairable, soloLandscape: !!(pairable && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)) };
     })) : Spreads.map((_, i) => [i]);
     const Sig = Groups.map(G => G.join('+')).join('|');
     if(Sig == R.TwoPaneGroupSignature) return { changed: false, spreads: [] };
