@@ -174,6 +174,7 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
         }
         delete Spread.OldPages, delete Spread.PreviousSpreadBoxLength;
     }
+    if(R.TwoPane && !R.LayingOut) R.requestTwoPaneSnap(); // settle re-aim: late geometry growth (image loads) must not stick misaligned
     resolve(Spread);
 });
 
@@ -488,13 +489,42 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
         R.TwoPaneRelaying = true;
         try {
             const { changed, spreads } = R.updateTwoPaneGrouping();
-            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItems(Sp))).then(() => {
-                try { const Cur = I.PageObserver.Current.Pages[0]; if(Cur) R.focusOn({ Page: Cur }, { Duration: 0 }).catch(() => {}); } catch(Err) {}
-            });
+            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItems(Sp))).then(() => { R.snapTwoPaneView(); });
         } finally { R.TwoPaneRelaying = false; }
     }, 120);
 };
-
+R.isTwoPanePairAligned = (Pair) => {
+    if(!R.TwoPane || !Pair || Pair.length < 2) return true;
+    try {
+        const MR = R.Main.getBoundingClientRect();
+        const Rs = Pair.map(Sp => Sp.Box.getBoundingClientRect());
+        return Rs[0].left >= MR.left - 1 && Rs[Rs.length - 1].right <= MR.right + 1;
+    } catch(Err) { return true; }
+};
+R.snapTwoPaneView = (Tries = 3) => { // re-aim the current pair only when misaligned; retries converge transient geometry (progressive image loads), then stop
+    if(!R.TwoPane || R.Moving) return false;
+    try {
+        const Cur = I.PageObserver.Current.Pages[0];
+        if(!Cur || !Cur.Spread) return false;
+        const Pair = Cur.Spread.TwoPaneGroup;
+        if(!Pair || Pair.length < 2 || R.isTwoPanePairAligned(Pair)) return false;
+        const P0 = R.getP();
+        R.focusOn({ Page: Cur }, { Duration: 0 }).then(() => {
+            setTimeout(() => {
+                try {
+                    if(R.getP() != P0) return; // user moved on; never fight them
+                    const Pair2 = Cur.Spread.TwoPaneGroup;
+                    if(Pair2 && Pair2.length > 1 && !R.isTwoPanePairAligned(Pair2) && Tries > 1) R.snapTwoPaneView(Tries - 1);
+                } catch(Err) {}
+            }, 300);
+        }).catch(() => {});
+        return true;
+    } catch(Err) { return false; }
+};
+R.requestTwoPaneSnap = () => {
+    clearTimeout(R.TwoPaneSnapTimer);
+    R.TwoPaneSnapTimer = setTimeout(() => { R.snapTwoPaneView(); }, 150);
+};
 
 R.replacePages = (OldPages, NewPages) => {
     const StartIndex = OldPages[0].Index, OldLength = OldPages.length, NewLength = NewPages.length;
@@ -680,9 +710,9 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
             else if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
         }
     }
-    if(R.TwoPane && Page.Spread.TwoPaneGroup && Page.Spread.TwoPaneGroup.length > 1) { // center the whole pair, never a half-shifted spread
-        const Pair = Page.Spread.TwoPaneGroup, PairL = (C.L_AXIS_L == 'X') ? Pair.reduce((L, Sp) => L + Sp['offset' + C.L_SIZE_L], 0) : Math.max(...Pair.map(Sp => Sp['offset' + C.L_SIZE_L]));
-        FocusPoint = O.getElementCoord(Pair[0])[C.L_AXIS_L];
+    if(R.TwoPane && Page.Spread.TwoPaneGroup && Page.Spread.TwoPaneGroup.length > 1 && !R.isTwoPanePairAligned(Page.Spread.TwoPaneGroup)) { // center the whole pair on box slots, never a half-shifted spread (skip when already aligned: no redundant scrolls, no event storms)
+        const Pair = Page.Spread.TwoPaneGroup, PairL = (C.L_AXIS_L == 'X') ? Pair.reduce((L, Sp) => L + Sp.Box['offset' + C.L_SIZE_L], 0) : Math.max(...Pair.map(Sp => Sp.Box['offset' + C.L_SIZE_L]));
+        FocusPoint = O.getElementCoord(Pair[0].Box, R.Main)[C.L_AXIS_L];
         if(R.Stage[C.L_SIZE_L] >= PairL) FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - PairL) / 2);
     }
     // if(Number.isInteger(Dest.TextNodeIndex)) R.selectTextLocation(Dest); // Colorize Destination with Selection
