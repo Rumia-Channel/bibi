@@ -90,4 +90,9 @@ describe("two-pane wiring", () => {
         const src = reader();
         expect(src).toContain("!Item.OnlySingleSVG && !Item.OnlySingleImg");
     });
+    test("two-pane never doubles width without a real pair", () => {
+        // the Spreaded branch sizes left/right-tagged singles for a mate; without one,
+        // two-pane must fit the pane instead of shrinking to a quarter.
+        expect(reader()).toContain("R.TwoPane ? Promise.resolve(null)");
+    });
 });

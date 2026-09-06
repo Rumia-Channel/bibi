@@ -446,7 +446,7 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
     R.renderPrePaginatedItem.getScale = (Item, Vp = Item.Viewport) => Promise.resolve().then(() => {
         const PaneW = R.paneWidthFor(Item);
         return !Vp || Vp.IsSubstitute ? 1
-        : Item.Spreaded ? (Item.SpreadPair ? R.renderPrePaginatedItem.getViewport(Item.SpreadPair) : Promise.resolve(/^(left|right)$/.test(Item['rendition:page-spread']) ? Vp : null)).then(PVp => Math.min(R.Stage.Height / Vp.Height, PaneW / (Vp.Width + (PVp?.Width || 0))))
+        : Item.Spreaded ? (Item.SpreadPair ? R.renderPrePaginatedItem.getViewport(Item.SpreadPair) : (R.TwoPane ? Promise.resolve(null) : Promise.resolve(/^(left|right)$/.test(Item['rendition:page-spread']) ? Vp : null))).then(PVp => Math.min(R.Stage.Height / Vp.Height, PaneW / (Vp.Width + (PVp?.Width || 0))))
         : (S.RVM == 'paged' || !S['full-breadth-layout-in-scroll']) ? Math.min(R.Stage.Height / Vp.Height, PaneW / Vp.Width)
         : Math.min(1, R.Stage[C.L_SIZE_B] / Vp[C.L_SIZE_B]);
     });
