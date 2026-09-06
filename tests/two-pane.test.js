@@ -45,6 +45,12 @@ describe("two-pane geometry", () => {
         expect(isPairableSpread({ Index: 2, Items: [{}, {}] })).toBe(false);
         expect(isPairableSpread({ Index: 2, Items: [] })).toBe(false);
     });
+    test("resolved-small pictures rejoin pairing; the 384 gate exists", () => {
+        expect(isPairableSpread(spread({ Reflowable: true, TwoPaneRendered: true, OnlySingleSVG: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
+        expect(isPairableSpread(spread({ PrePaginated: true, OnlySingleImg: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
+        expect(reader()).toContain("384");
+        expect(reader()).toContain("SingleMediaIsBig");
+    });
     test("paged mode isolates block media from prose by column breaks", () => {
         // one image per page: the point of splitting pages is separating picture and text areas.
         const src = reader();
@@ -92,11 +98,12 @@ describe("two-pane wiring", () => {
         expect(i).toBeGreaterThan(-1);
         expect(src.slice(Math.max(0, i - 160), i)).toContain("R.organizePages();");
     });
-    test("single-media items render fitted even in reflowable books", () => {
-        // pre-paginated flag comes from package metadata; a lone picture page must not
+    test("big single-media items render fitted even in reflowable books", () => {
+        // pre-paginated flag comes from package metadata; a lone big picture page must not
         // fall into the column paginator just because the book declares reflowable layout.
         const src = reader();
-        expect(src).toContain("!Item.OnlySingleSVG && !Item.OnlySingleImg");
+        expect(src).toContain("SoloBigPicture");
+        expect(src).toContain("renderPrePaginatedItem(Item)");
     });
     test("two-pane never doubles width without a real pair", () => {
         // the Spreaded branch sizes left/right-tagged singles for a mate; without one,

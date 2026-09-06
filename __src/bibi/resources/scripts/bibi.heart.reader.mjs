@@ -181,7 +181,11 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
 
 R.layOutItem = async (Item) => {
     await E.dispatch('bibi:is-going-to:lay-out-item', Item);
-    await ((Item.Reflowable && !Item.OnlySingleSVG && !Item.OnlySingleImg) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // single-media pages (even in reflowable books) are fitted pictures, not column text
+    const SoloMediaEl = (Item.OnlySingleSVG || Item.OnlySingleImg) ? R.renderPrePaginatedItem.getSingleMediaElement(Item) : null;
+    const SoloSizeVerdict = SoloMediaEl ? R.singleMediaIsBig(SoloMediaEl) : null;
+    if(SoloSizeVerdict !== null) Item.SingleMediaIsBig = SoloSizeVerdict; // dimensions resolved (e.g. image finished loading)
+    const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false;
+    await ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // big single-media pages (even in reflowable books) are fitted pictures, not column text
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
@@ -268,6 +272,8 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'display'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
+            if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
+            if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
             if(!Paged) return;
             if(Tar === Ele) {
                 const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
@@ -482,6 +488,21 @@ R.isBlankPageContent = (Item) => { // true only when the document is present and
         return !Media;
     } catch(Err) { return false; }
 };
+R.singleMediaIsBig = (El) => { // true | false | null(still unknown): pictures at or below 384x384 are excluded from picture handling
+    if(!El) return false;
+    let W = 0, H = 0;
+    if(/^svg$/i.test(El.tagName)) {
+        const VB = O.getViewportByViewBox(El.getAttribute('viewBox'));
+        if(VB) { W = VB.Width; H = VB.Height; }
+        else { W = El.getAttribute('width') * 1 || 0; H = El.getAttribute('height') * 1 || 0; }
+    } else if(/^img$/i.test(El.tagName)) {
+        W = El.naturalWidth || El.getAttribute('width') * 1 || 0;
+        H = El.naturalHeight || El.getAttribute('height') * 1 || 0;
+    } else return true;
+    if(!(W > 0 && H > 0)) return null;
+    return W > 384 || H > 384;
+};
+R.isBigPicture = (El) => R.singleMediaIsBig(El) !== false; // optimistic: unknown counts as big until dimensions resolve
 R.getSingleMediaAspect = (Item) => { // [w, h] from the media element itself when Item.Viewport is unresolved (e.g. bare <img> pages)
     try {
         const El = R.renderPrePaginatedItem.getSingleMediaElement(Item);
@@ -512,7 +533,8 @@ R.updateTwoPaneGrouping = () => {
         const pairable = R.isPairableSpread(Sp) && !R.isBlankPageContent(Solo);
         const Vp = Solo && Solo.Viewport;
         const Aspect = (Vp && !Vp.IsSubstitute) ? [Vp.Width, Vp.Height] : (Solo ? R.getSingleMediaAspect(Solo) : null);
-        return { pairable: pairable, soloLandscape: !!(pairable && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)) };
+        const BigEnough = (Vp && !Vp.IsSubstitute) ? true : (Solo ? Solo.SingleMediaIsBig === true : false); // media fallback counts only when resolved big; small stays pairable
+        return { pairable: pairable, soloLandscape: !!(pairable && BigEnough && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)) };
     })) : Spreads.map((_, i) => [i]);
     const Sig = Groups.map(G => G.join('+')).join('|');
     if(Sig == R.TwoPaneGroupSignature) return { changed: false, spreads: [] };

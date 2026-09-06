@@ -848,8 +848,9 @@ L.postprocessItem = (Item) => {
                 const SingleSVG = (DeepSingle && /^svg$/i.test(DeepSingle.tagName) && DeepSingle.getAttribute('viewBox')) ? DeepSingle : null; // viewBox keeps parity with the direct-svg rule
                 const SingleImg = (DeepSingle && /^img$/i.test(DeepSingle.tagName)) ? DeepSingle : null;
                 const WrappedTextless = !DeepSingle || Lv1Ele === DeepSingle || !O.getElementInnerText(Lv1Ele); // captioned wrappers stay reflowable
-                     if(SingleSVG && WrappedTextless) Item.Outsourcing = Item.OnlySingleSVG = true;
-                else if(SingleImg && WrappedTextless) Item.Outsourcing = Item.OnlySingleImg = true;
+                Item.SingleMediaIsBig = (SingleSVG || SingleImg) ? R.singleMediaIsBig(SingleSVG || SingleImg) : undefined; // true | false | null(unknown until load)
+                     if(SingleSVG && WrappedTextless && Item.SingleMediaIsBig !== false) Item.Outsourcing = Item.OnlySingleSVG = true;
+                else if(SingleImg && WrappedTextless && Item.SingleMediaIsBig !== false) Item.Outsourcing = Item.OnlySingleImg = true;
                 else if( /^iframe$/i.test(Lv1Ele.tagName)) Item.Outsourcing =                      true;
                 else if(!O.getElementInnerText(Item.Body)) Item.Outsourcing =                      true;
             }

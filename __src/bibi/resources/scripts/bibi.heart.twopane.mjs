@@ -11,7 +11,7 @@ export const isPairableSpread = (Sp) => {
     if(Sp.Index < 1) return false; // the opening spread (usually the cover) always stands alone
     const Solo = Sp.Items[0];
     if(Solo.SpreadPair) return false;
-    if(Solo.OnlySingleSVG || Solo.OnlySingleImg) return false; // one picture always takes a full page alone
+    if((Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig !== false) return false; // one big picture always takes a full page alone (small/unknown verdicts fall through below)
     if(Solo.Pages.length != 1) return false; // multi-page strips stay solo (re-evaluated as pages resolve)
     if(Solo.TwoPaneSoloLocked) return false; // reflowable that outgrew a half pane: never re-pair (flap guard)
     return !!(Solo.PrePaginated || (Solo.Reflowable && Solo.TwoPaneRendered));
