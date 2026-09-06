@@ -184,6 +184,7 @@ R.layOutItem = async (Item) => {
     await ((Item.Reflowable && !Item.OnlySingleSVG && !Item.OnlySingleImg) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // single-media pages (even in reflowable books) are fitted pictures, not column text
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
+    if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
     await E.dispatch('bibi:laid-out-item', Item);
     return Item;
 };
@@ -542,7 +543,16 @@ R.replacePages = (OldPages, NewPages) => {
 R.layOutStage = () => {
     //E.dispatch('bibi:is-going-to:lay-out-stage');
     let MainContentLayoutLength = 0;
-    R.Spreads.forEach(Spread => MainContentLayoutLength += Spread.Box['offset' + C.L_SIZE_L]);
+    if(R.TwoPane) { // paired spreads share one row: count each pair once at the taller member
+        const Seen = new Set();
+        R.Spreads.forEach(Spread => {
+            const Key = Spread.TwoPaneGroupKey !== undefined ? Spread.TwoPaneGroupKey : Spread.Index;
+            if(Seen.has(Key)) return;
+            Seen.add(Key);
+            const Members = (Spread.TwoPaneGroup && Spread.TwoPaneGroup.length > 1) ? Spread.TwoPaneGroup : [Spread];
+            MainContentLayoutLength += Math.max(...Members.map(Sp => Sp.Box['offset' + C.L_SIZE_L]));
+        });
+    } else R.Spreads.forEach(Spread => MainContentLayoutLength += Spread.Box['offset' + C.L_SIZE_L]);
     const SpreadGap = B.Reflowable || S.RVM == 'paged' || (() => { switch(S['concatenate-spreads'][S.RVM == 'horizontal' ? 0 : 1]) {
         case 'always': return true;
         case 'never': return false;

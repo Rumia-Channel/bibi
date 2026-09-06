@@ -8,13 +8,11 @@ export const shouldSoloLandscapeSpread = (VpW, VpH, StageW, StageH) =>
     (VpW / VpH) >= (StageW / StageH) * 0.85 && VpW >= StageW * 0.75;
 export const isPairableSpread = (Sp) => {
     if(!Sp || Sp.Items.length != 1) return false; // explicit pairs stay atomic
+    if(Sp.Index < 1) return false; // the opening spread (usually the cover) always stands alone
     const Solo = Sp.Items[0];
     if(Solo.SpreadPair) return false;
-    const spreadProp = Solo['rendition:spread'];
-    if(!(spreadProp === undefined || spreadProp == 'both' || spreadProp == 'landscape')) return false;
-    const pageSpreadProp = Solo['rendition:page-spread'];
-    if(!(pageSpreadProp === undefined || pageSpreadProp == 'center')) return false;
     if(Solo.Pages.length != 1) return false; // multi-page strips stay solo (re-evaluated as pages resolve)
+    if(Solo.TwoPaneSoloLocked) return false; // reflowable that outgrew a half pane: never re-pair (flap guard)
     return !!(Solo.PrePaginated || Solo.OnlySingleSVG || Solo.OnlySingleImg || (Solo.Reflowable && Solo.TwoPaneRendered));
 };
 

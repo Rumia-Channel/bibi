@@ -21,31 +21,29 @@ describe("two-pane geometry", () => {
         expect(shouldSoloLandscapeSpread(1600, 900, 3000, 768)).toBe(false); // too small to fill
         expect(shouldSoloLandscapeSpread(1200, 900, 1365, 768)).toBe(false); // squarish, not stage-like
     });
-    const spread = (item) => ({ Items: item ? [item] : [] });
+    const spread = (item, idx = 1) => ({ Index: idx, Items: item ? [item] : [] });
     const pre = (over = {}) => Object.assign({ PrePaginated: true, Pages: [{}] }, over);
     const txt = (over = {}) => Object.assign({ Reflowable: true, Pages: [{}] }, over);
 
-    test("untagged, both- and landscape-willing spreads pair; explicit solos do not", () => {
+    test("the opening spread always stands alone; the rest pair freely", () => {
+        expect(isPairableSpread(spread(pre(), 0))).toBe(false);
         expect(isPairableSpread(spread(pre()))).toBe(true);
-        expect(isPairableSpread(spread(pre({ "rendition:spread": "both" })))).toBe(true);
-        expect(isPairableSpread(spread(pre({ "rendition:spread": "landscape" })))).toBe(true);
-        expect(isPairableSpread(spread(pre({ "rendition:spread": "none" })))).toBe(false);
-        expect(isPairableSpread(spread(pre({ "rendition:spread": "portrait" })))).toBe(false);
-        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "center" })))).toBe(true);
-        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "left" })))).toBe(false);
-        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "right" })))).toBe(false);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "none" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "portrait" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "left" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "right" })))).toBe(true);
     });
 
-    test("single-page text and media can pair; multi-page strips and matched pairs stay atomic", () => {
+    test("single-page text and media can pair; locked and matched pairs stay atomic", () => {
         expect(isPairableSpread(spread(txt()))).toBe(false); // not yet rendered
         expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true })))).toBe(true);
+        expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true, TwoPaneSoloLocked: true })))).toBe(false);
         expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true, Pages: [{}, {}] })))).toBe(false);
         expect(isPairableSpread(spread({ Reflowable: true, OnlySingleSVG: true, Pages: [{}] }))).toBe(true);
         expect(isPairableSpread(spread(pre({ SpreadPair: {} })))).toBe(false);
-        expect(isPairableSpread({ Items: [{}, {}] })).toBe(false);
-        expect(isPairableSpread({ Items: [] })).toBe(false);
+        expect(isPairableSpread({ Index: 2, Items: [{}, {}] })).toBe(false);
+        expect(isPairableSpread({ Index: 2, Items: [] })).toBe(false);
     });
-
     test("greedy pairing leaves landscape-solo and odd tails single", () => {
         const P = (soloLandscape = false) => ({ pairable: true, soloLandscape });
         const S = { pairable: false, soloLandscape: false };
