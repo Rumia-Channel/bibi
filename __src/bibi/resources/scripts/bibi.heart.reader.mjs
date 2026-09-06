@@ -489,7 +489,7 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
         R.TwoPaneRelaying = true;
         try {
             const { changed, spreads } = R.updateTwoPaneGrouping();
-            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItems(Sp))).then(() => { R.snapTwoPaneView(); });
+            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.snapTwoPaneView(); });
         } finally { R.TwoPaneRelaying = false; }
     }, 120);
 };
