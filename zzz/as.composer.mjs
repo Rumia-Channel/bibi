@@ -171,8 +171,7 @@ Object.assign(Banners, {
     [`bibi/extensions/extractor/at-once.js`]: {
         'Bibi Extension: Extractor (at once)': BibiC, sM: true,
         'Depends on': {
-            'JSZip':      { '© Stuart Knightley': 'https://stuk.github.io/jszip',       'Dual licensed under the MIT License or the GPLv3': 'https://github.com/Stuk/jszip/blob/master/LICENSE.markdown'       },
-            'JSZipUtils': { '© Stuart Knightley': 'https://stuk.github.io/jszip-utils', 'Dual licensed under the MIT License or the GPLv3': 'https://github.com/Stuk/jszip-utils/blob/master/LICENSE.markdown' }
+            'JSZip':      { '© Stuart Knightley': 'https://stuk.github.io/jszip',       'Dual licensed under the MIT License or the GPLv3': 'https://github.com/Stuk/jszip/blob/master/LICENSE.markdown'       }
         }
     },
 

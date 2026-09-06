@@ -1,3 +1,9 @@
+@use "sass:color";
+@use "&globals" as *;
+
+
+
+
 // ================================================================================
 // + Footnotes
 // --------------------------------------------------------------------------------
@@ -96,7 +102,7 @@ div.bibi-footnote {
 				}
 			}
 			a {
-				color: saturate(steelblue, 20%) !important;
+				color: color.adjust(steelblue, $saturation: 20%) !important;
 				text-decoration: none !important;
 				&.disabled {
 					color: rgb(128,128,128) !important;
@@ -154,13 +160,13 @@ div.bibi-footnote {
 				border: solid 1px rgb(234,234,234);
 				border-radius: 4px;
 				@include size(24px);
-				color: saturate(steelblue, 20%);
+				color: color.adjust(steelblue, $saturation: 20%);
 				background: transparent;
 				&:not(.disabled).hover {
 					z-index: 99;
-					border-color: lighten(saturate(steelblue, 20%), 25%);
-					color: saturate(steelblue, 20%);
-					background: lighten(saturate(steelblue, 20%), 45%);
+					border-color: color.adjust(color.adjust(steelblue, $saturation: 20%), $lightness: 25%);
+					color: color.adjust(steelblue, $saturation: 20%);
+					background: color.adjust(color.adjust(steelblue, $saturation: 20%), $lightness: 45%);
 					cursor: pointer;
 				}
 				&.disabled {
@@ -169,7 +175,7 @@ div.bibi-footnote {
 				&:before,
 				&:after {
 					display: inline-block;
-					@include GLOBAL__FontIcon_BaseStyles("Material Icons", 24px, 1);
+					@include GLOBAL__FontIcon_BaseStyles("Material Symbols Outlined", 24px, 1);
 				}
 			}
 		}

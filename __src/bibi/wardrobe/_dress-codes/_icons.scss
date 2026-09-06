@@ -1,4 +1,9 @@
 @use "sass:math";
+@use "../../resources/styles/&globals" as *;
+@use "../_dress-patterns/&default" as *;
+@use "menu" as *;
+@use "slider" as *;
+@use "subpanels" as *;
 
 
 
@@ -21,7 +26,7 @@
 	&:before {
 		position: relative;
 		// ----
-		font: 1em / .98em "Material Icons";
+		font: 1em / .98em "Material Symbols Outlined";
 		-ms-font-feature-settings: 'liga' 1;  font-feature-settings: 'liga';  text-transform: none;
 		-webkit-font-smoothing: antialiased;  -moz-osx-font-smoothing: grayscale;  text-rendering: optimizelegibility;
 		speak: none;  direction: ltr;  letter-spacing: 0;  white-space: nowrap;  word-wrap: normal;  overflow-wrap: normal;
@@ -173,42 +178,42 @@
 }
 
 // [ja] ５種のフォントサイズ変更アイコンの font-size 値を同一比率で段階づけするためにここだけで使っている関数。使用しなくても構いません。
-@function LOCAL__GENERALICON__FontSize__pow($SCOPED__Pow) {
-	@return 14px * pow(1.25, $SCOPED__Pow);
+@function LOCAL__GENERALICON__FontSize__scaled($SCOPED__Step) {
+	@return 14px * math.pow(1.25, $SCOPED__Step);
 }
 
 @mixin GENERALICON__FontSize-Largest() {
 	&:before {
 		// content: "大";
-		font-size: LOCAL__GENERALICON__FontSize__pow( 2);
+		font-size: LOCAL__GENERALICON__FontSize__scaled( 2);
 	}
 }
 
 @mixin GENERALICON__FontSize-Larger() {
 	&:before {
 		// content: "大";
-		font-size: LOCAL__GENERALICON__FontSize__pow( 1);
+		font-size: LOCAL__GENERALICON__FontSize__scaled( 1);
 	}
 }
 
 @mixin GENERALICON__FontSize-Medium() {
 	&:before {
 		// content: "中";
-		font-size: LOCAL__GENERALICON__FontSize__pow( 0);
+		font-size: LOCAL__GENERALICON__FontSize__scaled( 0);
 	}
 }
 
 @mixin GENERALICON__FontSize-Smaller() {
 	&:before {
 		// content: "小";
-		font-size: LOCAL__GENERALICON__FontSize__pow(-1);
+		font-size: LOCAL__GENERALICON__FontSize__scaled(-1);
 	}
 }
 
 @mixin GENERALICON__FontSize-Smallest() {
 	&:before {
 		// content: "小";
-		font-size: LOCAL__GENERALICON__FontSize__pow(-2);
+		font-size: LOCAL__GENERALICON__FontSize__scaled(-2);
 	}
 }
 
@@ -227,7 +232,7 @@
 
 @mixin GENERALICON__ABookmark() {
 	&:before {
-		content: "bookmark_border";
+		content: "bookmark";
 	}
 }
 
@@ -407,6 +412,58 @@
 
 // - "Flow Direction" Icons in Subpanels
 // --------------------------------------------------------------------------------
+// NOTE: DEFAULT__SPECIALICON__FlowDirection-Common lives here (not in _dress-patterns/&default.scss like the other DEFAULT__ mixins),
+// because it builds on GENERALICON__* in this file; keeping both sides in one module avoids a Sass module loop.
+// [ja] 進行方向アイコンの既定スタイル（SPECIALICON__* 側の @include を書き換えれば独自デザインに変更できます）。
+@mixin DEFAULT__SPECIALICON__FlowDirection-Common() {
+	.bibi-icon-symbol {
+		@include GENERALICON__Common();
+		@include GENERALICON__CommonInSubpanels();
+		overflow: hidden;
+		transform: translate(var(--translateX), var(--translateY)) scale(var(--scaleX), var(--scaleY)) !important;
+		&:before {
+			position: absolute;
+			overflow: hidden;
+			display: flex;
+			flex-direction: row;
+			justify-content: space-between;
+			align-items: flex-end;
+			box-sizing: border-box;
+			inset: -100%;
+			margin: auto;
+			border: none 0;
+			padding: 0;
+			content: "subjectsubject";
+			font-size: 18px;
+			@include size(2em, var(--before--height));
+			line-height: 1;
+			transform: rotateZ(var(--before--rotateZ)) translateX(var(--before--translateX)) !important;
+			transform-origin: 50% 50%;
+			transition: transform .1s ease-out !important;
+			will-change: transform !important;
+		}
+		--translateX: 0; --translateY: 0; --scaleX: 1; --scaleY: 1;
+		--before--height: 1em; --before--rotateZ: 0; --before--translateX: 0;
+	}
+	.bibi-icon-symbol {
+		/**/                &:before { --before--translateX: -25%; }
+		.bibi-button.active &:before { --before--translateX:  25%; }
+	}
+	.bibi-icon-symbol-flowdirection-horizontal {
+		&:nth-child(1):not(:last-child) {                --translateX: -17%; --scaleX: .87; }
+		&:nth-child(2) { --before--height: .6em;         --translateY:  16%; --scaleX: .39; }
+		& + .bibi-icon-symbol-flowdirection-horizontal { --translateX:  32%; }
+		& + .bibi-icon-symbol-flowdirection-vertical   { --translateX:  24%; }
+	}
+	.bibi-icon-symbol-flowdirection-vertical {
+		--before--rotateZ: 90deg;
+		&:nth-child(1):not(:last-child) {                --translateX:  18%; }
+		&:nth-child(2) { --before--height: .5em;         --translateY:   7%; --scaleY: .67; }
+		& + .bibi-icon-symbol-flowdirection-horizontal { --translateX: -32%; }
+		& + .bibi-icon-symbol-flowdirection-vertical   { --translateX: -41%; }
+	}
+}
+
 
 @mixin SPECIALICON__FlowDirection-Common() {
 	@include DEFAULT__SPECIALICON__FlowDirection-Common();

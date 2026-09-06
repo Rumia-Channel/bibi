@@ -1,3 +1,8 @@
+@use "&globals" as *;
+
+
+
+
 // ================================================================================
 // + Panel
 // --------------------------------------------------------------------------------
@@ -62,9 +67,9 @@ div#bibi-panel-bookinfo {
 		// @____Bibi:Dress__('-') padding: $Panel_PaddingBefore $Panel_PaddingEnd $Panel_PaddingAfter $Panel_PaddingStart;
 		// @____Bibi:Dress__('-') padding:
 		// @____Bibi:Dress__('-') 	$Panel_PaddingBefore
-		// @____Bibi:Dress__('-') 	unquote('max(#{ $Panel_PaddingEnd   }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
+		// @____Bibi:Dress__('-') 	string.unquote('max(#{ $Panel_PaddingEnd   }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 		// @____Bibi:Dress__('-') 	$Panel_PaddingAfter
-		// @____Bibi:Dress__('-') 	unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+		// @____Bibi:Dress__('-') 	string.unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 	html.nav-rtl & {
 		overflow-x: auto;
@@ -73,9 +78,9 @@ div#bibi-panel-bookinfo {
 		// @____Bibi:Dress__('-') padding: $Panel_PaddingStart $Panel_PaddingBefore $Panel_PaddingEnd $Panel_PaddingAfter;
 		// @____Bibi:Dress__('-') padding:
 		// @____Bibi:Dress__('-') 	$Panel_PaddingStart
-		// @____Bibi:Dress__('-') 	unquote('max(#{ $Panel_PaddingBefore }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
+		// @____Bibi:Dress__('-') 	string.unquote('max(#{ $Panel_PaddingBefore }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 		// @____Bibi:Dress__('-') 	$Panel_PaddingEnd
-		// @____Bibi:Dress__('-') 	unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+		// @____Bibi:Dress__('-') 	string.unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 }
 

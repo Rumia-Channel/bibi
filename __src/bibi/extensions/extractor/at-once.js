@@ -1,7 +1,6 @@
 'use strict';
 
 import JSZip from 'jszip/dist/jszip.min.js';
-import JSZipUtils from 'jszip-utils/dist/jszip-utils.min.js';
 
 Bibi.x({
 
@@ -25,10 +24,10 @@ Bibi.x({
     .then(load)
     .then(extract);
 
-    const load = (BookData) => new Promise((resolve, reject) => // resolve(ArrayBuffer)
-        typeof BookData == 'string' ? JSZipUtils.getBinaryContent(BookData, (Err, ABuf) => Err ? reject(Bibi.ErrorMessages.Unidentified) : resolve(ABuf)) :
-        BookData.size && BookData.type ? (() => { const FR = new FileReader(); FR.onerror = () => reject(Bibi.ErrorMessages.DataInvalid); FR.onload = () => resolve(FR.result); FR.readAsArrayBuffer(BookData); })() :
-        reject(Bibi.ErrorMessages.DataInvalid)
+    const load = (BookData) => ( // resolve(ArrayBuffer)
+        typeof BookData == 'string' ? fetch(BookData).then(Res => Res.ok ? Res.arrayBuffer() : Promise.reject()).catch(() => Promise.reject(Bibi.ErrorMessages.Unidentified)) :
+        BookData.size && BookData.type ? new Promise((resolve, reject) => { const FR = new FileReader(); FR.onerror = () => reject(Bibi.ErrorMessages.DataInvalid); FR.onload = () => resolve(FR.result); FR.readAsArrayBuffer(BookData); }) :
+        Promise.reject(Bibi.ErrorMessages.DataInvalid)
     ).then(ArrayBuffer => JSZip.loadAsync(ArrayBuffer).catch(Err => Promise.reject(Bibi.ErrorMessages.DataInvalid)));
 
     const extract = (BookDataArchive) => new Promise((resolve, reject) => {

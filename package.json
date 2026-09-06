@@ -20,7 +20,7 @@
   "bugs": "https://github.com/satorumurmur/bibi/issues",
   "readmeFilename": "README.md",
   "type": "module",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "workspaces": [
     "zzz"
   ],
@@ -37,43 +37,44 @@
     "make:dress-template": "zzz --make:dress-template",
     "archive": "zzz --clean tmp --weave archive && webpack --progress --config-name archive && zzz --archive",
     "archive@wbck": "zzz --clean tmp --weave archive@wbck && webpack --progress --config-name archive@wbck && zzz --archive wbck",
-    "serve": "browser-sync start --config bs-config.cjs",
+    "serve": "webpack serve --progress --config-name development",
     "demo": "bun run build@wbck && bun run serve",
-    "start": "bun run develop+watch"
+    "start": "bun run develop+watch",
+    "test": "bun test"
   },
   "devDependencies": {
     "zzz": "workspace:*",
-    "browser-sync": "^3.0.4",
-    "browser-sync-webpack-plugin": "^2.4.0",
-    "copy-webpack-plugin": "^13.0.1",
-    "css-loader": "^7.1.2",
-    "cssnano": "^7.1.2",
+    "copy-webpack-plugin": "^14.0.0",
+    "css-loader": "^7.1.5",
+    "cssnano": "^9.0.3",
     "mini-css-extract-plugin": "^2.9.4",
-    "postcss": "^8.5.6",
+    "postcss": "^8.5.28",
     "postcss-loader": "^8.2.0",
-    "postcss-preset-env": "^10.4.0",
-    "sass": "^1.94.2",
-    "sass-loader": "^16.0.6",
+    "postcss-preset-env": "^11.5.1",
+    "sass": "^1.104.0",
+    "sass-loader": "^17.0.1",
+    "style-loader": "^4.0.0",
     "terser-webpack-plugin": "^5.3.14",
-    "webpack": "^5.103.0",
-    "webpack-cli": "^7.2.2",
+    "webpack": "^5.110.3",
+    "webpack-cli": "^7.2.3",
+    "webpack-dev-server": "^5.2.2",
     "webpack-fix-style-only-entries": "^0.6.1"
   },
   "dependencies": {
     "bibi-zip-loader": "^0.9.0",
     "dompurify": "^3.3.0",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^5.4.1",
     "jszip": "^3.10.1",
-    "jszip-utils": "^0.1.0",
-    "material-icons": "^1.13.14",
+    "material-symbols": "0.35.1",
     "nosleep.js": "^0.12.0",
-    "sml.js": "^1.0.37"
+    "sml.js": "^3.0.0"
+  },
+  "overrides": {
+    "immutable": "^4.3.9",
+    "qs": "^6.16.0"
   },
   "browserslist": [
     "last 3 major versions",
     "not dead"
-  ],
-  "volta": {
-    "node": "20.11.0"
-  }
+  ]
 }

@@ -1,3 +1,10 @@
+@use "sass:string";
+@use "&default" as *;
+@use "../_dress-codes/@parts" as *;
+
+
+
+
 // ================================================================================
 // + Panel
 // --------------------------------------------------------------------------------
@@ -28,17 +35,17 @@ div#bibi-panel-bookinfo {
 		padding: $Panel_PaddingBefore $Panel_PaddingEnd $Panel_PaddingAfter $Panel_PaddingStart;
 		padding:
 			$Panel_PaddingBefore
-			unquote('max(#{ $Panel_PaddingEnd   }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
+			string.unquote('max(#{ $Panel_PaddingEnd   }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 			$Panel_PaddingAfter
-			unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+			string.unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 	html.nav-rtl & {
 		padding: $Panel_PaddingStart $Panel_PaddingBefore $Panel_PaddingEnd $Panel_PaddingAfter;
 		padding:
 			$Panel_PaddingStart
-			unquote('max(#{ $Panel_PaddingBefore }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
+			string.unquote('max(#{ $Panel_PaddingBefore }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 			$Panel_PaddingEnd
-			unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+			string.unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 }
 

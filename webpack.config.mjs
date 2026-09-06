@@ -16,9 +16,6 @@ import FixStyleOnlyEntriesPlugin from 'webpack-fix-style-only-entries';
 import MiniCSSExtractPlugin from 'mini-css-extract-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 
-import BrowserSyncPlugin from 'browser-sync-webpack-plugin';
-import BSConfig from './bs-config.cjs';
-
 import Path from 'node:path';
 const resolvePath = (...PathSteps) => Path.resolve(import.meta.dirname, ...PathSteps);
 const normalizePath = (...PathSteps) => Path.normalize(PathSteps.filter(Boolean).join('/')).replaceAll('\\', '/');
@@ -32,6 +29,8 @@ const Config = {
     devtool      : Composer.IsDeveloping ? 'inline-source-map' : undefined,
     performance  : { maxEntrypointSize: 1000000, maxAssetSize: 1000000, hints: false  },
     output       : { path: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), filename: '[name].js' },
+    // Serves DIST for `bun run serve` (replaces browser-sync/bs-config.cjs; port and start path preserved).
+    devServer    : { port: 61671, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true },
     module       : { rules: [] },
     optimization : { minimizer: [] },
     plugins      : [],
@@ -52,7 +51,6 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 
 Config.plugins.push(
     new Webpack.DefinePlugin(ENVARS),
-    new BrowserSyncPlugin(BSConfig, { reload: true, injectCss: true }),
     new FixStyleOnlyEntriesPlugin({ extensions: ['scss', 'css'] }),
     new MiniCSSExtractPlugin({ filename: '[name]' })
 );

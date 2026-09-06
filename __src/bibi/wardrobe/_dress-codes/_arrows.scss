@@ -1,3 +1,8 @@
+@use "../../resources/styles/&globals" as *;
+
+
+
+
 // ================================================================================
 // + Arrows
 // --------------------------------------------------------------------------------
@@ -15,7 +20,7 @@ $Arrow-Icon_Size: $Arrow-Bar_Width;
 	color: white;//rgb(96,96,96);
 	background: black;
 	// --------
-	font: #{$Arrow-Icon_Size} / 1em "Material Icons";
+	font: #{$Arrow-Icon_Size} / 1em "Material Symbols Outlined";
 	-ms-font-feature-settings: 'liga' 1; font-feature-settings: 'liga'; text-transform: none;
 	-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizelegibility;
 	speak: none; direction: ltr; letter-spacing: 0; white-space: nowrap; word-wrap: normal; overflow-wrap: normal;

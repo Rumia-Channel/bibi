@@ -1,21 +1,21 @@
-@import "stage";
-@import "main";
+@forward "stage";
+@forward "main";
 
-@import "menu";
+@forward "menu";
 
-@import "slider";
+@forward "slider";
 
-@import "notifier";
-@import "veil";
-@import "help";
+@forward "notifier";
+@forward "veil";
+@forward "help";
 
-@import "panel";
-@import "subpanels";
+@forward "panel";
+@forward "subpanels";
 
-@import "icons";
+@forward "icons";
 
-@import "footnotes";
-@import "search";
-@import "nombre";
-@import "arrows";
-@import "spinner";
+@forward "footnotes";
+@forward "search";
+@forward "nombre";
+@forward "arrows";
+@forward "spinner";

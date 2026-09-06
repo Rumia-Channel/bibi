@@ -1,3 +1,9 @@
+@use "sass:color";
+@use "slider" as *;
+
+
+
+
 // ================================================================================
 // + Nombre
 // --------------------------------------------------------------------------------
@@ -8,14 +14,14 @@ $Nombre_Height: 20px;
 $Nombre_KeyColor: rgb(48,48,48);
 
 $Nombre-Current_Color: $Nombre_KeyColor;
-$Nombre-Delimiter_Color: lighten($Nombre_KeyColor, 20%);
-$Nombre-Total_Color: lighten($Nombre_KeyColor, 10%);
-$Nombre-Percent_Color: lighten($Nombre_KeyColor, 20%);
-$Nombre_BackgroundColor: rgba(lighten($Nombre_KeyColor, 77%), .9);
+$Nombre-Delimiter_Color: color.adjust($Nombre_KeyColor, $lightness: 20%);
+$Nombre-Total_Color: color.adjust($Nombre_KeyColor, $lightness: 10%);
+$Nombre-Percent_Color: color.adjust($Nombre_KeyColor, $lightness: 20%);
+$Nombre_BackgroundColor: rgba(color.adjust($Nombre_KeyColor, $lightness: 77%), .9);
 
 $Nombre_KeyColor__SliderOpened: $Slider_KeyColor;
 $Nombre-Current_Color__SliderOpened: $Nombre_KeyColor__SliderOpened;
-$Nombre-Delimiter_Color__SliderOpened: lighten($Nombre_KeyColor__SliderOpened, 20%);
-$Nombre-Total_Color__SliderOpened: lighten($Nombre_KeyColor__SliderOpened, 10%);
-$Nombre-Percent_Color__SliderOpened: lighten($Nombre_KeyColor__SliderOpened, 20%);
+$Nombre-Delimiter_Color__SliderOpened: color.adjust($Nombre_KeyColor__SliderOpened, $lightness: 20%);
+$Nombre-Total_Color__SliderOpened: color.adjust($Nombre_KeyColor__SliderOpened, $lightness: 10%);
+$Nombre-Percent_Color__SliderOpened: color.adjust($Nombre_KeyColor__SliderOpened, $lightness: 20%);
 $Nombre_BackgroundColor__SliderOpened: transparent;

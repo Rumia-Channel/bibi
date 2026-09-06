@@ -1,6 +1,5 @@
-$material-icons-font-path: '~material-icons/iconfont/';
-@import "~material-icons/iconfont/material-icons.scss";
+@use "~material-symbols/core" as symbols with ($material-symbols-font-path: "~material-symbols/");
+@use "&globals" as *;
+@use "@parts" as *;
 
-$images-path: './images';
-@import "&globals";
-@import "@parts";
+@include symbols.material-symbols-font("Material Symbols Outlined");

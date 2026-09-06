@@ -1,4 +1,6 @@
 @use "sass:math";
+@use "sass:string";
+@use "&globals" as *;
 
 
 
@@ -296,7 +298,7 @@ div#bibi-poweredby {
 				right: auto;
 				bottom: 0;
 				left: $SCOPED__PoweredBy-Logo-Box_Left;
-				left: unquote('max(#{ $SCOPED__PoweredBy-Logo-Box_Left }, env(safe-area-inset-left, 0))');
+				left: string.unquote('max(#{ $SCOPED__PoweredBy-Logo-Box_Left }, env(safe-area-inset-left, 0))');
 				margin: auto 0;
 				border-radius: 2px;
 				@include size($SCOPED__PoweredBy-Logo-Box_Width, $SCOPED__PoweredBy-Logo-Box_Height);
@@ -545,7 +547,7 @@ div#bibi-is-dev-mode {
 			cursor: pointer;
 			background: rgba(white, 0);
 			&:before {
-				font-family: 'Material Icons';
+				font-family: 'Material Symbols Outlined';
 				content: 'highlight_off';
 				line-height: 1;
 			}

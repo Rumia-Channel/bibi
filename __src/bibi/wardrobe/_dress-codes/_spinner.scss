@@ -1,4 +1,6 @@
+@use "sass:color";
 @use "sass:math";
+@use "../../resources/styles/&globals" as *;
 
 
 
@@ -68,7 +70,7 @@ $Spinner_Size: 56px;
 			@for $i from 1 through $SCOPED__Spinner_HowManyBits {
 				&:nth-child(#{$i}) {
 					transform: rotate(#{ math.div(360deg, $SCOPED__Spinner_HowManyBits) * $i });
-					&:before { background: darken(rgb(255,255,255), math.div(54%, $SCOPED__Spinner_HowManyBits) * $i); }
+					&:before { background: color.adjust(rgb(255,255,255), $lightness: math.div(-54%, $SCOPED__Spinner_HowManyBits) * $i); }
 				}
 			}
 			@if $SCOPED__Spinner_HowManyBits < 12 { @for $i from $SCOPED__Spinner_HowManyBits + 1 through 12 { &:nth-child(#{$i}) { display: none; } } }

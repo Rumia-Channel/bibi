@@ -22,11 +22,11 @@ $Veil-Play_BackgroundColor__Hover: rgba(32,40,48, 0.4);//rgba(black, 0.4);
 
 $Veil-Play-Icon_Size: 84px;
 @mixin Veil-Play-Icon() {
-	font: #{$Veil-Play-Icon_Size}/#{$Veil-Play-Icon_Size} "Material Icons";
+	font: #{$Veil-Play-Icon_Size}/#{$Veil-Play-Icon_Size} "Material Symbols Outlined";
 	-ms-font-feature-settings: 'liga' 1; font-feature-settings: 'liga'; text-transform: none;
 	-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizelegibility;
 	speak: none; direction: ltr; letter-spacing: 0; white-space: nowrap; word-wrap: normal; overflow-wrap: normal;
-	content: "play_circle_filled";
+	content: "play_circle";
 	color: rgba(white, 0.9);
 	text-shadow: 0 0 12px rgba(120,128,136,.125);//rgba(128,128,128,.125);
 }

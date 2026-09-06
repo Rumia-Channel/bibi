@@ -1,3 +1,10 @@
+@use "sass:string";
+@use "../../resources/styles/&globals" as *;
+@use "../_dress-codes/@parts" as *;
+
+
+
+
 // ================================================================================
 // + Search
 // --------------------------------------------------------------------------------
@@ -6,7 +13,7 @@ div#bibi-search {
 	> div#bibi-search-bar {
 		$SCOPED_Padding: ($Menu_Height - $Menu-Icon_Size) * 0.5;
 		padding: $SCOPED_Padding;
-		padding-left: unquote('max(#{ $SCOPED_Padding }, env(safe-area-inset-left,  0))');
+		padding-left: string.unquote('max(#{ $SCOPED_Padding }, env(safe-area-inset-left,  0))');
 		padding-right: $Menu-Icon_Size + $Menu-ButtonGroup_Padding + $Menu-ButtonGroup-Button_Margin;
 		padding-right: calc(env(safe-area-inset-right, 0) + #{ $Menu-Icon_Size + $Menu-ButtonGroup_Padding + $Menu-ButtonGroup-Button_Margin });
 		height: $Menu_Height;
@@ -102,7 +109,7 @@ div#bibi-search {
 					> .bibi-button-iconbox {
 						> .bibi-icon {
 							&:before {
-								@include GLOBAL__FontIcon_BaseStyles("Material Icons", 24px, $Menu-Icon_Size);
+								@include GLOBAL__FontIcon_BaseStyles("Material Symbols Outlined", 24px, $Menu-Icon_Size);
 								content: "format_list_bulleted";
 							}
 						}
@@ -117,7 +124,7 @@ div#bibi-search {
 						> .bibi-icon {
 							&:before {
 								transform: none;
-								@include GLOBAL__FontIcon_BaseStyles("Material Icons", 30px, $Menu-Icon_Size);
+								@include GLOBAL__FontIcon_BaseStyles("Material Symbols Outlined", 30px, $Menu-Icon_Size);
 							}
 						}
 					}
@@ -150,7 +157,7 @@ div#bibi-search {
 							border: none 0;
 							background: transparent;
 							&:before {
-								@include GLOBAL__FontIcon_BaseStyles("Material Icons", 24px, $Menu-Icon_Size);
+								@include GLOBAL__FontIcon_BaseStyles("Material Symbols Outlined", 24px, $Menu-Icon_Size);
 								content: "close";
 							}
 						}
@@ -231,7 +238,7 @@ div#bibi-search {
 					&:before {
 						position: relative;
 						top: -1px;
-						@include GLOBAL__FontIcon_BaseStyles("Material Icons", 30px, $Menu-Icon_Size);
+						@include GLOBAL__FontIcon_BaseStyles("Material Symbols Outlined", 30px, $Menu-Icon_Size);
 						content: "manage_search";
 					}
 				}

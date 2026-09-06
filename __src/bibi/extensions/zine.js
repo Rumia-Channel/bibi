@@ -1,6 +1,6 @@
 'use strict';
 
-import jsyaml from 'js-yaml';
+import * as jsyaml from 'js-yaml';
 
 Bibi.x({
 
@@ -20,7 +20,7 @@ Bibi.x({
         return Promise.resolve();
     };
 
-    this.openYAML = () => O.file(B.ZineData.Source).then(() => jsyaml.safeLoad(B.ZineData.Source.Content));
+    this.openYAML = () => O.file(B.ZineData.Source).then(() => jsyaml.load(B.ZineData.Source.Content));
 
     this.createPackageDocument = (YAML) => {
         const NS = {
