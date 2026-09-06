@@ -402,6 +402,10 @@ I.PageObserver = { create: () => {
             // PageObserver.Timer_automarkOnScrolled = setTimeout(() => PageObserver.automark(), 99);
             PageObserver.automark();
         });
+        // Paged flips, slider/bookmark/history/search jumps funnel through focusOn/scrollBy,
+        // which never touch native scroll: persist those completions too. P only, no %:
+        // percentages depend on viewport/pagination and would go stale across screens.
+        E.add(['bibi:focused-on', 'bibi:scrolled-by'], () => PageObserver.automark());
     });
     E.dispatch('bibi:created-page-observer');
 }};
