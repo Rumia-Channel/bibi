@@ -503,6 +503,8 @@ R.updateTwoPaneGrouping = () => {
         const Factor = (Members.length > 1) ? 0.5 : 1;
         if(Sp.TwoPaneGroupKey !== Key || Sp.PaneWidthFactor !== Factor) Changed.push(Sp);
         Sp.TwoPaneGroup = Members; Sp.TwoPaneGroupKey = Key; Sp.PaneWidthFactor = Factor; Sp.Box.classList.toggle('two-pane-paired', Factor == 0.5);
+        Sp.Box.classList.toggle('two-pane-pair-first', Factor == 0.5 && Members[0] === Sp);
+        Sp.Box.classList.toggle('two-pane-pair-second', Factor == 0.5 && Members[Members.length - 1] === Sp && Members[0] !== Sp);
     };
     Groups.forEach(G => { const Members = G.map(i => Spreads[i]); Members.forEach(Sp => Touch(Sp, Members)); });
     return { changed: Changed.length > 0, spreads: Changed };

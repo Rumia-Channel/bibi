@@ -326,15 +326,31 @@ html.two-pane {
 		justify-content: flex-start;
 		align-content: flex-start;
 	}
-	&.spread-ttb div#bibi-main-book {
-		flex-direction: row; // vertical-advance books also open pairs side by side
+	// Vertical-advance books flow top-down by default; pairs open side by side,
+	// mirroring the book's reading direction (first spread at the outer start).
+	&.spread-ttb.appearance-ltr div#bibi-main-book {
+		flex-direction: row;
+	}
+	&.spread-ttb.appearance-rtl div#bibi-main-book {
+		flex-direction: row-reverse;
 	}
 	div.spread-box.two-pane-paired {
 		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
 		min-height: 0 !important; // beats book-type min-height:100vh
-		div.item-box {
-			margin-left: auto;
-			margin-right: auto;
-		}
+	}
+	// Pair contents hug the shared spine instead of centering in their pane.
+	&.spread-ltr div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-ttb.appearance-ltr div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-rtl div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-ttb.appearance-rtl div.spread-box.two-pane-pair-second div.item-box {
+		margin-left: auto;
+		margin-right: 0;
+	}
+	&.spread-ltr div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-ttb.appearance-ltr div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-rtl div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-ttb.appearance-rtl div.spread-box.two-pane-pair-first div.item-box {
+		margin-left: 0;
+		margin-right: auto;
 	}
 }
