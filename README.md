@@ -216,12 +216,11 @@ License
 * Core:
     - [sML.js](https://github.com/satorumurmur/sML) : © Satoru Matsushima / Licensed under [the MIT License](https://github.com/satorumurmur/sML/blob/master/LICENSE)
 * UI:
-    - [Material Icons](https://material.io/icons/) : © Material Design Authors &amp; Google Inc. / Licensed under [the Apache License version 2.0](https://www.apache.org/licenses/LICENSE-2.0.html)
+    - [Material Symbols](https://fonts.google.com/icons) : © Google / Licensed under [the Apache License version 2.0](https://www.apache.org/licenses/LICENSE-2.0.html) (Outlined woff2 self-hosted in `__src/bibi/resources/styles/fonts/`, see its LICENSE)
 * Extensions:
     - [Bibi Zip Loader](https://github.com/lunascape/bibi-zip-loader) : © Lunascape / Licensed under [the MIT License](https://github.com/lunascape/bibi-zip-loader/blob/master/LICENSE)
     - [DOMPurify](https://github.com/cure53/DOMPurify) : © Mario Heiderich / Dual licensed under [the Apache License Version 2.0 or the Mozilla Public License Version 2.0](https://github.com/cure53/DOMPurify/blob/master/LICENSE)
     - [JSZip](http://stuk.github.io/jszip) : © Stuart Knightley / Dual licensed under [the MIT License or the GPLv3](https://github.com/Stuk/jszip/blob/HEAD/LICENSE.markdown)
-    - [JSZipUtils](http://stuk.github.io/jszip-utils) : © Stuart Knightley / Dual licensed under [the MIT License or the GPLv3](https://github.com/Stuk/jszip-utils/blob/master/LICENSE.markdown)
     - [JS-YAML](http://nodeca.github.io/js-yaml/) : © Vitaly Puzrin / Licensed under [the MIT License](https://github.com/nodeca/js-yaml/blob/master/LICENSE)
  *  - [NoSleep.js](https://github.com/richtr/NoSleep.js) : © Rich Tibbett / Licensed under [the MIT License](https://github.com/richtr/NoSleep.js/blob/master/LICENSE)
 

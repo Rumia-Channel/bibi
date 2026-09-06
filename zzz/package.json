@@ -8,7 +8,7 @@
   "main": "index.mjs",
   "bin": "cli.mjs",
   "dependencies": {
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "del": "^8.0.1"
   }
 }

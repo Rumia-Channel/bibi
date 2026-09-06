@@ -1,5 +1,3 @@
-@use "~material-symbols/core" as symbols with ($material-symbols-font-path: "~material-symbols/");
+@use "symbols" as *;
 @use "&globals" as *;
 @use "@parts" as *;
-
-@include symbols.material-symbols-font("Material Symbols Outlined");

@@ -81,11 +81,11 @@ Object.assign(Conductor.Baton, {  // ===========================================
         const zip = (ArchiveName) => new Promise(resolve => {
             const PackageZipName = ArchiveName + '.zip';
             const WriteStream = Conductor.createWriteStream(ARCHIVES_TMP + '/' + PackageZipName);
-            const ZipArchive = archiver('zip', { forceLocalTime: true, zlib: { level: 9 } });
-            ZipArchive.pipe(WriteStream);
-            ZipArchive.directory(ARCHIVES_TMP_DIST, ArchiveName);
-            ZipArchive.finalize();
-            WriteStream.on('close', () => resolve([PackageZipName, ZipArchive.pointer()]));
+            const Zip = new ZipArchive({ forceLocalTime: true, zlib: { level: 9 } });
+            Zip.pipe(WriteStream);
+            Zip.directory(ARCHIVES_TMP_DIST, ArchiveName);
+            Zip.finalize();
+            WriteStream.on('close', () => resolve([PackageZipName, Zip.pointer()]));
         });
         const formatNum = (Num) => {
             let NumStr = String(Num), Matched = null;
@@ -109,7 +109,7 @@ Object.assign(Conductor.Baton, {  // ===========================================
 
 import { deleteSync } from 'del';
 import fs from 'fs'; // import path from 'path';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 
 Conductor.wave = (Wave) => (Arg) => { try { Conductor.Baton[Wave].call(Conductor, Arg) } catch(Err) { console.error(Err); } };
 
