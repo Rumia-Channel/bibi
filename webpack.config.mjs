@@ -60,7 +60,7 @@ Config.plugins.push(
 const CommonLoadersForCSS = [
     { loader: 'css-loader',     options: { url: true, import: true, importLoaders: 2 } },
     { loader: 'postcss-loader', options: {} },
-    { loader: 'sass-loader',    options: { additionalData: Object.entries(ENVARS).map(([N, V]) => '$' + N + ': ' + V + ';').join(' ') } }
+    { loader: 'sass-loader',    options: { additionalData: Object.entries(ENVARS).map(([N, V]) => '$' + N + ': ' + V + ';').join(' '), sassOptions: { quietDeps: true } } } // quietDeps silences material-symbols/_core.scss (upstream still on deprecated globals as of 0.35.1-0.47.1); our __src stays loud
 ];
 
 const StylesToBePacked = Composer.FileTree.Pack.map(({ Origin, FilePath }) => resolvePath(Origin, FilePath));
