@@ -15,11 +15,12 @@ describe("two-pane geometry", () => {
         expect(isTwoPaneViewport(1365, 768)).toBe(false);
     });
 
-    test("landscape-solo needs both aspect and resolution gates", () => {
-        expect(shouldSoloLandscapeSpread(1600, 900, 1365, 768)).toBe(true);
-        expect(shouldSoloLandscapeSpread(800, 900, 1365, 768)).toBe(false); // portrait
-        expect(shouldSoloLandscapeSpread(1600, 900, 3000, 768)).toBe(false); // too small to fill
-        expect(shouldSoloLandscapeSpread(1200, 900, 1365, 768)).toBe(false); // squarish, not stage-like
+    test("landscape-solo needs half-pane overflow, not stage-likeness", () => {
+        expect(shouldSoloLandscapeSpread(1600, 900, 1365, 768)).toBe(true); // 1.78 >= 0.89: shrinks in a half pane
+        expect(shouldSoloLandscapeSpread(2270, 1600, 1706, 800)).toBe(true); // the novel's wide illustration
+        expect(shouldSoloLandscapeSpread(1135, 1600, 1706, 800)).toBe(false); // portrait pairs
+        expect(shouldSoloLandscapeSpread(700, 900, 1365, 768)).toBe(false); // portrait pairs
+        expect(shouldSoloLandscapeSpread(400, 100, 1365, 768)).toBe(false); // tiny strip: no solo upscale
     });
     const spread = (item, idx = 1) => ({ Index: idx, Items: item ? [item] : [] });
     const pre = (over = {}) => Object.assign({ PrePaginated: true, Pages: [{}] }, over);

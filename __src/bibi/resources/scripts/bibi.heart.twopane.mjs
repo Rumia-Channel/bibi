@@ -5,7 +5,7 @@
 export const isTwoPaneViewport = (W, H) => H * 2 <= W;
 
 export const shouldSoloLandscapeSpread = (VpW, VpH, StageW, StageH) =>
-    (VpW / VpH) >= (StageW / StageH) * 0.85 && VpW >= StageW * 0.75;
+    (VpW / VpH) >= (StageW / StageH) / 2 && VpW >= StageW / 2; // at fit height it overflows a half pane: solo shows it bigger instead of shrinking it in
 export const isPairableSpread = (Sp) => {
     if(!Sp || Sp.Items.length != 1) return false; // explicit pairs stay atomic
     if(Sp.Index < 1) return false; // the opening spread (usually the cover) always stands alone
