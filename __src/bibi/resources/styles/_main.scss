@@ -313,3 +313,22 @@ html:not(.moving):not(.mouse-pressing) {
 		}
 	}
 }
+// ================================================================================
+// + Two-Pane (paged 2-up; html.two-pane toggled from R.resetStage)
+// --------------------------------------------------------------------------------
+// Paired spreads share one viewport row at half width. Solo spreads, scroll
+// modes, and narrow viewports are untouched (no .two-pane-paired mark).
+html.two-pane {
+	div#bibi-main-book {
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		align-content: flex-start;
+	}
+	&.spread-ttb div#bibi-main-book {
+		flex-direction: row;
+	}
+	div.spread-box.two-pane-paired {
+		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
+		min-height: 0 !important; // beats book-type min-height:100vh
+	}
+}

@@ -1,0 +1,80 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { isPairableSpread, isTwoPaneViewport, planTwoPaneGroups, shouldSoloLandscapeSpread } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
+
+const ROOT = join(import.meta.dir, "..");
+const reader = () => readFileSync(join(ROOT, "__src/bibi/resources/scripts/bibi.heart.reader.mjs"), "utf8");
+
+// 不変条件: 2ペイン化は paged 専用の幾何学ゲート + 論理グルーピングで成り立つ。
+// 構造変更 (DOM 移動・頁採番) をしないことが設計の要。
+describe("two-pane geometry", () => {
+    test("viewport rule is height-doubled-fits-width, boundary inclusive", () => {
+        expect(isTwoPaneViewport(1600, 800)).toBe(true);
+        expect(isTwoPaneViewport(1599, 800)).toBe(false);
+        expect(isTwoPaneViewport(1365, 768)).toBe(false);
+    });
+
+    test("landscape-solo needs both aspect and resolution gates", () => {
+        expect(shouldSoloLandscapeSpread(1600, 900, 1365, 768)).toBe(true);
+        expect(shouldSoloLandscapeSpread(800, 900, 1365, 768)).toBe(false); // portrait
+        expect(shouldSoloLandscapeSpread(1600, 900, 3000, 768)).toBe(false); // too small to fill
+        expect(shouldSoloLandscapeSpread(1200, 900, 1365, 768)).toBe(false); // squarish, not stage-like
+    });
+    const spread = (item) => ({ Items: item ? [item] : [] });
+    const pre = (over = {}) => Object.assign({ PrePaginated: true, Pages: [{}] }, over);
+    const txt = (over = {}) => Object.assign({ Reflowable: true, Pages: [{}] }, over);
+
+    test("untagged, both- and landscape-willing spreads pair; explicit solos do not", () => {
+        expect(isPairableSpread(spread(pre()))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "both" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "landscape" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "none" })))).toBe(false);
+        expect(isPairableSpread(spread(pre({ "rendition:spread": "portrait" })))).toBe(false);
+        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "center" })))).toBe(true);
+        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "left" })))).toBe(false);
+        expect(isPairableSpread(spread(pre({ "rendition:page-spread": "right" })))).toBe(false);
+    });
+
+    test("single-page text and media can pair; multi-page strips and matched pairs stay atomic", () => {
+        expect(isPairableSpread(spread(txt()))).toBe(false); // not yet rendered
+        expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true })))).toBe(true);
+        expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true, Pages: [{}, {}] })))).toBe(false);
+        expect(isPairableSpread(spread({ Reflowable: true, OnlySingleSVG: true, Pages: [{}] }))).toBe(true);
+        expect(isPairableSpread(spread(pre({ SpreadPair: {} })))).toBe(false);
+        expect(isPairableSpread({ Items: [{}, {}] })).toBe(false);
+        expect(isPairableSpread({ Items: [] })).toBe(false);
+    });
+
+    test("greedy pairing leaves landscape-solo and odd tails single", () => {
+        const P = (soloLandscape = false) => ({ pairable: true, soloLandscape });
+        const S = { pairable: false, soloLandscape: false };
+        expect(planTwoPaneGroups([P(), P(), P()])).toEqual([[0, 1], [2]]);
+        expect(planTwoPaneGroups([P(), { pairable: true, soloLandscape: true }, P()])).toEqual([[0], [1], [2]]);
+        expect(planTwoPaneGroups([S, P(), P(), S])).toEqual([[0], [1, 2], [3]]);
+        expect(planTwoPaneGroups([])).toEqual([]);
+    });
+});
+
+describe("two-pane wiring", () => {
+    test("flag requires paged mode and horizontal advance", () => {
+        const m = reader().match(/R\.TwoPane = ([^;]+);/);
+        expect(m).not.toBeNull();
+        expect(m[1]).toContain("S.RVM == 'paged'");
+        expect(m[1]).toContain("S.ARA == 'horizontal'");
+    });
+
+    test("grouping runs on full relayout and after each item render", () => {
+        const src = reader();
+        expect(src).toContain("R.updateTwoPaneGrouping();");
+        expect(src).toContain("R.requestTwoPaneRegroup();");
+    });
+
+    test("focus snaps to pair starts instead of half-shifted spreads", () => {
+        expect(reader()).toContain("Page.Spread.TwoPaneGroup");
+    });
+
+    test("paired panes render at half stage width", () => {
+        expect(reader()).toContain("PaneWidthFactor == 0.5");
+    });
+});

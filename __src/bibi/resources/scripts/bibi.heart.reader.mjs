@@ -3,6 +3,7 @@
 import { Bibi, O, L, R, I, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
 import { W } from './bibi.heart.wand.mjs';
+import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups } from './bibi.heart.twopane.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -61,6 +62,8 @@ R.resetStage = () => {
     if(!S['use-full-height']) R.Stage.Height -= I.Menu.Height;
     if(S['content-margin'] > 0) R.Main.Book.style['padding' + C.L_BASE_S] = R.Main.Book.style['padding' + C.L_BASE_E] = S['content-margin'] + 'px';
     //R.Main.style['background'] = S['book-background'] ? S['book-background'] : '';
+    R.TwoPane = S.RVM == 'paged' && S.ARA == 'horizontal' && R.Stage.Height * 2 <= R.Stage.Width; // paged 2-up only; scroll modes, vertical advance, and narrow viewports behave exactly as before
+    O.HTML.classList.toggle('two-pane', !!R.TwoPane);
 };
 
 
@@ -153,6 +156,7 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
     SpreadBox.classList.toggle('spreaded', Spread.Spreaded);
     SpreadBox.style[C.L_SIZE_b] = '', Spread.style[C.L_SIZE_b] = ''; // Math.ceil(SpreadSize[C.L_SIZE_B]) + 'px';
     SpreadBox.style[C.L_SIZE_l] =     Spread.style[C.L_SIZE_l] = Math.ceil(SpreadSize[C.L_SIZE_L]) + 'px';
+    if(Spread.PaneWidthFactor == 0.5) SpreadBox.style.width = Math.floor(R.Stage.Width / 2) + 'px'; else SpreadBox.style.width = ''; // paired panes share one row at half stage width (% would resolve against the content-sized container)
     //sML.style(Spread, { 'border-radius': S['spread-border-radius'], 'box-shadow': S['spread-box-shadow'] });
     if(Opt.Makeover) {
         if(!Spread.PrePaginated) R.replacePages(Spread.OldPages, Spread.Pages);
@@ -177,6 +181,8 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
 R.layOutItem = async (Item) => {
     await E.dispatch('bibi:is-going-to:lay-out-item', Item);
     await (Item.Reflowable ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item));
+    R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
+    Item.TwoPaneRendered = true;
     await E.dispatch('bibi:laid-out-item', Item);
     return Item;
 };
@@ -189,10 +195,10 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
            Top: S['item-padding-top'],     Left: S['item-padding-left']  + SafeArea.Left,
         Bottom: S['item-padding-bottom'], Right: S['item-padding-right'] + SafeArea.Right
     };
-    const ItemPaddingSE = Item.NoPadding ? 0 : Item.Padding[C.L_BASE_S] + Item.Padding[C.L_BASE_E];
     const ItemPaddingBA = Item.NoPadding ? 0 : Item.Padding[C.L_BASE_B] + Item.Padding[C.L_BASE_A];
-    const PageCB = R.Stage[C.L_SIZE_B] - ItemPaddingSE; // Page "C"ontent "B"readth
-    let   PageCL = R.Stage[C.L_SIZE_L] - ItemPaddingBA; // Page "C"ontent "L"ength
+    const ItemPaddingSE = Item.NoPadding ? 0 : Item.Padding[C.L_BASE_S] + Item.Padding[C.L_BASE_E];
+    const PageCB = (C.L_SIZE_B == 'Width' && R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 ? R.Stage.Width / 2 : R.Stage[C.L_SIZE_B]) - ItemPaddingSE; // Page "C"ontent "B"readth (paired pane is half stage width)
+    let   PageCL = (C.L_SIZE_L == 'Width' && R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 ? R.Stage.Width / 2 : R.Stage[C.L_SIZE_L]) - ItemPaddingBA; // Page "C"ontent "L"ength (paired pane is half stage width)
     const PageGap = ItemPaddingBA;
     ['b','a','s','e'].forEach(base => { const trbl = C['L_BASE_' + base], TRBL = C['L_BASE_' + base.toUpperCase()]; Item.style['padding-' + trbl] = Item.NoPadding ? 0 : Item.Padding[TRBL] + 'px'; });
     sML.style(Item.HTML, { 'width': '', 'height': '' });
@@ -213,6 +219,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     Item.ReversedColumned = false;
     Item.Half = false;
     Item.Spreaded = (
+        !(R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5) && // paired panes own the 2-up job; self-halving would quarter the columns
         S.SLA == 'horizontal' && (S['pagination-method'] == 'x' || /-tb$/.test(Item.WritingMode))
             &&
         (Item['rendition:spread'] == 'both' || R.Orientation == Item['rendition:spread'] || R.Orientation == 'landscape')
@@ -419,21 +426,74 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
             : Item.OnlySingleImg                 ? Item.Viewport = O.getViewportByImage(  R.renderPrePaginatedItem.getSingleMediaElement(Item)                                             )
             :                                      null
         ) || {
-            Width:  Math.floor(Math.min(R.Stage.Width, R.Stage.Height * S['orientation-border-ratio']) / (/^(left|right)$/.test(Item['rendition:page-spread']) ? 2 : 1)),
+            Width:  Math.floor(Math.min(R.paneWidthFor(Item), R.Stage.Height * S['orientation-border-ratio']) / (/^(left|right)$/.test(Item['rendition:page-spread']) ? 2 : 1)),
             Height: R.Stage.Height,
             IsSubstitute: true
         }
     );
 
-    R.renderPrePaginatedItem.getScale = (Item, Vp = Item.Viewport) => Promise.resolve().then(() =>
-          !Vp || Vp.IsSubstitute ? 1
-        : Item.Spreaded ? (Item.SpreadPair ? R.renderPrePaginatedItem.getViewport(Item.SpreadPair) : Promise.resolve(/^(left|right)$/.test(Item['rendition:page-spread']) ? Vp : null)).then(PVp => Math.min(R.Stage.Height / Vp.Height, R.Stage.Width / (Vp.Width + (PVp?.Width || 0))))
-        : (S.RVM == 'paged' || !S['full-breadth-layout-in-scroll']) ? Math.min(R.Stage.Height / Vp.Height, R.Stage.Width / Vp.Width)
-        : Math.min(1, R.Stage[C.L_SIZE_B] / Vp[C.L_SIZE_B])
-    );
+    R.renderPrePaginatedItem.getScale = (Item, Vp = Item.Viewport) => Promise.resolve().then(() => {
+        const PaneW = R.paneWidthFor(Item);
+        return !Vp || Vp.IsSubstitute ? 1
+        : Item.Spreaded ? (Item.SpreadPair ? R.renderPrePaginatedItem.getViewport(Item.SpreadPair) : Promise.resolve(/^(left|right)$/.test(Item['rendition:page-spread']) ? Vp : null)).then(PVp => Math.min(R.Stage.Height / Vp.Height, PaneW / (Vp.Width + (PVp?.Width || 0))))
+        : (S.RVM == 'paged' || !S['full-breadth-layout-in-scroll']) ? Math.min(R.Stage.Height / Vp.Height, PaneW / Vp.Width)
+        : Math.min(1, R.Stage[C.L_SIZE_B] / Vp[C.L_SIZE_B]);
+    });
 
 
 R.organizePages = () => R.Pages = R.Spreads.reduce((NewPages, Spread) => Spread.Pages.reduce((NewPages, Page) => { Page.Index = NewPages.push(Page) - 1; return NewPages; }, NewPages), []);
+R.isBlankPageContent = (Item) => { // true only when the document is present and provably empty
+    try {
+        const Doc = Item.contentDocument;
+        if(!Doc || !Doc.body) return false;
+        if(O.getElementInnerText(Doc.body)) return false;
+        const Media = Doc.body.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object');
+        return !Media;
+    } catch(Err) { return false; }
+};
+R.TwoPane = false;
+R.TwoPaneGroupSignature = '';
+R.TwoPaneRelaying = false;
+R.isTwoPaneViewport = isTwoPaneViewport;
+R.shouldSoloLandscapeSpread = shouldSoloLandscapeSpread;
+R.isPairableSpread = isPairableSpread;
+R.planTwoPaneGroups = planTwoPaneGroups;
+R.paneWidthFor = (Item) => (R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5) ? R.Stage.Width / 2 : R.Stage.Width;
+R.updateTwoPaneGrouping = () => {
+    const Spreads = R.Spreads;
+    const Groups = R.TwoPane ? R.planTwoPaneGroups(Spreads.map(Sp => {
+        const Solo = (Sp.Items.length == 1) ? Sp.Items[0] : null;
+        const pairable = R.isPairableSpread(Sp) && !R.isBlankPageContent(Solo);
+        const Vp = Solo && Solo.Viewport;
+        return { pairable: pairable, soloLandscape: !!(pairable && Vp && !Vp.IsSubstitute && R.shouldSoloLandscapeSpread(Vp.Width, Vp.Height, R.Stage.Width, R.Stage.Height)) };
+    })) : Spreads.map((_, i) => [i]);
+    const Sig = Groups.map(G => G.join('+')).join('|');
+    if(Sig == R.TwoPaneGroupSignature) return { changed: false, spreads: [] };
+    R.TwoPaneGroupSignature = Sig;
+    const Changed = [];
+    const Touch = (Sp, Members) => {
+        const Key = Members.map(M => M.Index).join('+');
+        const Factor = (Members.length > 1) ? 0.5 : 1;
+        if(Sp.TwoPaneGroupKey !== Key || Sp.PaneWidthFactor !== Factor) Changed.push(Sp);
+        Sp.TwoPaneGroup = Members; Sp.TwoPaneGroupKey = Key; Sp.PaneWidthFactor = Factor; Sp.Box.classList.toggle('two-pane-paired', Factor == 0.5);
+    };
+    Groups.forEach(G => { const Members = G.map(i => Spreads[i]); Members.forEach(Sp => Touch(Sp, Members)); });
+    return { changed: Changed.length > 0, spreads: Changed };
+};
+R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signature-guarded and storm-safe
+    if(!R.Spreads.length || R.TwoPaneRelaying) return;
+    clearTimeout(R.TwoPaneRegroupTimer);
+    R.TwoPaneRegroupTimer = setTimeout(() => {
+        if(R.LayingOut) { R.requestTwoPaneRegroup(); return; }
+        R.TwoPaneRelaying = true;
+        try {
+            const { changed, spreads } = R.updateTwoPaneGrouping();
+            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItems(Sp))).then(() => {
+                try { const Cur = I.PageObserver.Current.Pages[0]; if(Cur) R.focusOn({ Page: Cur }, { Duration: 0 }).catch(() => {}); } catch(Err) {}
+            });
+        } finally { R.TwoPaneRelaying = false; }
+    }, 120);
+};
 
 
 R.replacePages = (OldPages, NewPages) => {
@@ -494,6 +554,7 @@ R.layOutBook = (Opt) => new Promise((resolve, reject) => setTimeout(() => {
     setTimeout(() => Promise.resolve().then(() => typeof Opt.before == 'function' ? Opt.before() : true).then(() => {
         if(!Opt.Reset) return resolve();
         if(!Opt.ResetOnlyContent) R.resetStage();
+        R.updateTwoPaneGrouping(); // signature-guarded: first layout, resizes, and setting changes converge here
         const Promises = [];
         R.Spreads.forEach(Spread => Promises.push(R.layOutSpreadAndItsItems(Spread)));
         Promise.all(Promises).then(() => {
@@ -618,6 +679,11 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
             if(R.Stage[C.L_SIZE_L] > Page['offset' + C.L_SIZE_L]) FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - Page['offset' + C.L_SIZE_L]) / 2);
             else if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
         }
+    }
+    if(R.TwoPane && Page.Spread.TwoPaneGroup && Page.Spread.TwoPaneGroup.length > 1) { // center the whole pair, never a half-shifted spread
+        const Pair = Page.Spread.TwoPaneGroup, PairL = (C.L_AXIS_L == 'X') ? Pair.reduce((L, Sp) => L + Sp['offset' + C.L_SIZE_L], 0) : Math.max(...Pair.map(Sp => Sp['offset' + C.L_SIZE_L]));
+        FocusPoint = O.getElementCoord(Pair[0])[C.L_AXIS_L];
+        if(R.Stage[C.L_SIZE_L] >= PairL) FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - PairL) / 2);
     }
     // if(Number.isInteger(Dest.TextNodeIndex)) R.selectTextLocation(Dest); // Colorize Destination with Selection
     const ScrollTarget = { Frame: R.Main, X: 0, Y: 0 };
