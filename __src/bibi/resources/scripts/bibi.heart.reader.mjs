@@ -3,7 +3,7 @@
 import { Bibi, O, L, R, I, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
 import { W } from './bibi.heart.wand.mjs';
-import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups } from './bibi.heart.twopane.mjs';
+import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, spreadKind } from './bibi.heart.twopane.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -524,6 +524,7 @@ R.TwoPaneRelaying = false;
 R.isTwoPaneViewport = isTwoPaneViewport;
 R.shouldSoloLandscapeSpread = shouldSoloLandscapeSpread;
 R.isPairableSpread = isPairableSpread;
+R.spreadKind = spreadKind;
 R.planTwoPaneGroups = planTwoPaneGroups;
 R.paneWidthFor = (Item) => (R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5) ? R.Stage.Width / 2 : R.Stage.Width;
 R.updateTwoPaneGrouping = () => {
@@ -534,7 +535,7 @@ R.updateTwoPaneGrouping = () => {
         const Vp = Solo && Solo.Viewport;
         const Aspect = (Vp && !Vp.IsSubstitute) ? [Vp.Width, Vp.Height] : (Solo ? R.getSingleMediaAspect(Solo) : null);
         const BigEnough = (Vp && !Vp.IsSubstitute) ? true : (Solo ? Solo.SingleMediaIsBig === true : false); // media fallback counts only when resolved big; small stays pairable
-        return { pairable: pairable, soloLandscape: !!(pairable && BigEnough && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)) };
+        return { pairable: pairable, soloLandscape: !!(pairable && BigEnough && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)), kind: R.spreadKind(Sp) };
     })) : Spreads.map((_, i) => [i]);
     const Sig = Groups.map(G => G.join('+')).join('|');
     if(Sig == R.TwoPaneGroupSignature) return { changed: false, spreads: [] };
