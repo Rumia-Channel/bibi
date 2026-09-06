@@ -188,8 +188,8 @@ If you want to modify them, please edit files in the `Source` column instead of 
 ### How to Verify
 
 * $ `bun audit`
-    - Checks installed packages for vulnerabilities. Currently 1 known remaining: `uuid@8` via `webpack-dev-server > sockjs` (moderate, dev-server only, never shipped; upstream `sockjs` pins `^8` and v9+ is ESM-only so a range fix would break its CJS `require` — accepted).
-    - `qs` is force-pinned via `overrides` (`^6.16.0`), `immutable` likewise (`^4.3.9`, dev-server only).
+    - Checks installed packages for vulnerabilities. Expect `No vulnerabilities found`.
+    - `qs`/`immutable` are force-pinned via `overrides` as belt and suspenders; `webpack-dev-server@6` (sockjs-free) removed the last advisory chain.
     - If new advisories appear, `bun audit fix --dry-run` previews range-safe fixes.
 * $ `bun outdated`
     - Lists dependencies newer than the pinned ranges. Empty output means fully tracking latest.

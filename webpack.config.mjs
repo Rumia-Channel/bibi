@@ -12,7 +12,7 @@ const { PACKAGE, WEBSITE_ADDRESS, LICENSE_ADDRESS, SRC, SRC_BC, DIST, ARCHIVES, 
 
 import Webpack from 'webpack';
 import CopyPlugin from 'copy-webpack-plugin';
-import FixStyleOnlyEntriesPlugin from 'webpack-fix-style-only-entries';
+import RemoveEmptyScriptsPlugin from 'webpack-remove-empty-scripts';
 import MiniCSSExtractPlugin from 'mini-css-extract-plugin';
 import TerserPlugin from 'terser-webpack-plugin';
 
@@ -51,7 +51,7 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 
 Config.plugins.push(
     new Webpack.DefinePlugin(ENVARS),
-    new FixStyleOnlyEntriesPlugin({ extensions: ['scss', 'css'] }),
+    new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'] }),
     new MiniCSSExtractPlugin({ filename: '[name]' })
 );
 
