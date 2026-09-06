@@ -91,8 +91,8 @@ O.error = (Err) => {
     O.HTML.classList.remove('loading');
     O.HTML.classList.remove('waiting');
     I.notify(Err, { Type: 'Error', Time: 99999999999 });
-    O.log(Err, '<e/>');
-    E.dispatch('bibi:x_x', typeof Err == 'string' ? new Error(Err) : Err);
+    O.log(Err && Err.stack ? Err.stack : Err, '<e/>');
+    if(typeof E.dispatch == 'function') E.dispatch('bibi:x_x', typeof Err == 'string' ? new Error(Err) : Err);
 };
 
 
