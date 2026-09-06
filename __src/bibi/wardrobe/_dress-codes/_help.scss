@@ -9,7 +9,7 @@
 
 $Help_Height: $Menu_Height;
 
-$Help_BorderTop: solid 1px rgb(240,240,240);
-$Help_Background: rgba(240,240,240,0.96);
+$Help_BorderTop: var(--bibi-help-border-top, solid 1px rgb(240,240,240));
+$Help_Background: var(--bibi-help-background, rgba(240,240,240,0.96));
 
-$Help-P_Color: rgb(96,96,96);
+$Help-P_Color: var(--bibi-help-p-color, rgb(96,96,96));

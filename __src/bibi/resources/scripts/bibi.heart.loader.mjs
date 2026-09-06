@@ -835,13 +835,6 @@ L.postprocessItem = (Item) => {
             sML.appendCSSRule(Item.contentDocument, 'html', '-webkit-text-size-adjust: 100%;');
             L.coordinateLinkages({ RootElement: Item.Body, BasePath: Item.Source.Path });
             const Lv1Eles = Item.contentDocument.querySelectorAll('body>*:not(script):not(style)');
-            if(Lv1Eles && Lv1Eles.length == 1) {
-                const Lv1Ele = Item.contentDocument.querySelector('body>*:not(script):not(style)');
-                     if(    /^svg$/i.test(Lv1Ele.tagName)) Item.Outsourcing = Item.OnlySingleSVG = true;
-                else if(    /^img$/i.test(Lv1Ele.tagName)) Item.Outsourcing = Item.OnlySingleImg = true;
-                else if( /^iframe$/i.test(Lv1Ele.tagName)) Item.Outsourcing =                      true;
-                else if(!O.getElementInnerText(Item.Body)) Item.Outsourcing =                      true;
-            }
             sML.forEach(Item.Body.querySelectorAll('svg'))(SVG => { if(SVG.getAttribute('viewBox')) return;
                 const Images = SVG.querySelectorAll('image, img, canvas'); if(Images.length != 1) return;
                 const Image = Images[0];
@@ -849,6 +842,14 @@ L.postprocessItem = (Item) => {
                 const ImageH = Image.getAttribute('height'); if(!/^\d+$/.test(ImageH)) return;
                 SVG.setAttribute('viewBox', [0, 0, ImageW, ImageH].join(' '));
             });
+            if(Lv1Eles && Lv1Eles.length == 1) {
+                const Lv1Ele = Item.contentDocument.querySelector('body>*:not(script):not(style)');
+                const WrappedSingleMedia = (/^div$/i.test(Lv1Ele.tagName) && Lv1Ele.firstElementChild && !Lv1Ele.firstElementChild.nextElementSibling) ? Lv1Ele.firstElementChild : null; // div-wrapped cover pattern (e.g. Kadokawa): <div><svg viewBox=...>
+                     if((    /^svg$/i.test(Lv1Ele.tagName)          ) || (WrappedSingleMedia &&   /^svg$/i.test(WrappedSingleMedia.tagName) && WrappedSingleMedia.getAttribute('viewBox'))) Item.Outsourcing = Item.OnlySingleSVG = true;
+                else if((    /^img$/i.test(Lv1Ele.tagName)          ) || (WrappedSingleMedia &&   /^img$/i.test(WrappedSingleMedia.tagName)                                                     )) Item.Outsourcing = Item.OnlySingleImg = true;
+                else if( /^iframe$/i.test(Lv1Ele.tagName)) Item.Outsourcing =                      true;
+                else if(!O.getElementInnerText(Item.Body)) Item.Outsourcing =                      true;
+            }
             if(!Item.PrePaginated) return L.patchItemStyles(Item);
         },
         // () => Item.stamp('Postprocessed'),

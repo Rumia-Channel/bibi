@@ -1,0 +1,244 @@
+// ================================================================================
+// + Dark Mode (prefers-color-scheme: dark)
+// --------------------------------------------------------------------------------
+// Chrome UI only. Book content (publisher CSS) is untouched, but the canvas
+// behind it follows the scheme (reflowable bodies paint themselves dark too).
+// Light values live in ../_dress-codes/* as var(--bibi-*, <light>) fallbacks,
+// so light rendering never changes. This file only overrides the --bibi-*
+// custom properties inside the dark media query.
+// Custom dresses can join dark mode with one line (see README-Dress_ja):
+//   @forward "../_dress-patterns/dark";
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		// - Book area canvas (reflowable bodies paint #0d1117 themselves; pre-paginated stays black)
+		--bibi-book-background: #0d1117;
+		--bibi-book-background-subpanel-opened: #0d1117;
+		--bibi-book-background-pre-paginated: black;
+		--bibi-book-background-pre-paginated-subpanel-opened: black;
+		// - PoweredBy white/black logo opacities (swapped: dark surfaces show the white logo)
+		--bibi-powered-by-a-logo-opacity-of-white-veil-opened: .69;
+		--bibi-powered-by-a-logo-opacity-of-black-veil-opened: 0;
+		--bibi-powered-by-a-logo-opacity-of-white-veil-opened-hover: 0;
+		--bibi-powered-by-a-logo-opacity-of-black-veil-opened-hover: .96;
+		--bibi-powered-by-a-logo-opacity-of-white-waiting-file: .69;
+		--bibi-powered-by-a-logo-opacity-of-black-waiting-file: 0;
+		--bibi-powered-by-a-logo-opacity-of-white-waiting-file-hover: 0;
+		--bibi-powered-by-a-logo-opacity-of-black-waiting-file-hover: .96;
+		--bibi-powered-by-a-logo-opacity-of-white-panel-opened: .56;
+		--bibi-powered-by-a-logo-opacity-of-black-panel-opened: 0;
+		--bibi-powered-by-a-logo-opacity-of-white-panel-opened-hover: 0;
+		--bibi-powered-by-a-logo-opacity-of-black-panel-opened-hover: .96;
+		// - PoweredBy backgrounds
+		--bibi-powered-by-background-color-veil-opened: rgba(13,17,23,0.6);
+		--bibi-powered-by-a-background-color-veil-opened: rgba(22,27,34,0.96);
+		--bibi-powered-by-a-background-color-veil-opened-hover: rgba(0,0,0,0.6);
+		--bibi-powered-by-background-color-waiting-file: #0d1117;
+		--bibi-powered-by-a-background-color-waiting-file-hover: rgba(0,0,0,0.6);
+		--bibi-powered-by-background-color-panel-opened: rgba(0,0,0,0.4);
+		--bibi-powered-by-a-background-color-panel-opened-hover: rgba(0,0,0,0.6);
+		// - Stage / Catcher / Veil
+		--bibi-html-background: #0d1117;
+		--bibi-body-background: #0d1117;
+		--bibi-catcher-background: linear-gradient(to bottom, #21262d, #0d1117);
+		--bibi-catcher-border: dashed 4px #e6edf3;
+		--bibi-catcher-border-hover: solid 8px #e6edf3;
+		--bibi-catcher-border-active: solid 16px #e6edf3;
+		--bibi-catcher-border-touch-device: solid 4px #e6edf3;
+		--bibi-catcher-border-touch-device-active: solid 8px #e6edf3;
+		--bibi-catcher-icon-outer-color: #e6edf3;
+		--bibi-catcher-icon-inner-color: #9198a1;
+		--bibi-catcher-button-color: #e6edf3;
+		--bibi-catcher-button-background-color: #161b22;
+		--bibi-catcher-text-color: #9198a1;
+		--bibi-veil-background: linear-gradient(to bottom, #1c2128, #0d1117);
+		--bibi-veil-bye-bye-color: #e6edf3;
+		--bibi-veil-bye-bye-background: rgba(0,0,0,0.4);
+		--bibi-veil-play-background-color: rgba(13,17,23,0);
+		--bibi-veil-play-background-color-hover: rgba(13,17,23,0.6);
+		--bibi-veil-cover-icon-outer-color-without-cover-image: #e6edf3;
+		--bibi-veil-cover-icon-inner-color-without-cover-image: #9198a1;
+		--bibi-veil-cover-p-color-without-cover-image: #9198a1;
+		// - Help
+		--bibi-help-border-top: solid 1px #30363d;
+		--bibi-help-background: rgba(22,27,34,0.96);
+		--bibi-help-p-color: #e6edf3;
+		// - Notifier
+		--bibi-notifier-color: #e6edf3;
+		--bibi-notifier-color-error: #f85149;
+		--bibi-notifier-background: rgba(22,27,34,0.96);
+		--bibi-notifier-box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+		// - Menu bar
+		--bibi-menu-background-color: rgba(13,17,23,0);
+		--bibi-menu-background-color-hover: rgba(13,17,23,0.9);
+		--bibi-menu-background-color-active: rgba(13,17,23,1);
+		--bibi-menu-background-color-veil-opened: rgba(13,17,23,0.8);
+		--bibi-menu-background-color-panel-opened: rgba(13,17,23,1);
+		--bibi-menu-background-color-not-bfh: rgba(13,17,23,1);
+		--bibi-menu-background-color-not-bfh-hover: rgba(13,17,23,1);
+		--bibi-menu-background-color-not-bfh-active: rgba(13,17,23,1);
+		--bibi-menu-background-color-not-bfh-veil-opened: rgba(13,17,23,1);
+		--bibi-menu-background-color-not-bfh-panel-opened: rgba(13,17,23,1);
+		--bibi-menu-box-shadow-active: 0 0 16px rgba(0,0,0,0.5);
+		--bibi-menu-box-shadow-not-bfh-active: 0 0 16px rgba(0,0,0,0.5);
+		--bibi-menu-border-bottom-color-not-bfh: rgba(255,255,255,0.08);
+		--bibi-menu-border-bottom-color-not-bfh-hover: rgba(255,255,255,0.08);
+		--bibi-menu-border-bottom-color-not-bfh-active: rgba(255,255,255,0.08);
+		--bibi-menu-button-group-separator-color: #30363d;
+		// - Menu icons
+		--bibi-menu-icon-font-paint-color: #9198a1;
+		--bibi-menu-icon-shape-paint-color: #e6edf3;
+		--bibi-menu-icon-shape-outline-color: #9198a1;
+		--bibi-menu-icon-background-color: rgba(22,27,34,0.9);
+		--bibi-menu-icon-border-color: #30363d;
+		--bibi-menu-icon-font-paint-color-hover: #e6edf3;
+		--bibi-menu-icon-shape-paint-color-hover: #e6edf3;
+		--bibi-menu-icon-shape-outline-color-hover: #e6edf3;
+		--bibi-menu-icon-background-color-hover: rgba(33,38,45,0.9);
+		--bibi-menu-icon-border-color-hover: #30363d;
+		--bibi-menu-icon-font-paint-color-active: #0d1117;
+		--bibi-menu-icon-shape-paint-color-active: #e6edf3;
+		--bibi-menu-icon-shape-outline-color-active: #9198a1;
+		--bibi-menu-icon-background-color-active: #9198a1;
+		--bibi-menu-icon-border-color-active: #30363d;
+		--bibi-menu-icon-font-paint-color-active-hover: #0d1117;
+		--bibi-menu-icon-shape-paint-color-active-hover: #e6edf3;
+		--bibi-menu-icon-shape-outline-color-active-hover: #9198a1;
+		--bibi-menu-icon-background-color-active-hover: #30363d;
+		--bibi-menu-icon-border-color-active-hover: #30363d;
+		// - Nombre (monochrome)
+		--bibi-nombre-key-color: #e6edf3;
+		--bibi-nombre-current-color: #e6edf3;
+		--bibi-nombre-delimiter-color: #9198a1;
+		--bibi-nombre-total-color: #e6edf3;
+		--bibi-nombre-percent-color: #9198a1;
+		--bibi-nombre-background-color: rgba(22,27,34,0.9);
+		// - Nombre (accent, slider opened)
+		--bibi-nombre-key-color-slider-opened: #58a6ff;
+		--bibi-nombre-current-color-slider-opened: #58a6ff;
+		--bibi-nombre-delimiter-color-slider-opened: #79b8ff;
+		--bibi-nombre-total-color-slider-opened: #79b8ff;
+		--bibi-nombre-percent-color-slider-opened: #79b8ff;
+		// - Panel
+		--bibi-panel-background: #161b22;
+		--bibi-panel-nav-a-color: #e6edf3;
+		--bibi-panel-nav-a-color-hover: #58a6ff;
+		--bibi-panel-nav-a-text-decoration-color-hover: #79b8ff;
+		--bibi-panel-nav-contour-line-color: #30363d;
+		--bibi-panel-cover-border-color: #30363d;
+		--bibi-panel-cover-icon-outer-color-without-cover-image: #e6edf3;
+		--bibi-panel-cover-icon-inner-color-without-cover-image: #161b22;
+		--bibi-panel-cover-info-color: #9198a1;
+		// - Slider chrome
+		--bibi-slider-key-color: #58a6ff;
+		--bibi-slider-border-color: #30363d;
+		--bibi-slider-background: #161b22;
+		--bibi-slider-border-color-slider-opened: #30363d;
+		--bibi-slider-background-slider-opened: #161b22;
+		--bibi-slider-box-shadow-slider-opened: 0 0 16px rgba(0,0,0,0.5);
+		--bibi-slider-thumb-background-color: #9198a1;
+		--bibi-slider-thumb-background-color-hover: #e6edf3;
+		--bibi-slider-thumb-background-color-active: #9198a1;
+		--bibi-slider-thumb-background-color-slider-opened: rgba(88,166,255,0.6);
+		--bibi-slider-thumb-background-color-slider-opened-min: rgba(88,166,255,0.6);
+		--bibi-slider-rail-full-length-color-slider-opened: #30363d;
+		--bibi-slider-rail-full-length-color-slider-opened-hover: #30363d;
+		--bibi-slider-rail-groove-color-slider-opened: #30363d;
+		--bibi-slider-rail-groove-color-slider-opened-hover: #30363d;
+		--bibi-slider-rail-progress-color-slider-opened: #58a6ff;
+		--bibi-slider-rail-progress-color-slider-opened-hover: #58a6ff;
+		--bibi-slider-edgebar-background: #21262d;
+		// - Slider icons
+		--bibi-slider-icon-font-paint-color: #9198a1;
+		--bibi-slider-icon-shape-paint-color: #e6edf3;
+		--bibi-slider-icon-shape-outline-color: #9198a1;
+		--bibi-slider-icon-background-color: #21262d;
+		--bibi-slider-icon-border-color: #30363d;
+		--bibi-slider-icon-font-paint-color-hover: #e6edf3;
+		--bibi-slider-icon-shape-paint-color-hover: #58a6ff;
+		--bibi-slider-icon-shape-outline-color-hover: #e6edf3;
+		--bibi-slider-icon-background-color-hover: #58a6ff;
+		--bibi-slider-icon-border-color-hover: #58a6ff;
+		--bibi-slider-icon-font-paint-color-active: #e6edf3;
+		--bibi-slider-icon-shape-paint-color-active: #58a6ff;
+		--bibi-slider-icon-shape-outline-color-active: #e6edf3;
+		--bibi-slider-icon-background-color-active: #58a6ff;
+		--bibi-slider-icon-border-color-active: #58a6ff;
+		--bibi-slider-icon-font-paint-color-active-hover: #e6edf3;
+		--bibi-slider-icon-shape-paint-color-active-hover: #58a6ff;
+		--bibi-slider-icon-shape-outline-color-active-hover: #e6edf3;
+		--bibi-slider-icon-background-color-active-hover: #58a6ff;
+		--bibi-slider-icon-border-color-active-hover: #58a6ff;
+		// - Subpanel chrome
+		--bibi-subpanel-key-color: #58a6ff;
+		--bibi-subpanel-background-color: rgba(22,27,34,0.96);
+		--bibi-subpanel-box-shadow: rgba(0,0,0,0.5) 0 2px 2px;
+		--bibi-subpanel-scrollbar-track-background-color: #0d1117;
+		--bibi-subpanel-scrollbar-thumb-background-color: #6e7681;
+		--bibi-subpanel-scrollbar-thumb-background-color-hover: #9198a1;
+		--bibi-subpanel-scrollbar-thumb-background-color-active: #9198a1;
+		--bibi-subpanel-heading-color: #e6edf3;
+		--bibi-subpanel-heading-small-color: #9198a1;
+		--bibi-subpanel-heading-small-marker-color: #6e7681;
+		--bibi-subpanel-button-group-border-color: rgba(255,255,255,0.1);
+		--bibi-subpanel-button-color: #e6edf3;
+		--bibi-subpanel-button-check-color: #9198a1;
+		--bibi-subpanel-button-border-color: rgba(255,255,255,0.1);
+		--bibi-subpanel-button-background-color: #0d1117;
+		--bibi-subpanel-button-color-active: #e6edf3;
+		--bibi-subpanel-button-check-color-active: #58a6ff;
+		--bibi-subpanel-button-border-color-active: rgba(255,255,255,0.1);
+		--bibi-subpanel-button-background-color-active: #0d1117;
+		--bibi-subpanel-button-color-hover: #58a6ff;
+		--bibi-subpanel-button-check-color-hover: rgba(88,166,255,0.8);
+		--bibi-subpanel-button-border-color-hover: rgba(88,166,255,0.15);
+		--bibi-subpanel-button-background-color-hover: rgba(56,139,253,0.15);
+		--bibi-bookmark-subpanel-button-background-color-hot: rgba(255,215,0,0.15);
+		--bibi-bookmark-is-current-background: rgba(88,166,255,0.18);
+		--bibi-bookmark-remove-icon-color: rgba(230,237,243,0.75);
+		--bibi-subpanel-steps-check-color-strong: rgba(145,152,161,0.9);
+		--bibi-subpanel-steps-check-color-soft: rgba(145,152,161,0.5);
+		// - Subpanel icons
+		--bibi-subpanel-icon-font-paint-color: #9198a1;
+		--bibi-subpanel-icon-shape-paint-color: #e6edf3;
+		--bibi-subpanel-icon-shape-outline-color: #9198a1;
+		--bibi-subpanel-icon-background-color: #0d1117;
+		--bibi-subpanel-icon-border-color: #30363d;
+		--bibi-subpanel-icon-font-paint-color-hover: #58a6ff;
+		--bibi-subpanel-icon-shape-paint-color-hover: #e6edf3;
+		--bibi-subpanel-icon-shape-outline-color-hover: #58a6ff;
+		--bibi-subpanel-icon-background-color-hover: rgba(56,139,253,0.15);
+		--bibi-subpanel-icon-border-color-hover: #58a6ff;
+		--bibi-subpanel-icon-font-paint-color-active: #e6edf3;
+		--bibi-subpanel-icon-shape-paint-color-active: #e6edf3;
+		--bibi-subpanel-icon-shape-outline-color-active: #58a6ff;
+		--bibi-subpanel-icon-background-color-active: #58a6ff;
+		--bibi-subpanel-icon-border-color-active: #58a6ff;
+		--bibi-subpanel-icon-font-paint-color-active-hover: #e6edf3;
+		--bibi-subpanel-icon-shape-paint-color-active-hover: #e6edf3;
+		--bibi-subpanel-icon-shape-outline-color-active-hover: #58a6ff;
+		--bibi-subpanel-icon-background-color-active-hover: #79b8ff;
+		--bibi-subpanel-icon-border-color-active-hover: #58a6ff;
+		// - Search
+		--bibi-search-bar-border-color: rgba(255,255,255,0.12);
+		--bibi-search-bar-background: #161b22;
+		--bibi-search-form-border-color: #30363d;
+		--bibi-search-form-background: #0d1117;
+		--bibi-search-form-input-color: #e6edf3;
+		--bibi-search-form-input-not-found-color: #9198a1;
+		--bibi-search-list-icon-border-color: #30363d;
+		--bibi-search-list-icon-color: #e6edf3;
+		--bibi-search-list-icon-background: #0d1117;
+	}
+	// Structural layer paints div.item-box (+::before underlay) white under main#bibi-main;
+	// match that scope so the override wins.
+	main#bibi-main div.item-box, main#bibi-main div.item-box::before {
+		background: var(--bibi-book-background);
+	}
+	html.book-pre-paginated main#bibi-main div.item-box, html.book-pre-paginated main#bibi-main div.item-box::before {
+		background: var(--bibi-book-background-pre-paginated);
+	}
+	html {
+		color-scheme: dark;
+	}
+}

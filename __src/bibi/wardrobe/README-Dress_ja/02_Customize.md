@@ -329,5 +329,7 @@ $Subpanel-Button_BackgroundColor__Active: $Subpanel-Button_BackgroundColor;
 ほか、先頭に `DEFAULT__` の付されたミックスインがいくつか存在しています。
 これは、複数のドレスソースファイルで使用されることを前提に用意された変数で、基本的には _stage.scss 内で定義されています。
 
-
-
+ダークモード（`prefers-color-scheme: dark`）に対応する場合は、ドレスの `_@.scss` に `@forward "../_dress-patterns/dark";` の１行を加えるだけで参加できます。
+色はすべて `var(--bibi-*, <light値>)` 経由のため、light の見た目は変わりません。書籍コンテンツ側の色には触れないでください。
+新しい `--bibi-*` を追加したときは `_dress-patterns/_dark.scss` 内の dark メディアクエリにも同名の値を必ず定義してください。
+定義漏れは `tests/dress-dark.test.js` が検出します。
