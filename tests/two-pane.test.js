@@ -34,16 +34,24 @@ describe("two-pane geometry", () => {
         expect(isPairableSpread(spread(pre({ "rendition:page-spread": "left" })))).toBe(true);
         expect(isPairableSpread(spread(pre({ "rendition:page-spread": "right" })))).toBe(true);
     });
-
-    test("single-page text and media can pair; locked and matched pairs stay atomic", () => {
-        expect(isPairableSpread(spread(txt()))).toBe(false); // not yet rendered
+    test("single pictures always stand alone; single-page text can pair", () => {
         expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true })))).toBe(true);
+        expect(isPairableSpread(spread({ Reflowable: true, OnlySingleSVG: true, Pages: [{}] }))).toBe(false);
+        expect(isPairableSpread(spread({ PrePaginated: true, OnlySingleImg: true, Pages: [{}] }))).toBe(false);
         expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true, TwoPaneSoloLocked: true })))).toBe(false);
         expect(isPairableSpread(spread(Object.assign(txt(), { TwoPaneRendered: true, Pages: [{}, {}] })))).toBe(false);
-        expect(isPairableSpread(spread({ Reflowable: true, OnlySingleSVG: true, Pages: [{}] }))).toBe(true);
+        expect(isPairableSpread(spread(txt()))).toBe(false); // not yet rendered
         expect(isPairableSpread(spread(pre({ SpreadPair: {} })))).toBe(false);
         expect(isPairableSpread({ Index: 2, Items: [{}, {}] })).toBe(false);
         expect(isPairableSpread({ Index: 2, Items: [] })).toBe(false);
+    });
+    test("paged mode isolates block media from prose by column breaks", () => {
+        // one image per page: the point of splitting pages is separating picture and text areas.
+        const src = reader();
+        expect(src).toContain("Separate pictures from prose");
+        expect(src).toContain("breakBefore");
+        expect(src).toContain("breakAfter");
+        expect(src).toContain("BibiDefaultBreaks");
     });
     test("greedy pairing leaves landscape-solo and odd tails single", () => {
         const P = (soloLandscape = false) => ({ pairable: true, soloLandscape });

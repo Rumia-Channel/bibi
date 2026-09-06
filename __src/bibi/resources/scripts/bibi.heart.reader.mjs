@@ -259,6 +259,18 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             });
         });
     }
+    { // Separate pictures from prose in paged mode: block-level media gets its own column (= page)
+        const Paged = S.RVM == 'paged';
+        sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
+            if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); }
+            else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]);
+            if(!Paged) return;
+            const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
+            if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
+            if(Ele.previousElementSibling) Ele.style.breakBefore = 'column';
+            if(Ele.nextElementSibling) Ele.style.breakAfter = 'column';
+        });
+    }
     if(sML.UA.Gecko) { // Part 1/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
         if(Item.OFREs === undefined) {
             Item.OFREs = []; // Orthogonal Flow Root Elements
