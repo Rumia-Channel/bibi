@@ -1,8 +1,8 @@
 // ================================================================================
 // + Dark Mode (prefers-color-scheme: dark)
 // --------------------------------------------------------------------------------
-// Chrome UI only. Book content (publisher CSS) is untouched:
-// $Book-Background* stays white/black by design (see below).
+// Chrome UI only. Book content (publisher CSS) is untouched, but the canvas
+// behind it follows the scheme (reflowable bodies paint themselves dark too).
 // Light values live in ../_dress-codes/* as var(--bibi-*, <light>) fallbacks,
 // so light rendering never changes. This file only overrides the --bibi-*
 // custom properties inside the dark media query.
@@ -11,9 +11,9 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		// - Book area (intentionally invariant: reflowable stays white, pre-paginated stays black)
-		--bibi-book-background: white;
-		--bibi-book-background-subpanel-opened: white;
+		// - Book area canvas (reflowable bodies paint #0d1117 themselves; pre-paginated stays black)
+		--bibi-book-background: #0d1117;
+		--bibi-book-background-subpanel-opened: #0d1117;
 		--bibi-book-background-pre-paginated: black;
 		--bibi-book-background-pre-paginated-subpanel-opened: black;
 		// - PoweredBy white/black logo opacities (swapped: dark surfaces show the white logo)
@@ -229,6 +229,14 @@
 		--bibi-search-list-icon-border-color: #30363d;
 		--bibi-search-list-icon-color: #e6edf3;
 		--bibi-search-list-icon-background: #0d1117;
+	}
+	// Structural layer paints div.item-box (+::before underlay) white under main#bibi-main;
+	// match that scope so the override wins.
+	main#bibi-main div.item-box, main#bibi-main div.item-box::before {
+		background: var(--bibi-book-background);
+	}
+	html.book-pre-paginated main#bibi-main div.item-box, html.book-pre-paginated main#bibi-main div.item-box::before {
+		background: var(--bibi-book-background-pre-paginated);
 	}
 	html {
 		color-scheme: dark;
