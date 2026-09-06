@@ -102,7 +102,7 @@ SCSS から CSS へのコンパイル機能（変換処理）は、ビビの開�
     + bibi/
         - index.html … 使用するドレスを決定する HTML ファイルです。
         + wardrobe/
-            - _dresses.js … 用意しておきたいドレスの名前を列挙しておくファイルです。
+            - _dresses.mjs … 用意しておきたいドレスの名前を列挙しておくファイルです。
 ```
 
 配布段階でこの構成図に挙げられていないファイル・フォルダは、ドレスの新規作成には関係ないため、別の目的がないかぎり編集する必要はなく、以降の説明でも言及しません。
@@ -116,7 +116,7 @@ SCSS から CSS へのコンパイル機能（変換処理）は、ビビの開�
 ※ この項目は、一度ドレス作りの概要を把握した後の振り返りを助けるために挟んであります。最初は読み飛ばして次に進むことを推奨します。
 
 1. テンプレートフォルダを生成・リネームして、あらたなドレスのソースフォルダを作る
-2. _dresses.js にドレス名を追加する
+2. _dresses.mjs にドレス名を追加する
 3. ビビ全体の生成処理を実行してドレスファイルを生成する
 4. index.html で読み込むドレスファイルを変更する
 5. 表示を確認しながらソースフォルダ内を編集してドレス作りを進める
@@ -131,7 +131,7 @@ SCSS から CSS へのコンパイル機能（変換処理）は、ビビの開�
 それから、次のコマンドを実行します。
 
 ```
-npm run make:dress-template
+bun run make:dress-template
 ```
 
 すると、さきに挙げた構成図にある wardrobe ディレクトリ（__src/bibi/wardrobe/）に、生成日時を含む DRESS-TEMPLATE-20191218-153045 のような名前のフォルダが生成されます。
@@ -149,12 +149,12 @@ npm run make:dress-template
 用意したソースフォルダからドレスファイルを生成するためには、ビビ全体のファイル生成処理を利用します。
 
 ビビ全体のファイル生成処理は、ドレス以外も含む __src 以下のソースファイルに基づき、実際にサーバに設置して使用できるファイルを __dist 以下に生成します。
-__src/bibi/wardrobe/ にドレスのソースフォルダを設置し、__src/bibi/wardrobe/_dresses.js にドレス名を記載することで、ビビ全体のファイル生成処理を実行するときにそのドレスも処理対象となり、__dist/bibi/wardrobe/ 内にドレスフォルダ・ドレスファイルが生成されるようになります。
+__src/bibi/wardrobe/ にドレスのソースフォルダを設置し、__src/bibi/wardrobe/_dresses.mjs にドレス名を記載することで、ビビ全体のファイル生成処理を実行するときにそのドレスも処理対象となり、__dist/bibi/wardrobe/ 内にドレスフォルダ・ドレスファイルが生成されるようになります。
 
-_dresses.js を開くと、次のような内容になっています。
+_dresses.mjs を開くと、次のような内容になっています。
 
 ```
-module.exports = {
+export default {
     'custom-made': [
         'everyday'
     ],
@@ -168,7 +168,7 @@ everyday というドレスのみが生成処理の対象になっている状�
 これを次のように書き換えます。
 
 ```
-module.exports = {
+export default {
     'custom-made': [
         'cocktail',
         'everyday'
@@ -187,10 +187,10 @@ module.exports = {
 　＊
 
 もしも誰かが作成したドレス（special とします）も使いつつ自分でもドレスをつくりたい場合は、まず、special ドレスフォルダを開発環境の wardrobe ディレクトリ（__src/bibi/wardrobe/）に設置してください。
-次に、special ドレスフォルダ内が bibi.dress.scss ドレスソースファイルなら、cocktail と同じように _dresses.js の 'custom-made' に 'special' を追加します。
+次に、special ドレスフォルダ内が bibi.dress.scss ドレスソースファイルなら、cocktail と同じように _dresses.mjs の 'custom-made' に 'special' を追加します。
 
 ```
-module.exports = {
+export default {
     'custom-made': [
         'cocktail',
         'special',
@@ -202,10 +202,10 @@ module.exports = {
 ```
 
 こうすれば special ドレスも生成処理に加わります。
-ただし、もし special ドレスフォルダ内が既に生成処理を経た bibi.dress.css ドレスファイルなら、次のように、_dresses.js の 'ready-made' に 'special' を加えてください。
+ただし、もし special ドレスフォルダ内が既に生成処理を経た bibi.dress.css ドレスファイルなら、次のように、_dresses.mjs の 'ready-made' に 'special' を加えてください。
 
 ```
-module.exports = {
+export default {
     'custom-made': [
         'cocktail',
         'everyday'
@@ -235,7 +235,7 @@ __dist/bibi/wardrobe/ 内はファイル生成処理の際に 一旦すべて削
 ターミナルで、さきほどテンプレートフォルダを生成したときからディレクトリを移動していなければそのまま、次のコマンドを実行してください。
 
 ```
-npm run build
+bun run build
 ```
 
 すると、サーバに設置するビビの構成ファイル群（__dist ディレクトリ以下）が生成され、その中には下の CSS ファイルも生成されているはずです。
@@ -301,12 +301,12 @@ __src 以下の開発環境の bibi/index.html は編集内容がそのまま __
 参考）さらに別の自作ドレスを追加して、複数のドレスを管理する
 --------------------------------------------------------------------------------------------------------------------------------
 
-もしさらに別のドレスをあらたに作成するときは、cocktail ドレスを作ったときと同様に、まず `npm run make:dress-template` で作成したドレスソースフォルダを任意の名前に変更し、生成処理対象として _dresses.js にドレス名を追記します。
+もしさらに別のドレスをあらたに作成するときは、cocktail ドレスを作ったときと同様に、まず `bun run make:dress-template` で作成したドレスソースフォルダを任意の名前に変更し、生成処理対象として _dresses.mjs にドレス名を追記します。
 
-_dresses.js には、下のように順不同で追加することができます。
+_dresses.mjs には、下のように順不同で追加することができます。
 
 ```
-module.exports = {
+export default {
     'custom-made': [
         'party',
         'cocktail',
@@ -318,8 +318,8 @@ module.exports = {
 };
 ```
 
-_dresses.js に列挙されたドレスは、すべて生成処理の対象になり、個別のドレスファイルが生成されます。
-既に完成していたり不要になったりして都度の生成処理にかける必要がなくなったドレスは、_dresses.js 内でコメントアウトするなどして、生成処理の対象から外すことができます（everyday ドレスも例外ではなく、もし不要なら生成処理の対象から外しても構いません）。
+_dresses.mjs に列挙されたドレスは、すべて生成処理の対象になり、個別のドレスファイルが生成されます。
+既に完成していたり不要になったりして都度の生成処理にかける必要がなくなったドレスは、_dresses.mjs 内でコメントアウトするなどして、生成処理の対象から外すことができます（everyday ドレスも例外ではなく、もし不要なら生成処理の対象から外しても構いません）。
 
 
 

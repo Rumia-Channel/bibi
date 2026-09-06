@@ -185,6 +185,17 @@ If you want to modify them, please edit files in the `Source` column instead of 
 * $ `bun run archive`
     1. A zipped archive of the production version of Bibi is generated in `__archives` folder.
 
+### How to Verify
+
+* $ `bun audit`
+    - Checks installed packages for vulnerabilities. Currently 1 known remaining: `uuid@8` via `webpack-dev-server > sockjs` (moderate, dev-server only, never shipped; upstream `sockjs` pins `^8` and v9+ is ESM-only so a range fix would break its CJS `require` — accepted).
+    - `qs` is force-pinned via `overrides` (`^6.16.0`), `immutable` likewise (`^4.3.9`, dev-server only).
+    - If new advisories appear, `bun audit fix --dry-run` previews range-safe fixes.
+* $ `bun outdated`
+    - Lists dependencies newer than the pinned ranges. Empty output means fully tracking latest.
+* $ `bun run build`
+    - The production version of Bibi is generated in `__dist` folder. A passing build (`compiled ...` + `wove (production)`) proves the dependency set works.
+
 
 
 
