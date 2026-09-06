@@ -262,13 +262,21 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     { // Separate pictures from prose in paged mode: block-level media gets its own column (= page)
         const Paged = S.RVM == 'paged';
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
-            if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); }
-            else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]);
+            let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture
+            while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8
+                && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
+                && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
+            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'display'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
+            else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(!Paged) return;
-            const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
-            if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
-            if(Ele.previousElementSibling) Ele.style.breakBefore = 'column';
-            if(Ele.nextElementSibling) Ele.style.breakAfter = 'column';
+            if(Tar === Ele) {
+                const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
+                if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
+                if(/^inline/i.test(getComputedStyle(Ele).display)) return;
+            }
+            if(/^inline/i.test(getComputedStyle(Tar).display)) Tar.style.display = 'block';
+            if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
+            if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
         });
     }
     if(sML.UA.Gecko) { // Part 1/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
