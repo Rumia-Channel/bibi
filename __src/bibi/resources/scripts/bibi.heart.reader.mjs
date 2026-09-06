@@ -181,7 +181,7 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
 
 R.layOutItem = async (Item) => {
     await E.dispatch('bibi:is-going-to:lay-out-item', Item);
-    await (Item.Reflowable ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item));
+    await ((Item.Reflowable && !Item.OnlySingleSVG && !Item.OnlySingleImg) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // single-media pages (even in reflowable books) are fitted pictures, not column text
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     await E.dispatch('bibi:laid-out-item', Item);

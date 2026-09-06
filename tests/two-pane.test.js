@@ -85,4 +85,10 @@ describe("two-pane wiring", () => {
         expect(i).toBeGreaterThan(-1);
         expect(src.slice(Math.max(0, i - 160), i)).toContain("R.organizePages();");
     });
+    test("single-media items render fitted even in reflowable books", () => {
+        // pre-paginated flag comes from package metadata; a lone picture page must not
+        // fall into the column paginator just because the book declares reflowable layout.
+        const src = reader();
+        expect(src).toContain("!Item.OnlySingleSVG && !Item.OnlySingleImg");
+    });
 });
