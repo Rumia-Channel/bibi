@@ -405,6 +405,7 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
         });
     })).then(resolve);
 }).then(() => Item);
+    R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { const FE = Item.Body.firstElementChild; return (/^(svg|img)$/i.test(FE.tagName)) ? FE : (FE.querySelector ? FE.querySelector(':scope > svg, :scope > img') : null); };
 
     R.renderPrePaginatedItem.getViewport = (Item) => Promise.resolve().then(() =>
           Item.Viewport ? Item.Viewport
@@ -414,8 +415,8 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
           ) ? O.file(Item.Source).then(() => O.getItemViewport(Item).then(Vp => Item.Viewport = Vp))
         : (   Item.SpreadPair?.Viewport          ? Item.SpreadPair.Viewport
             : Item.IsPlaceholder || !Item.Loaded ? null
-            : Item.OnlySingleSVG                 ? Item.Viewport = O.getViewportByViewBox(Item.Body.firstElementChild.getAttribute('viewBox'))
-            : Item.OnlySingleImg                 ? Item.Viewport = O.getViewportByImage(  Item.Body.firstElementChild                        )
+            : Item.OnlySingleSVG                 ? Item.Viewport = O.getViewportByViewBox(R.renderPrePaginatedItem.getSingleMediaElement(Item)?.getAttribute('viewBox'))
+            : Item.OnlySingleImg                 ? Item.Viewport = O.getViewportByImage(  R.renderPrePaginatedItem.getSingleMediaElement(Item)                                             )
             :                                      null
         ) || {
             Width:  Math.floor(Math.min(R.Stage.Width, R.Stage.Height * S['orientation-border-ratio']) / (/^(left|right)$/.test(Item['rendition:page-spread']) ? 2 : 1)),
