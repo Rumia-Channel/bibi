@@ -95,4 +95,12 @@ describe("two-pane wiring", () => {
         // two-pane must fit the pane instead of shrinking to a quarter.
         expect(reader()).toContain("R.TwoPane ? Promise.resolve(null)");
     });
+    test("areafree single-media pages resolve to their picture", () => {
+        // fitted single-media pages never get column areas; element resolution
+        // (resize, destinations) must not crash on them.
+        const src = reader();
+        const i = src.indexOf("getSingleMediaElement(Page.Item); // fitted single-media");
+        expect(i).toBeGreaterThan(-1);
+        expect(src.slice(Math.max(0, i - 160), i)).toContain("OnlySingleSVG");
+    });
 });

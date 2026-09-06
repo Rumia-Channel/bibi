@@ -981,6 +981,7 @@ R.getElement = (_, Opt) => {
 R.getFirstElementOfPage = (Page, Opt) => {
     if(!Page || !Page.IsPage) return null;
     if(Page.Item.PrePaginated) return Page.Item;
+    if(!Page.ContentAreaInItem && Page.Item && (Page.Item.OnlySingleSVG || Page.Item.OnlySingleImg)) return R.renderPrePaginatedItem.getSingleMediaElement(Page.Item); // fitted single-media pages have no column areas; the picture itself is the first element
     const InCurrentViewport = S.RVM != 'paged' && Opt?.InCurrentViewport ? true : false;
     if(!InCurrentViewport && Page.FirstElement) return /*console.log('Without SCANNING:', `<${ Page.FirstElement.tagName }>${ Page.FirstElement.innerText.substring(0,8) }...`) ||*/ Page.FirstElement;
     const Item = Page.Item;
