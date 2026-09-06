@@ -1,4 +1,4 @@
-import { isPairableSpread, isTwoPaneViewport, planTwoPaneGroups, shouldSoloLandscapeSpread, spreadKind } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
+import { isPairableSpread, isTwoPaneViewport, planTwoPaneGroups, shouldSoloLandscapeSpread } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -44,14 +44,6 @@ describe("two-pane geometry", () => {
         expect(isPairableSpread({ Index: 2, Items: [{}, {}] })).toBe(false);
         expect(isPairableSpread({ Index: 2, Items: [] })).toBe(false);
     });
-    test("pictures pair only with pictures; text only with text", () => {
-        const pic = () => ({ Index: 3, Items: [{ PrePaginated: true, OnlySingleImg: true, Pages: [{}] }] });
-        const tx = () => ({ Index: 4, Items: [{ PrePaginated: true, Pages: [{}] }] });
-        expect(spreadKind(pic())).toBe("pic");
-        expect(spreadKind(tx())).toBe("text");
-        expect(spreadKind(spread({ Reflowable: true, OnlySingleSVG: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe("text");
-        expect(spreadKind({ Index: 2, Items: [] })).toBe("text");
-    });
     test("resolved-small pictures rejoin pairing; the 384 gate exists", () => {
         expect(isPairableSpread(spread({ Reflowable: true, TwoPaneRendered: true, OnlySingleSVG: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
         expect(isPairableSpread(spread({ PrePaginated: true, OnlySingleImg: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
@@ -66,14 +58,13 @@ describe("two-pane geometry", () => {
         expect(src).toContain("breakAfter");
         expect(src).toContain("BibiDefaultBreaks");
     });
-    test("greedy pairing matches kinds and leaves solos single", () => {
-        const P = (kind = "text", soloLandscape = false) => ({ pairable: true, soloLandscape, kind });
-        const S = { pairable: false, soloLandscape: false, kind: "text" };
+    test("greedy pairing mixes freely; solos stay single", () => {
+        // pic|pic, text|pic, pic|text, text|text all pair; landscape-solo and odd tails stay single.
+        const P = (soloLandscape = false) => ({ pairable: true, soloLandscape });
+        const S = { pairable: false, soloLandscape: false };
         expect(planTwoPaneGroups([P(), P(), P()])).toEqual([[0, 1], [2]]);
-        expect(planTwoPaneGroups([P(), { pairable: true, soloLandscape: true, kind: "text" }, P()])).toEqual([[0], [1], [2]]);
+        expect(planTwoPaneGroups([P(), { pairable: true, soloLandscape: true }, P()])).toEqual([[0], [1], [2]]);
         expect(planTwoPaneGroups([S, P(), P(), S])).toEqual([[0], [1, 2], [3]]);
-        expect(planTwoPaneGroups([P("pic"), P("pic"), P("text"), P("text")])).toEqual([[0, 1], [2, 3]]);
-        expect(planTwoPaneGroups([P("pic"), P("text"), P("pic")])).toEqual([[0], [1], [2]]);
         expect(planTwoPaneGroups([])).toEqual([]);
     });
 });
