@@ -489,7 +489,7 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
         R.TwoPaneRelaying = true;
         try {
             const { changed, spreads } = R.updateTwoPaneGrouping();
-            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.snapTwoPaneView(); });
+            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.organizePages(); try { I.PageObserver.updateCurrent(); } catch(Err) {} R.snapTwoPaneView(); }); // layOutSpread rebuilds Spread.Pages from recreated item pages but leaves R.Pages/Current pointing at detached nodes (slider math crashes on them) — rebuild both
         } finally { R.TwoPaneRelaying = false; }
     }, 120);
 };

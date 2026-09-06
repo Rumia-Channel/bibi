@@ -77,4 +77,12 @@ describe("two-pane wiring", () => {
     test("paired panes render at half stage width", () => {
         expect(reader()).toContain("PaneWidthFactor == 0.5");
     });
+    test("regroup relayout rebuilds the page index before snapping", () => {
+        // renderReflowableItem recreates item pages; without organizePages, R.Pages/Current
+        // point at detached nodes and slider geometry crashes on null offsetParent.
+        const src = reader();
+        const i = src.indexOf("R.snapTwoPaneView();");
+        expect(i).toBeGreaterThan(-1);
+        expect(src.slice(Math.max(0, i - 160), i)).toContain("R.organizePages();");
+    });
 });
