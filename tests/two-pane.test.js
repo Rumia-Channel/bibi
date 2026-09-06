@@ -110,6 +110,13 @@ describe("two-pane wiring", () => {
         // two-pane must fit the pane instead of shrinking to a quarter.
         expect(reader()).toContain("R.TwoPane ? Promise.resolve(null)");
     });
+    test("focus completion syncs current tracking", () => {
+        // untracked spreads stay visibility:hidden; pair mates must not wait for a scroll event.
+        const src = reader();
+        const i = src.indexOf("E.dispatch('bibi:focused-on'");
+        expect(i).toBeGreaterThan(-1);
+        expect(src.slice(Math.max(0, i - 220), i)).toContain("PageObserver.updateCurrent()");
+    });
     test("areafree single-media pages resolve to their picture", () => {
         // fitted single-media pages never get column areas; element resolution
         // (resize, destinations) must not crash on them.

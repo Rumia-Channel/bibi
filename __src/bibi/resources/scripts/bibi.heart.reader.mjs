@@ -804,6 +804,7 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
         ease: typeof Opt.ease == 'function' ? Opt.ease : (Pos) => (Pos === 1) ? 1 : Math.pow(2, -10 * Pos) * -1 + 1
     }).then(() => {
         O.HTML.classList.remove('moving');
+        try { I.PageObserver.updateCurrent(); } catch(Err) {} // visible-but-untracked spreads stay visibility:hidden (pair mates especially) — sync at final geometry
         resolve(Dest);
         E.dispatch('bibi:focused-on', Dest);
     }).catch(reject);
