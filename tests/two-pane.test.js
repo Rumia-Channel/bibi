@@ -8,12 +8,15 @@ const reader = () => readFileSync(join(ROOT, "__src/bibi/resources/scripts/bibi.
 // 不変条件: 2ペイン化は paged 専用の幾何学ゲート + 論理グルーピングで成り立つ。
 // 構造変更 (DOM 移動・頁採番) をしないことが設計の要。
 describe("two-pane geometry", () => {
-    test("viewport rule admits everyday landscape (1.5+), boundary inclusive", () => {
+    test("viewport rule admits 4:3 landscape and wider, boundary inclusive", () => {
         expect(isTwoPaneViewport(1706, 800)).toBe(true);
         expect(isTwoPaneViewport(1568, 785)).toBe(true);
         expect(isTwoPaneViewport(2560, 1440)).toBe(true);
-        expect(isTwoPaneViewport(1365, 768)).toBe(true);
-        expect(isTwoPaneViewport(1024, 768)).toBe(false);
+        expect(isTwoPaneViewport(1194, 834)).toBe(true); // iPad landscape
+        expect(isTwoPaneViewport(1180, 820)).toBe(true); // iPad landscape
+        expect(isTwoPaneViewport(1024, 768)).toBe(true); // exactly 4:3
+        expect(isTwoPaneViewport(1000, 800)).toBe(false);
+        expect(isTwoPaneViewport(820, 1180)).toBe(false); // iPad portrait stays solo
     });
     test("landscape-solo needs half-pane overflow, not stage-likeness", () => {
         expect(shouldSoloLandscapeSpread(1600, 900, 1365, 768)).toBe(true); // 1.78 >= 0.89: shrinks in a half pane

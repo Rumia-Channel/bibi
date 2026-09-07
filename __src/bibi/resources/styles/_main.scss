@@ -327,9 +327,10 @@ html.two-pane {
 		align-content: flex-start;
 	}
 	// Vertical-advance books flow top-down by default; pairs open side by side,
-	// mirroring the book's reading direction (first spread at the outer start).
-	&.spread-ttb.appearance-ltr div#bibi-main-book {
-		flex-direction: row;
+	div.spread-box.two-pane-paired {
+		flex: 0 0 50%; // halves share a row by construction: exact px sums break on subpixel/chrome losses and wrap apart
+		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
+		min-height: 0 !important; // beats book-type min-height:100vh
 	}
 	&.spread-ttb.appearance-rtl div#bibi-main-book {
 		flex-direction: row-reverse;

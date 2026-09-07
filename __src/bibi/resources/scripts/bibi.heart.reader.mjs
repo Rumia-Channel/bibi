@@ -156,7 +156,6 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
     SpreadBox.classList.toggle('spreaded', Spread.Spreaded);
     SpreadBox.style[C.L_SIZE_b] = '', Spread.style[C.L_SIZE_b] = ''; // Math.ceil(SpreadSize[C.L_SIZE_B]) + 'px';
     SpreadBox.style[C.L_SIZE_l] =     Spread.style[C.L_SIZE_l] = Math.ceil(SpreadSize[C.L_SIZE_L]) + 'px';
-    if(Spread.PaneWidthFactor == 0.5) SpreadBox.style.width = Math.floor(R.Stage.Width / 2) + 'px'; else SpreadBox.style.width = ''; // paired panes share one row at half stage width (% would resolve against the content-sized container)
     //sML.style(Spread, { 'border-radius': S['spread-border-radius'], 'box-shadow': S['spread-box-shadow'] });
     if(Opt.Makeover) {
         if(!Spread.PrePaginated) R.replacePages(Spread.OldPages, Spread.Pages);
