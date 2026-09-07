@@ -2,7 +2,7 @@
 // Paged 2-up pairs consecutive pairable solo spreads on wide viewports.
 // No structural change: spreads keep one item each, pages flow untouched.
 
-export const isTwoPaneViewport = (W, H) => H * 2 <= W;
+export const isTwoPaneViewport = (W, H) => W * 2 >= H * 3; // 1.5+: side-by-side fills everyday landscape screens (16:9 included); narrower stays solo
 
 export const shouldSoloLandscapeSpread = (VpW, VpH, StageW, StageH) =>
     (VpW / VpH) >= (StageW / StageH) / 2 && VpW >= StageW / 2; // at fit height it overflows a half pane: solo shows it bigger instead of shrinking it in
