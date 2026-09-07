@@ -281,7 +281,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 if(/^inline/i.test(getComputedStyle(Ele).display)) return;
             }
             if(/^inline/i.test(getComputedStyle(Tar).display)) Tar.style.display = 'block';
-            Tar.style.width = Math.max(Tar.offsetWidth, R.paneWidthFor(Item) - ItemPaddingSE) + 'px'; // blocks shrink-wrap to content in vertical-rl: claim the full row so no void remains beside the picture
+            Tar.style.width = Math.max(0, R.paneWidthFor(Item) - ItemPaddingSE) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
             Tar.style.marginLeft = 'auto'; Tar.style.marginRight = 'auto'; Tar.style.textAlign = 'center'; // isolated pictures center in their page (Tar holds no text by construction, or is the picture itself)
             if(Ele !== Tar) { Tar.style.display = 'flex'; Tar.style.alignItems = 'center'; Tar.style.justifyContent = 'center'; } // flex centers on both axes regardless of writing mode (margins/text-align only serve one axis)
             if(Ele !== Tar && /^inline/i.test(getComputedStyle(Ele).display)) Ele.style.display = 'block'; // horizontal centering is block-axis business in vertical writing too
