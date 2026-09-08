@@ -254,8 +254,8 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             let EMaxB = PageCB, EMaxL = PageCL;
             if(S.SLA != ItemLineAxis) EMaxB -= ESpacing, EMaxL -= PPadTRBL[0] + PPadTRBL[2];
             else                      EMaxL -= ESpacing, EMaxB -= PPadTRBL[1] + PPadTRBL[3];
-            const ENatB = Ele['offset' + C.L_SIZE_B];
-            const ENatL = Ele['offset' + C.L_SIZE_L];
+            let ENatB = Ele['offset' + C.L_SIZE_B], ENatL = Ele['offset' + C.L_SIZE_L];
+            if(!(ENatB > 0) || !(ENatL > 0)) { const NW = Ele.naturalWidth, NH = Ele.naturalHeight; if(NW > 0 && NH > 0) { ENatB = (C.L_SIZE_B == 'Width' ? NW : NH); ENatL = (C.L_SIZE_L == 'Width' ? NW : NH); } } // unreadable layout size (transient zero during reflow): fit off natural instead of skipping into stale (result stays EMax-bounded either way)
             const EFitRatio = Math.min(EMaxB / ENatB, EMaxL / ENatL);
             if(EFitRatio < 1) sML.style(Ele, { width: 'auto', height: 'auto',
                 ['max' + C.L_SIZE_B]: Math.floor(ENatB * EFitRatio) + 'px',
@@ -272,7 +272,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
-            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); }
+            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'width', 'maxWidth', 'maxHeight', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); }
             if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
             if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
             if(!Paged) return;
@@ -289,7 +289,14 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Ele !== Tar) Ele.style.marginLeft = 'auto', Ele.style.marginRight = 'auto';
             if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
-            if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { Tar.style.cssFloat = 'left'; Tar.style.width = ''; } // share the strip with prose: shrink to the picture and let prose wrap beside it (text|image or image|text, reading order preserved); keeps break alignment so strips never tear. horizontal content keeps full-row centering below scope.
+            if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose, picture half fixed: prose keeps the other half (both orders OK, reading order preserved); breaks keep strips untorn. horizontal content and narrow viewports keep shrink-to-fit below.
+                Tar.style.cssFloat = 'left';
+                if(R.TwoPane && /^img$/i.test(Ele.tagName) && Ele.naturalWidth > 0) {
+                    const FillW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), Ele.naturalWidth); // half the content width, never upscale beyond natural (aspect preserved, stays sharp)
+                    Tar.style.width = FillW + 'px';
+                    Ele.style.width = FillW + 'px'; Ele.style.height = 'auto'; Ele.style.maxWidth = 'none'; Ele.style.maxHeight = 'none';
+                } else Tar.style.width = '';
+            }
         });
     }
     if(sML.UA.Gecko) { // Part 1/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
