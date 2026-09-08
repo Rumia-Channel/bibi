@@ -470,7 +470,7 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
     let adopted = 0;
     const Metas = R.Spreads.map(Sp => {
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
-        if(!Solo || !Solo.Body || !Solo.contentDocument) return null;
+        if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
         if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) { // re-donates after document reloads (new unflagged nodes); settled pictures are skipped by their adopted flag below
             const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
             if(Media && !Media.BibiAdoptedPicture) return { donor: true };
@@ -485,6 +485,8 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
     planSoloPictureDonations(Metas).forEach(({ from, to, atHead }) => {
         const Donor = R.Spreads[from].Items[0], Recip = R.Spreads[to].Items[0];
         if(!Donor.Body || !Recip.Body || !Recip.contentDocument) return;
+        if(Donor.BibiDonatedTo === to) { try { if(Recip.Body.querySelector(':scope [data-bibi-adopted-from="' + Donor.Index + '"]')) return; } catch(Err) {} } // settled: copy present, nothing to do (no churn across sweeps)
+        if((Donor.BibiAdoptCount || 0) > 8) return; // reload storm guard: stop re-adopting into documents that keep dropping the copy (degrades to inline/pillar, never loops)
         let Tar = R.renderPrePaginatedItem.getSingleMediaElement(Donor);
         if(!Tar || Tar.BibiAdoptedPicture) return;
         let Guard = 0; // climb through textless single-child wrappers (p > img): adopt the paragraph, not the bare picture
@@ -495,13 +497,14 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
         let Adopted = null;
         try {
             Host.querySelectorAll(':scope [data-bibi-adopted-from="' + Donor.Index + '"]').forEach(N => N.remove()); // reload survivor: drop the stale copy from this donor before moving the fresh node
+            if(/^(img|svg)$/i.test(Tar.tagName)) { const Wrap = Recip.contentDocument.createElement('div'); Wrap.appendChild(Recip.contentDocument.adoptNode(Tar)); Tar = Wrap; } // bare pictures need a wrapper: zones equal to the picture box leave no slack for clearance nudges
             Adopted = Recip.contentDocument.adoptNode(Tar); // same-origin iframes: the node moves with listeners and image data, no reload
-            if(atHead) Host.prepend(Adopted); else Host.append(Adopted);
         } catch(Err) { return; }
         try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); } catch(Err) {}
         const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
         if(Media) Media.BibiAdoptedPicture = true;
         Donor.BibiDonationDonor = true;
+        Donor.BibiDonatedTo = to; Donor.BibiAdoptCount = (Donor.BibiAdoptCount || 0) + 1;
         adopted++;
         recipients.add(R.Spreads[to]);
     });
