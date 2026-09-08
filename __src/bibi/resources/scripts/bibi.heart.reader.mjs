@@ -185,6 +185,7 @@ R.layOutItem = async (Item) => {
     if(SoloSizeVerdict !== null) Item.SingleMediaIsBig = SoloSizeVerdict; // dimensions resolved (e.g. image finished loading)
     const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false;
     await ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // big single-media pages (even in reflowable books) are fitted pictures, not column text
+    if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
@@ -266,6 +267,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     { // Separate pictures from prose in paged mode: block-level media gets its own column (= page)
         const Paged = S.RVM == 'paged';
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
+            delete Ele.BibiPictureZone; // re-marked below when the big in-flow branch claims it; stale marks must not survive repurposing
             let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture
             while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8
                 && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
@@ -294,10 +296,12 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
                     const HalfW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
-                    Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it. breakAfter stays: following prose resumes from the next page, never sandwiching the picture into text|image|text
+                    Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
+                    Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'column' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
                     if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
-                    Ele.style.height = 'auto'; // aspect preserved, never distorted
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
+                    Ele.BibiPictureZone = Tar; // audited below for row sharing
+                    Ele.style.height = 'auto'; // aspect preserved, never distorted
                 } else {
                     Tar.style.cssFloat = 'left'; // narrow pictures only: share the column with prose wrapping beside them
                     Tar.style.width = '';
@@ -430,6 +434,33 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     //*/
     resolve();
 }).then(() => Item);
+
+R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture sharing its row with its tail (backfill) keeps following prose off the row; a leading picture lets prose join it (text|image). change-driven, verdict-backed: returns true only when a break changed (caller re-renders at most once); steady rows cost one measurement and no relayout.
+    if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged') return false;
+    const Doc = Item.contentDocument;
+    let Changed = false;
+    sML.forEach(Item.Body.querySelectorAll('img'))(Ele => {
+        const Tar = Ele.BibiPictureZone;
+        if(!Tar || !Tar.isConnected || !Tar.contains(Ele)) return;
+        const Prev = Tar.previousElementSibling;
+        let Shared = false;
+        if(Prev) {
+            try {
+                const Walker = Doc.createTreeWalker(Prev, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+                let Last = null; while(Walker.nextNode()) Last = Walker.currentNode;
+                if(Last) {
+                    const Range = Doc.createRange(); Range.selectNodeContents(Last);
+                    const Rects = Range.getClientRects(), L = Rects[Rects.length - 1], T = Tar.getBoundingClientRect();
+                    if(L && T) Shared = Math.min(L.bottom, T.bottom) - Math.max(L.top, T.top) > 200; // tail's last line lives in the picture's row
+                }
+            } catch(Err) {}
+        }
+        Tar.BibiPictureRowShared = Shared;
+        const Want = Shared ? 'column' : '';
+        if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
+    });
+    return Changed;
+};
 
 /* R.Paginated */ Object.defineProperty(R, 'Paginated', { get: () => {
     if(B.PrePaginated) return true;
