@@ -151,7 +151,7 @@ How to Arrange Development Environment
 
 1. $ `bun start`
     1. webpack generates development version of Bibi to `__dist` folder, and start to watch changes of the files in `__src` folder.
-    2. BrowserSync webserver launches and navigate your browser to `http://localhost:61671/bibi/?book=`.
+    2. BrowserSync webserver launches and navigate your browser to `http://localhost:62222/bibi/?book=`.
 2. Edit source files.
     1. If you modify source files in `__src` folder, development version of the file(s) are updated in `__dist` folder automaticaly.
     2. BrowserSync reloads your browser(s) or inject changes of CSS.
