@@ -205,7 +205,20 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     };
     const ItemPaddingBA = Item.NoPadding ? 0 : Item.Padding[C.L_BASE_B] + Item.Padding[C.L_BASE_A];
     const ItemPaddingSE = Item.NoPadding ? 0 : Item.Padding[C.L_BASE_S] + Item.Padding[C.L_BASE_E];
-    const PageCB = (C.L_SIZE_B == 'Width' && R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 ? R.Stage.Width / 2 : R.Stage[C.L_SIZE_B]) - ItemPaddingSE; // Page "C"ontent "B"readth (paired pane is half stage width)
+    const ItemLineAxis = Item.WritingMode.split('-')[1] == 'tb' ? 'horizontal' : 'vertical'; // inline-axis of the content lines (vertical in vertical writing): shared by fit, isolation, and the text gutter below
+    let TextGutter = 0; // four blank lines at each screen edge: prose never touches the bezel on tablets. measured from a real line box (line thickness = pitch), so it tracks font size and device scaling. flows into PageCB so every page band narrows symmetrically (HTML padding would only pad the strip ends, not interior page edges).
+    if(!Item.NoPadding && Item.Body && Item.contentDocument) {
+        try {
+            const Doc = Item.contentDocument;
+            const Walker = Doc.createTreeWalker(Item.Body, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+            const Widths = [], Range = Doc.createRange();
+            while(Walker.nextNode() && Widths.length < 60) { Range.selectNodeContents(Walker.currentNode); const Rects = Range.getClientRects(); for(let i = 0; i < Rects.length && Widths.length < 60; i++) if(Rects[i].height > 10) Widths.push(ItemLineAxis == 'vertical' ? Rects[i].width : Rects[i].height); }
+            if(Widths.length) { Widths.sort((a, b) => a - b); TextGutter = Widths[Math.floor(Widths.length / 2)]; } // median line thickness = pitch
+            if(!(TextGutter > 0)) TextGutter = parseFloat(getComputedStyle(Item.Body).fontSize) || 16;
+            TextGutter = Math.round(TextGutter * 4);
+        } catch(Err) { TextGutter = 0; }
+    }
+    const PageCB = (C.L_SIZE_B == 'Width' && R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 ? R.Stage.Width / 2 : R.Stage[C.L_SIZE_B]) - ItemPaddingSE - TextGutter * 2; // Page "C"ontent "B"readth (paired pane is half stage width)
     let   PageCL = (C.L_SIZE_L == 'Width' && R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 ? R.Stage.Width / 2 : R.Stage[C.L_SIZE_L]) - ItemPaddingBA; // Page "C"ontent "L"ength (paired pane is half stage width)
     const PageGap = ItemPaddingBA;
     ['b','a','s','e'].forEach(base => { const trbl = C['L_BASE_' + base], TRBL = C['L_BASE_' + base.toUpperCase()]; Item.style['padding-' + trbl] = Item.NoPadding ? 0 : Item.Padding[TRBL] + 'px'; });
@@ -242,7 +255,6 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         [C.L_SIZE_l]: PageCL + 'px'
     });
     const WordWrappingStyleSheetIndex = sML.appendCSSRule(Item.contentDocument, '*', 'word-wrap: break-word; overflow-wrap: break-word;'); ////
-    const ItemLineAxis = Item.WritingMode.split('-')[1] == 'tb' ? 'horizontal' : 'vertical'; // inline-axis of the content lines (vertical in vertical writing): shared by fit and isolation below
     { // Fit Image and Embeded Content
         const [ItemBDir, ItemLDir] = Item.WritingMode.split('-');
         const TRBL = ['Top', 'Right', 'Bottom', 'Left'];
@@ -285,7 +297,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 if(/^inline/i.test(getComputedStyle(Ele).display)) return;
             }
             if(/^inline/i.test(getComputedStyle(Tar).display)) Tar.style.display = 'block';
-            Tar.style.width = Math.max(0, R.paneWidthFor(Item) - ItemPaddingSE) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
+            Tar.style.width = Math.max(0, PageCB) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
             Tar.style.marginLeft = 'auto'; Tar.style.marginRight = 'auto'; Tar.style.textAlign = 'center'; // isolated pictures center in their page (Tar holds no text by construction, or is the picture itself)
             if(Ele !== Tar) { Tar.style.display = 'flex'; Tar.style.alignItems = 'center'; Tar.style.justifyContent = 'center'; } // flex centers on both axes regardless of writing mode (margins/text-align only serve one axis)
             if(Ele !== Tar && /^inline/i.test(getComputedStyle(Ele).display)) Ele.style.display = 'block'; // horizontal centering is block-axis business in vertical writing too
@@ -294,8 +306,8 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its zone, prose keeps the rest (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
-                if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
-                    const HalfW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
+                if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < PageCB / 2)) {
+                    const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
                     Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'column' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
@@ -533,8 +545,6 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
         case   'vertical': return B.WritingMode.split('-')[0] == 'tb';
     }
 } });
-
-
 R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
     sML.style(Item, { width: '', height: '', transform: '' });
     Item.Spreaded = (
