@@ -482,27 +482,30 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
             if(Tar.getClientRects().length !== 1) return; // fragmented zone: do not touch
             const IR = Ele.getBoundingClientRect();
             if(!(IR.width > 0) || IR.width > Half) return; // wider than half: middle-touch impossible
-            const WantX = Tar.BibiPictureRowShared ? Mid - IR.width : Mid; // backfill: right edge to middle; leading: left edge to middle
-            const Dx = Math.round(WantX - IR.left);
-            if(!Dx) return;
-            const TR = Tar.getBoundingClientRect(), TX0 = IR.left + Dx, TX1 = TX0 + IR.width;
+            const TR = Tar.getBoundingClientRect();
             const Walker = Doc.createTreeWalker(Doc.body, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
             const Range = Doc.createRange();
-            let Hit = false;
-            while(Walker.nextNode() && !Hit) {
+            const Rows = [];
+            while(Walker.nextNode()) {
                 const T = Walker.currentNode;
                 if(Tar.contains(T)) continue;
                 try {
                     Range.selectNodeContents(T);
                     const Rects = Range.getClientRects();
-                    for(let i = 0; i < Rects.length && !Hit; i++) {
+                    for(let i = 0; i < Rects.length; i++) {
                         const R0 = Rects[i];
                         if(R0.bottom <= TR.top + 2 || R0.top >= TR.bottom - 2) continue; // outside the picture's row
-                        if(Math.min(R0.right, TX1) - Math.max(R0.left, TX0) > 2) Hit = true; // target occupied: never paint over prose
+                        Rows.push(R0);
                     }
                 } catch(Err) {}
             }
-            if(!Hit) Tar.style.transform = 'translateX(' + Dx + 'px)';
+            const Gap = Rows.length ? (Rows[0].width > 0 ? Rows[0].width : 28) * 2 : 0; // two-line clearance between picture and prose (none needed when the row has no prose)
+            const WantX = Tar.BibiPictureRowShared ? Mid - IR.width - Gap : Mid + Gap; // backfill: right edge near middle; leading: left edge near middle; both keep two lines off the prose
+            const Dx = Math.round(WantX - IR.left);
+            if(!Dx) return;
+            const TX0 = IR.left + Dx, TX1 = TX0 + IR.width;
+            for(let i = 0; i < Rows.length; i++) if(Math.min(Rows[i].right, TX1) - Math.max(Rows[i].left, TX0) > 2) return; // target occupied: never paint over prose
+            Tar.style.transform = 'translateX(' + Dx + 'px)';
         } catch(Err) {}
     });
 };
