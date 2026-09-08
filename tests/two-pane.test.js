@@ -1,4 +1,4 @@
-import { isPairableSpread, isTwoPaneViewport, planTwoPaneGroups, shouldSoloLandscapeSpread } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
+import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, SOLO_PICTURE_MIN_TEXT_LENGTH } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -70,6 +70,34 @@ describe("two-pane geometry", () => {
         expect(planTwoPaneGroups([P(), { pairable: true, soloLandscape: true }, P()])).toEqual([[0], [1], [2]]);
         expect(planTwoPaneGroups([S, P(), P(), S])).toEqual([[0], [1, 2], [3]]);
         expect(planTwoPaneGroups([])).toEqual([]);
+    });
+});
+
+describe("solo picture donation", () => {
+    const D = { donor: true };
+    const T = (textLen = 20000) => ({ donor: false, textLen });
+    test("title illustration prefers next-head, falls back to prev-tail", () => {
+        expect(planSoloPictureDonations([T(), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([T(), D])).toEqual([{ from: 1, to: 0, atHead: false }]);
+        expect(planSoloPictureDonations([D, T()])).toEqual([{ from: 0, to: 1, atHead: true }]);
+    });
+    test("short neighbors are gallery context: pictures stay standalone", () => {
+        expect(planSoloPictureDonations([T(600), D, T(600)])).toEqual([]);
+        expect(planSoloPictureDonations([T(600), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([T(), D, T(600)])).toEqual([{ from: 1, to: 0, atHead: false }]);
+        expect(planSoloPictureDonations([{ donor: false, textLen: SOLO_PICTURE_MIN_TEXT_LENGTH }, D])).toEqual([{ from: 1, to: 0, atHead: false }]);
+    });
+    test("non-text neighbors never receive; one donation per recipient end", () => {
+        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]);
+        expect(planSoloPictureDonations([null, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([])).toEqual([]);
+    });
+    test("donation runs pre-layout and converges late pictures via regroup", () => {
+        const src = reader();
+        expect(src).toContain("R.donateSoloPictures();");
+        expect(src).toContain("BibiDonationDonor");
+        expect(src).toContain("BibiAdoptedPicture");
     });
 });
 

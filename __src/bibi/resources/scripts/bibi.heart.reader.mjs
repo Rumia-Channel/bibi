@@ -3,7 +3,7 @@
 import { Bibi, O, L, R, I, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
 import { W } from './bibi.heart.wand.mjs';
-import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups } from './bibi.heart.twopane.mjs';
+import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, planSoloPictureDonations } from './bibi.heart.twopane.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -183,7 +183,7 @@ R.layOutItem = async (Item) => {
     const SoloMediaEl = (Item.OnlySingleSVG || Item.OnlySingleImg) ? R.renderPrePaginatedItem.getSingleMediaElement(Item) : null;
     const SoloSizeVerdict = SoloMediaEl ? R.singleMediaIsBig(SoloMediaEl) : null;
     if(SoloSizeVerdict !== null) Item.SingleMediaIsBig = SoloSizeVerdict; // dimensions resolved (e.g. image finished loading)
-    const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false;
+    const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false && !Item.BibiDonationDonor; // donated-away husks render reflowable (and collapse to zero pages below), never as fitted solo pictures
     await ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // big single-media pages (even in reflowable books) are fitted pictures, not column text
     if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
     if(Item.Reflowable && !SoloBigPicture) R.alignPicturesToMiddle(Item); // geta: touch solo pictures to the page middle (visual only, exclusion kept)
@@ -387,7 +387,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     if(sML.UA.Gecko) { // Part 2/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
         if(Item.OFREs.length) Item.OFREs.forEach(OFRE => sML.style(OFRE, { width: OFRE.offsetWidth + 'px', height: OFRE.offsetHeight + 'px' }));
     }
-    const [ItemL, HowManyPages] = (() => {
+    let [ItemL, HowManyPages] = (() => {
         let ItemL, HowManyPages;
         const LineSpacing = (() => {
             const Ps = Item.Body.querySelectorAll('p');
@@ -406,6 +406,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         })();
         return [ItemL, HowManyPages];
     })();
+    if(Item.BibiDonationDonor && R.isBlankPageContent(Item)) { HowManyPages = 0; ItemL = 0; } // donated-away husk dissolves (no blank stop); text-bearing donors keep their pages
     Item.Box.style[C.L_SIZE_b] = (PageCB + ItemPaddingSE) + 'px';
     Item.Box.style[C.L_SIZE_l] = (ItemL + ItemPaddingBA /* + ((S.RVM == 'paged' && Item.Spreaded && HowManyPages % 2) ? (PageGap + PageCL) : 0) */ ) + 'px';
     Item.Pages.forEach(Page => {
@@ -447,6 +448,47 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     //*/
     resolve();
 }).then(() => Item);
+
+R.donateSoloPictures = () => { // dissolve standalone title illustrations into adjacent long text: the picture node is adopted into the text flow and processed as an inline illustration (same zone/middle/clearance machinery). idempotent; returns { adopted, recipients }.
+    const recipients = new Set();
+    let adopted = 0;
+    const Metas = R.Spreads.map(Sp => {
+        const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
+        if(!Solo || !Solo.Body || !Solo.contentDocument) return null;
+        if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true && !Solo.BibiDonationDonor) {
+            const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
+            if(Media && !Media.BibiAdoptedPicture) return { donor: true };
+        }
+        if(Solo.Reflowable && !Solo.OnlySingleSVG && !Solo.OnlySingleImg) {
+            let textLen = 0;
+            try { textLen = (O.getElementInnerText(Solo.Body) || '').length; } catch(Err) {}
+            return { donor: false, textLen };
+        }
+        return null;
+    });
+    planSoloPictureDonations(Metas).forEach(({ from, to, atHead }) => {
+        const Donor = R.Spreads[from].Items[0], Recip = R.Spreads[to].Items[0];
+        if(!Donor.Body || !Recip.Body || !Recip.contentDocument) return;
+        let Tar = R.renderPrePaginatedItem.getSingleMediaElement(Donor);
+        if(!Tar || Tar.BibiAdoptedPicture) return;
+        let Guard = 0; // climb through textless single-child wrappers (p > img): adopt the paragraph, not the bare picture
+        while(Tar.parentElement && Tar.parentElement !== Donor.Body && Guard++ < 8
+            && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
+            && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
+        const Host = Recip.Body.querySelector('div.main') || Recip.Body;
+        let Adopted = null;
+        try {
+            Adopted = Recip.contentDocument.adoptNode(Tar); // same-origin iframes: the node moves with listeners and image data, no reload
+            if(atHead) Host.prepend(Adopted); else Host.append(Adopted);
+        } catch(Err) { return; }
+        const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
+        if(Media) Media.BibiAdoptedPicture = true;
+        Donor.BibiDonationDonor = true;
+        adopted++;
+        recipients.add(R.Spreads[to]);
+    });
+    return { adopted, recipients: [...recipients] };
+};
 
 R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture sharing its row with its tail (backfill) keeps following prose off the row; a leading picture lets prose join it (text|image). change-driven, verdict-backed: returns true only when a break changed (caller re-renders at most once); steady rows cost one measurement and no relayout.
     if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged') return false;
@@ -607,7 +649,6 @@ R.isBlankPageContent = (Item) => { // true only when the document is present and
     try {
         const Doc = Item.contentDocument;
         if(!Doc || !Doc.body) return false;
-        if(O.getElementInnerText(Doc.body)) return false;
         const Media = Doc.body.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object');
         return !Media;
     } catch(Err) { return false; }
@@ -649,6 +690,7 @@ R.isTwoPaneViewport = isTwoPaneViewport;
 R.shouldSoloLandscapeSpread = shouldSoloLandscapeSpread;
 R.isPairableSpread = isPairableSpread;
 R.planTwoPaneGroups = planTwoPaneGroups;
+R.planSoloPictureDonations = planSoloPictureDonations;
 R.paneWidthFor = (Item) => (R.TwoPane && Item.Spread && Item.Spread.PaneWidthFactor == 0.5) ? R.Stage.Width / 2 : R.Stage.Width;
 R.updateTwoPaneGrouping = () => {
     const Spreads = R.Spreads;
@@ -682,8 +724,10 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
         if(R.LayingOut) { R.requestTwoPaneRegroup(); return; }
         R.TwoPaneRelaying = true;
         try {
+            const Donation = R.donateSoloPictures(); // late-resolving pictures dissolve here (bulk pass runs pre-layout in layOutBook); recipients join the relayout even when grouping is unchanged for them
             const { changed, spreads } = R.updateTwoPaneGrouping();
-            if(changed && spreads.length) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.organizePages(); try { I.PageObserver.updateCurrent(); } catch(Err) {} R.snapTwoPaneView(); }); // layOutSpread rebuilds Spread.Pages from recreated item pages but leaves R.Pages/Current pointing at detached nodes (slider math crashes on them) — rebuild both
+            Donation.recipients.forEach(Sp => { if(!spreads.includes(Sp)) spreads.push(Sp); });
+            if(spreads.length && (changed || Donation.adopted)) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.organizePages(); try { I.PageObserver.updateCurrent(); } catch(Err) {} R.snapTwoPaneView(); }); // layOutSpread rebuilds Spread.Pages from recreated item pages but leaves R.Pages/Current pointing at detached nodes (slider math crashes on them) — rebuild both
         } finally { R.TwoPaneRelaying = false; }
     }, 120);
 };
@@ -787,6 +831,7 @@ R.layOutBook = (Opt) => new Promise((resolve, reject) => setTimeout(() => {
     setTimeout(() => Promise.resolve().then(() => typeof Opt.before == 'function' ? Opt.before() : true).then(() => {
         if(!Opt.Reset) return resolve();
         if(!Opt.ResetOnlyContent) R.resetStage();
+        R.donateSoloPictures(); // bulk pass: standalone pictures dissolve into adjacent long text before pagination (late-resolving ones follow via regroup)
         R.updateTwoPaneGrouping(); // signature-guarded: first layout, resizes, and setting changes converge here
         const Promises = [];
         R.Spreads.forEach(Spread => Promises.push(R.layOutSpreadAndItsItems(Spread)));
