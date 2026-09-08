@@ -499,13 +499,28 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
                     }
                 } catch(Err) {}
             }
-            const Gap = Rows.length ? (Rows[0].width > 0 ? Rows[0].width : 28) * 2 : 0; // two-line clearance between picture and prose (none needed when the row has no prose)
-            const WantX = Tar.BibiPictureRowShared ? Mid - IR.width - Gap : Mid + Gap; // backfill: right edge near middle; leading: left edge near middle; both keep two lines off the prose
-            const Dx = Math.round(WantX - IR.left);
-            if(!Dx) return;
-            const TX0 = IR.left + Dx, TX1 = TX0 + IR.width;
-            for(let i = 0; i < Rows.length; i++) if(Math.min(Rows[i].right, TX1) - Math.max(Rows[i].left, TX0) > 2) return; // target occupied: never paint over prose
-            Tar.style.transform = 'translateX(' + Dx + 'px)';
+            const Pitch = Rows.length && Rows[0].width > 0 ? Rows[0].width : 28, Need = Rows.length ? Pitch * 2 : 0; // two-line clearance (none needed when the row has no prose)
+            let dL = 1e9, dR = 1e9;
+            for(let i = 0; i < Rows.length; i++) {
+                const R0 = Rows[i];
+                if(R0.right <= IR.left + 2) dL = Math.min(dL, IR.left - R0.right);
+                else if(R0.left >= IR.right - 2) dR = Math.min(dR, R0.left - IR.right);
+                else if(Math.min(R0.right, IR.right) - Math.max(R0.left, IR.left) > 2) return; // overlapping layout: do not touch
+            }
+            const Cands = [Tar.BibiPictureRowShared ? Mid - IR.width : Mid]; // first: middle-touch (backfill right edge to middle, leading left edge to middle)
+            if(Math.min(dL, dR) < Need) Cands.push(dL <= dR ? IR.left + (Need - dL) : IR.right - (Need - dR) - IR.width); // fallback: back off the nearer prose
+            for(let c = 0; c < Cands.length; c++) {
+                const WantX = Math.round(Cands[c]), TX1 = WantX + IR.width;
+                if(WantX < ContentLeft - 1 || TX1 > ContentLeft + Item.ColumnBreadth + 1) continue; // never leave the content: a shift past the edge would paint over chrome or clip
+                let gL = 1e9, gR = 1e9, Hit = false;
+                for(let i = 0; i < Rows.length && !Hit; i++) {
+                    const R0 = Rows[i];
+                    if(R0.right <= WantX + 2) gL = Math.min(gL, WantX - R0.right);
+                    else if(R0.left >= TX1 - 2) gR = Math.min(gR, R0.left - TX1);
+                    else if(Math.min(R0.right, TX1) - Math.max(R0.left, WantX) > 2) Hit = true;
+                }
+                if(!Hit && Math.min(gL, gR) >= Need - 1) { if(WantX !== Math.round(IR.left)) Tar.style.transform = 'translateX(' + Math.round(WantX - IR.left) + 'px)'; return; }
+            }
         } catch(Err) {}
     });
 };
