@@ -200,7 +200,7 @@ R.layOutItem = async (Item) => {
     }
     await (HuskDissolved ? Promise.resolve() : ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item))); // big single-media pages (even in reflowable books) are fitted pictures, not column text
     if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
-    if(Item.Reflowable && !SoloBigPicture) R.alignPicturesToMiddle(Item); // geta: touch solo pictures to the page middle (visual only, exclusion kept)
+    if(Item.Reflowable && !SoloBigPicture) R.clearPictureMargins(Item); // two-line clearance around solo pictures (in-zone nudge, stranding-free)
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
@@ -318,13 +318,12 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             Tar.style.width = Math.max(0, PageCB) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
             Tar.style.marginLeft = 'auto'; Tar.style.marginRight = 'auto'; Tar.style.textAlign = 'center'; // isolated pictures center in their page (Tar holds no text by construction, or is the picture itself)
             if(Ele !== Tar) { Tar.style.display = 'flex'; Tar.style.alignItems = 'center'; Tar.style.justifyContent = 'center'; } // flex centers on both axes regardless of writing mode (margins/text-align only serve one axis)
-            if(Ele !== Tar && /^inline/i.test(getComputedStyle(Ele).display)) Ele.style.display = 'block'; // horizontal centering is block-axis business in vertical writing too
             if(Ele !== Tar) Ele.style.marginLeft = 'auto', Ele.style.marginRight = 'auto';
             if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its zone, prose keeps the rest (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
-                if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName) && !(mediaNaturalWidth(Ele) > 0 && mediaNaturalWidth(Ele) < PageCB / 2)) { // vector pictures share the inline machinery: intrinsic size via viewBox, same zone/middle/clearance verdicts as raster
+                if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName) && !(mediaNaturalWidth(Ele) > 0 && mediaNaturalWidth(Ele) < PageCB / 3)) { // pictures wider than a third of the band claim the half zone (narrower ones share the column); medium illustrations must not stay floats (fragment overflow paints over prose)
                     const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
@@ -539,23 +538,21 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
     return Changed;
 };
 
-R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page middle (visual transform only; the exclusion zone stays put, so no reflow and no overlap). backfilled pictures touch the middle with their right edge, leading ones with their left edge. dead space verified per row; skipped on any doubt.
-    if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged' || !Item.Columned || !(Item.ColumnBreadth > 0)) return;
+R.clearPictureMargins = (Item) => { // two-line clearance around solo pictures, stranding-free: the picture slides inside its own zone slack (exclusion untouched, no reflow, no void). pictures flush to the zone's text edge by construction; only nudge when prose comes closer than two lines and the slack allows it. skips (keeps natural) whenever any doubt remains.
+    if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged' || !Item.Columned) return;
     const Doc = Item.contentDocument;
-    const ContentLeft = Item.HTML.getBoundingClientRect().left + (Item.Padding ? Item.Padding.Left : 0);
-    const Mid = ContentLeft + Item.ColumnBreadth / 2, Half = Item.ColumnBreadth / 2;
     const Tars = [];
     sML.forEach(Item.Body.querySelectorAll('img, svg'))(Ele => {
         const Tar = Ele.BibiPictureZone;
         if(!Tar || !Tar.isConnected || !Tar.contains(Ele)) return;
-        Tar.style.transform = ''; Tars.push([Ele, Tar]); // clear stale shifts; measure pure layout below
+        if(Tar.style.transform) Tar.style.transform = ''; // drop stale shifts (older middle-touch builds): clearance nudges live on margins now
+        Tars.push([Ele, Tar]);
     });
     Tars.forEach(([Ele, Tar]) => {
         try {
             if(Tar.getClientRects().length !== 1) return; // fragmented zone: do not touch
-            const IR = Ele.getBoundingClientRect();
-            if(!(IR.width > 0) || IR.width > Half) return; // wider than half: middle-touch impossible
-            const TR = Tar.getBoundingClientRect();
+            const TR = Tar.getBoundingClientRect(), IR = Ele.getBoundingClientRect();
+            if(!(IR.width > 0)) return;
             const Walker = Doc.createTreeWalker(Doc.body, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
             const Range = Doc.createRange();
             const Rows = [];
@@ -572,7 +569,7 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
                     }
                 } catch(Err) {}
             }
-            const Pitch = Rows.length && Rows[0].width > 0 ? Rows[0].width : 28, Need = Rows.length ? Pitch * 2 : 0; // two-line clearance (none needed when the row has no prose)
+            let Pitch = 0; for(let i = 0; i < Rows.length; i++) if(Rows[i].width > Pitch) Pitch = Rows[i].width; if(!(Pitch > 0)) Pitch = 28; const Need = Pitch * 2; // two-line clearance from the row's widest line (first-line sampling caught small print)
             let dL = 1e9, dR = 1e9;
             for(let i = 0; i < Rows.length; i++) {
                 const R0 = Rows[i];
@@ -580,20 +577,13 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
                 else if(R0.left >= IR.right - 2) dR = Math.min(dR, R0.left - IR.right);
                 else if(Math.min(R0.right, IR.right) - Math.max(R0.left, IR.left) > 2) return; // overlapping layout: do not touch
             }
-            const Cands = [Tar.BibiPictureRowShared ? Mid - IR.width : Mid]; // first: middle-touch (backfill right edge to middle, leading left edge to middle)
-            if(Math.min(dL, dR) < Need) Cands.push(dL <= dR ? IR.left + (Need - dL) : IR.right - (Need - dR) - IR.width); // fallback: back off the nearer prose
-            for(let c = 0; c < Cands.length; c++) {
-                const WantX = Math.round(Cands[c]), TX1 = WantX + IR.width;
-                if(WantX < ContentLeft - 1 || TX1 > ContentLeft + Item.ColumnBreadth + 1) continue; // never leave the content: a shift past the edge would paint over chrome or clip
-                let gL = 1e9, gR = 1e9, Hit = false;
-                for(let i = 0; i < Rows.length && !Hit; i++) {
-                    const R0 = Rows[i];
-                    if(R0.right <= WantX + 2) gL = Math.min(gL, WantX - R0.right);
-                    else if(R0.left >= TX1 - 2) gR = Math.min(gR, R0.left - TX1);
-                    else if(Math.min(R0.right, TX1) - Math.max(R0.left, WantX) > 2) Hit = true;
-                }
-                if(!Hit && Math.min(gL, gR) >= Need - 1) { if(WantX !== Math.round(IR.left)) Tar.style.transform = 'translateX(' + Math.round(WantX - IR.left) + 'px)'; return; }
-            }
+            const slackR = TR.right - IR.right; // in-zone slack only: never past the zone edge (that would strand exclusion void)
+            const slackL = IR.left - TR.left;
+            let Net = 0;
+            if(dL < Need) Net += Need - dL; // prose too close on the left: back off rightward
+            if(dR < Need) Net -= Need - dR; // prose too close on the right: back off leftward
+            if(!Net || Net > slackR + 4 || Net < -slackL - 4) return; // already clear, or the slot cannot hold picture plus clearance: keep natural (4px sub-line tolerance for rounding noise)
+            Ele.style.marginLeft = (parseFloat(Ele.style.marginLeft) || 0) + Math.round(Net) + 'px';
         } catch(Err) {}
     });
 };
