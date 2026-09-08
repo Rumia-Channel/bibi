@@ -844,9 +844,13 @@ L.postprocessItem = (Item) => {
             });
             if(Lv1Eles && Lv1Eles.length == 1) {
                 const Lv1Ele = Item.contentDocument.querySelector('body>*:not(script):not(style)');
-                const WrappedSingleMedia = (/^div$/i.test(Lv1Ele.tagName) && Lv1Ele.firstElementChild && !Lv1Ele.firstElementChild.nextElementSibling) ? Lv1Ele.firstElementChild : null; // div-wrapped cover pattern (e.g. Kadokawa): <div><svg viewBox=...>
-                     if((    /^svg$/i.test(Lv1Ele.tagName)          ) || (WrappedSingleMedia &&   /^svg$/i.test(WrappedSingleMedia.tagName) && WrappedSingleMedia.getAttribute('viewBox'))) Item.Outsourcing = Item.OnlySingleSVG = true;
-                else if((    /^img$/i.test(Lv1Ele.tagName)          ) || (WrappedSingleMedia &&   /^img$/i.test(WrappedSingleMedia.tagName)                                                     )) Item.Outsourcing = Item.OnlySingleImg = true;
+                const DeepSingle = R.renderPrePaginatedItem.getSingleMediaElement(Item); // div > p > img nests included
+                const SingleSVG = (DeepSingle && /^svg$/i.test(DeepSingle.tagName) && DeepSingle.getAttribute('viewBox')) ? DeepSingle : null; // viewBox keeps parity with the direct-svg rule
+                const SingleImg = (DeepSingle && /^img$/i.test(DeepSingle.tagName)) ? DeepSingle : null;
+                const WrappedTextless = !DeepSingle || Lv1Ele === DeepSingle || !O.getElementInnerText(Lv1Ele); // captioned wrappers stay reflowable
+                Item.SingleMediaIsBig = (SingleSVG || SingleImg) ? R.singleMediaIsBig(SingleSVG || SingleImg) : undefined; // true | false | null(unknown until load)
+                     if(SingleSVG && WrappedTextless && Item.SingleMediaIsBig !== false) Item.Outsourcing = Item.OnlySingleSVG = true;
+                else if(SingleImg && WrappedTextless && Item.SingleMediaIsBig !== false) Item.Outsourcing = Item.OnlySingleImg = true;
                 else if( /^iframe$/i.test(Lv1Ele.tagName)) Item.Outsourcing =                      true;
                 else if(!O.getElementInnerText(Item.Body)) Item.Outsourcing =                      true;
             }

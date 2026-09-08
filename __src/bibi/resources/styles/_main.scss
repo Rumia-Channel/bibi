@@ -313,3 +313,45 @@ html:not(.moving):not(.mouse-pressing) {
 		}
 	}
 }
+// ================================================================================
+// + Two-Pane (paged 2-up; html.two-pane toggled from R.resetStage)
+// --------------------------------------------------------------------------------
+// Paired spreads share one viewport row at half width. Solo spreads, scroll
+// modes, and narrow viewports are untouched (no .two-pane-paired mark).
+html.two-pane {
+	// Paired spreads share one row at half width (book-like opening); solo spreads
+	// keep full-width rows. Scroll modes and narrow viewports never get the marks.
+	div#bibi-main-book {
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		align-content: flex-start;
+	}
+	// Vertical-advance books flow top-down by default; pairs open side by side,
+	div.spread-box.two-pane-paired {
+		flex: 0 0 50%; // halves share a row by construction: exact px sums break on subpixel/chrome losses and wrap apart
+		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
+		min-height: 0 !important; // beats book-type min-height:100vh
+	}
+	&.spread-ttb.appearance-rtl div#bibi-main-book {
+		flex-direction: row-reverse;
+	}
+	div.spread-box.two-pane-paired {
+		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
+		min-height: 0 !important; // beats book-type min-height:100vh
+	}
+	// Pair contents hug the shared spine instead of centering in their pane.
+	&.spread-ltr div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-ttb.appearance-ltr div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-rtl div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-ttb.appearance-rtl div.spread-box.two-pane-pair-second div.item-box {
+		margin-left: auto;
+		margin-right: 0;
+	}
+	&.spread-ltr div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-ttb.appearance-ltr div.spread-box.two-pane-pair-second div.item-box,
+	&.spread-rtl div.spread-box.two-pane-pair-first div.item-box,
+	&.spread-ttb.appearance-rtl div.spread-box.two-pane-pair-first div.item-box {
+		margin-left: 0;
+		margin-right: auto;
+	}
+}

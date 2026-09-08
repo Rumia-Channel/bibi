@@ -30,7 +30,7 @@ const Config = {
     performance  : { maxEntrypointSize: 1000000, maxAssetSize: 1000000, hints: false  },
     output       : { path: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), filename: '[name].js' },
     // Serves DIST for `bun run serve` (replaces browser-sync/bs-config.cjs; port and start path preserved).
-    devServer    : { port: 61671, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true },
+    devServer    : { port: 62222, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true }, // 61671 falls inside Windows' excluded port ranges on some machines (EACCES); 62222 sits clear of them
     module       : { rules: [] },
     optimization : { minimizer: [] },
     plugins      : [],
