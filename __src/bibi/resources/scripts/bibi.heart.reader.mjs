@@ -448,11 +448,14 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
         if(Prev) {
             try {
                 const Walker = Doc.createTreeWalker(Prev, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
-                let Last = null; while(Walker.nextNode()) Last = Walker.currentNode;
-                if(Last) {
-                    const Range = Doc.createRange(); Range.selectNodeContents(Last);
-                    const Rects = Range.getClientRects(), L = Rects[Rects.length - 1], T = Tar.getBoundingClientRect();
-                    if(L && T) Shared = Math.min(L.bottom, T.bottom) - Math.max(L.top, T.top) > 200; // tail's last line lives in the picture's row
+                const Range = Doc.createRange(), T = Tar.getBoundingClientRect();
+                while(Walker.nextNode() && !Shared) {
+                    Range.selectNodeContents(Walker.currentNode);
+                    const Rects = Range.getClientRects();
+                    for(let i = 0; i < Rects.length; i++) {
+                        const L = Rects[i];
+                        if(Math.min(L.bottom, T.bottom) - Math.max(L.top, T.top) > 100) { Shared = true; break; } // any tail line lives in the picture's row (last-line-only missed ragged short ends)
+                    }
                 }
             } catch(Err) {}
         }
