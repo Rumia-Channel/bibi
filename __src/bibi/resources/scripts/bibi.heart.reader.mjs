@@ -240,8 +240,9 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         [C.L_SIZE_l]: PageCL + 'px'
     });
     const WordWrappingStyleSheetIndex = sML.appendCSSRule(Item.contentDocument, '*', 'word-wrap: break-word; overflow-wrap: break-word;'); ////
+    const ItemLineAxis = Item.WritingMode.split('-')[1] == 'tb' ? 'horizontal' : 'vertical'; // inline-axis of the content lines (vertical in vertical writing): shared by fit and isolation below
     { // Fit Image and Embeded Content
-        const [ItemBDir, ItemLDir] = Item.WritingMode.split('-'), ItemLineAxis = ItemLDir == 'tb' ? 'horizontal' : 'vertical';
+        const [ItemBDir, ItemLDir] = Item.WritingMode.split('-');
         const TRBL = ['Top', 'Right', 'Bottom', 'Left'];
         sML.forEach(Item.Body.querySelectorAll('img, picture, svg, video, iframe'))(Ele => {
             if(!Ele.BibiDefaultStyle) { Ele.BibiDefaultStyle = {}; ['width', 'height', 'maxWidth', 'maxHeight'].forEach(Pro => Ele.BibiDefaultStyle[Pro] = Ele.style[Pro] || ''); }
@@ -269,7 +270,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8
                 && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
                 && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
-            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
+            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); }
             if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
@@ -288,6 +289,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Ele !== Tar) Ele.style.marginLeft = 'auto', Ele.style.marginRight = 'auto';
             if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
+            if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { Tar.style.cssFloat = 'left'; Tar.style.width = ''; } // share the strip with prose: shrink to the picture and let prose wrap beside it (text|image or image|text, reading order preserved); keeps break alignment so strips never tear. horizontal content keeps full-row centering below scope.
         });
     }
     if(sML.UA.Gecko) { // Part 1/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
