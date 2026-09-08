@@ -649,6 +649,7 @@ R.isBlankPageContent = (Item) => { // true only when the document is present and
     try {
         const Doc = Item.contentDocument;
         if(!Doc || !Doc.body) return false;
+        if(O.getElementInnerText(Doc.body)) return false; // has prose: pairable content, not a blank
         const Media = Doc.body.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object');
         return !Media;
     } catch(Err) { return false; }

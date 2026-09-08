@@ -157,4 +157,12 @@ describe("two-pane wiring", () => {
         expect(i).toBeGreaterThan(-1);
         expect(src.slice(Math.max(0, i - 160), i)).toContain("OnlySingleSVG");
     });
+    test("blank means no prose and no media, so single-page texts can pair", () => {
+        // media-only blank verdicts locked every pure-text page solo (tail afterword
+        // and questionnaire could never face each other). prose must disqualify blank.
+        const src = reader();
+        const i = src.indexOf("R.isBlankPageContent = (Item) =>");
+        expect(i).toBeGreaterThan(-1);
+        expect(src.slice(i, i + 600)).toContain("getElementInnerText(Doc.body)");
+    });
 });
