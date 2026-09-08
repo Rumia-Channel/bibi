@@ -186,6 +186,7 @@ R.layOutItem = async (Item) => {
     const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false;
     await ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // big single-media pages (even in reflowable books) are fitted pictures, not column text
     if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
+    if(Item.Reflowable && !SoloBigPicture) R.alignPicturesToMiddle(Item); // geta: touch solo pictures to the page middle (visual only, exclusion kept)
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
@@ -460,6 +461,47 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
     });
     return Changed;
+};
+
+R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page middle (visual transform only; the exclusion zone stays put, so no reflow and no overlap). backfilled pictures touch the middle with their right edge, leading ones with their left edge. dead space verified per row; skipped on any doubt.
+    if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged' || !Item.Columned || !(Item.ColumnBreadth > 0)) return;
+    const Doc = Item.contentDocument;
+    const ContentLeft = Item.HTML.getBoundingClientRect().left + (Item.Padding ? Item.Padding.Left : 0);
+    const Mid = ContentLeft + Item.ColumnBreadth / 2, Half = Item.ColumnBreadth / 2;
+    const Tars = [];
+    sML.forEach(Item.Body.querySelectorAll('img'))(Ele => {
+        const Tar = Ele.BibiPictureZone;
+        if(!Tar || !Tar.isConnected || !Tar.contains(Ele)) return;
+        Tar.style.transform = ''; Tars.push([Ele, Tar]); // clear stale shifts; measure pure layout below
+    });
+    Tars.forEach(([Ele, Tar]) => {
+        try {
+            if(Tar.getClientRects().length !== 1) return; // fragmented zone: do not touch
+            const IR = Ele.getBoundingClientRect();
+            if(!(IR.width > 0) || IR.width > Half) return; // wider than half: middle-touch impossible
+            const WantX = Tar.BibiPictureRowShared ? Mid - IR.width : Mid; // backfill: right edge to middle; leading: left edge to middle
+            const Dx = Math.round(WantX - IR.left);
+            if(!Dx) return;
+            const TR = Tar.getBoundingClientRect(), TX0 = IR.left + Dx, TX1 = TX0 + IR.width;
+            const Walker = Doc.createTreeWalker(Doc.body, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+            const Range = Doc.createRange();
+            let Hit = false;
+            while(Walker.nextNode() && !Hit) {
+                const T = Walker.currentNode;
+                if(Tar.contains(T)) continue;
+                try {
+                    Range.selectNodeContents(T);
+                    const Rects = Range.getClientRects();
+                    for(let i = 0; i < Rects.length && !Hit; i++) {
+                        const R0 = Rects[i];
+                        if(R0.bottom <= TR.top + 2 || R0.top >= TR.bottom - 2) continue; // outside the picture's row
+                        if(Math.min(R0.right, TX1) - Math.max(R0.left, TX0) > 2) Hit = true; // target occupied: never paint over prose
+                    }
+                } catch(Err) {}
+            }
+            if(!Hit) Tar.style.transform = 'translateX(' + Dx + 'px)';
+        } catch(Err) {}
+    });
 };
 
 /* R.Paginated */ Object.defineProperty(R, 'Paginated', { get: () => {
