@@ -193,7 +193,12 @@ R.layOutItem = async (Item) => {
     const SoloSizeVerdict = SoloMediaEl ? R.singleMediaIsBig(SoloMediaEl) : null;
     if(SoloSizeVerdict !== null) Item.SingleMediaIsBig = SoloSizeVerdict; // dimensions resolved (e.g. image finished loading)
     const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false && !Item.BibiDonationDonor; // donated-away husks render reflowable (and collapse to zero pages below), never as fitted solo pictures
-    await ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item)); // big single-media pages (even in reflowable books) are fitted pictures, not column text
+    const HuskDissolved = Item.BibiDonationDonor && R.isBlankPageContent(Item); // empty husk: drop pages and skip render (modeless items have no writing mode for the column machinery)
+    if(HuskDissolved) {
+        Item.Pages.forEach(Page => { delete Page.IsPage; try { I.PageObserver.unobservePageIntersection(Page); } catch(Err) {} if(Page.parentNode) Page.parentNode.removeChild(Page); });
+        Item.Pages = [];
+    }
+    await (HuskDissolved ? Promise.resolve() : ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item))); // big single-media pages (even in reflowable books) are fitted pictures, not column text
     if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
     if(Item.Reflowable && !SoloBigPicture) R.alignPicturesToMiddle(Item); // geta: touch solo pictures to the page middle (visual only, exclusion kept)
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
@@ -400,7 +405,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     if(sML.UA.Gecko) { // Part 2/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
         if(Item.OFREs.length) Item.OFREs.forEach(OFRE => sML.style(OFRE, { width: OFRE.offsetWidth + 'px', height: OFRE.offsetHeight + 'px' }));
     }
-    let [ItemL, HowManyPages] = (() => {
+    const [ItemL, HowManyPages] = (() => {
         let ItemL, HowManyPages;
         const LineSpacing = (() => {
             const Ps = Item.Body.querySelectorAll('p');
@@ -419,7 +424,6 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         })();
         return [ItemL, HowManyPages];
     })();
-    if(Item.BibiDonationDonor && R.isBlankPageContent(Item)) { HowManyPages = 0; ItemL = 0; } // donated-away husk dissolves (no blank stop); text-bearing donors keep their pages
     Item.Box.style[C.L_SIZE_b] = (PageCB + ItemPaddingSE) + 'px';
     Item.Box.style[C.L_SIZE_l] = (ItemL + ItemPaddingBA /* + ((S.RVM == 'paged' && Item.Spreaded && HowManyPages % 2) ? (PageGap + PageCL) : 0) */ ) + 'px';
     Item.Pages.forEach(Page => {
@@ -468,7 +472,7 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
     const Metas = R.Spreads.map(Sp => {
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.Body || !Solo.contentDocument) return null;
-        if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true && !Solo.BibiDonationDonor) {
+        if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) { // re-donates after document reloads (new unflagged nodes); settled pictures are skipped by their adopted flag below
             const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
             if(Media && !Media.BibiAdoptedPicture) return { donor: true };
         }
@@ -491,9 +495,11 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
         const Host = Recip.Body.querySelector('div.main') || Recip.Body;
         let Adopted = null;
         try {
+            Host.querySelectorAll(':scope [data-bibi-adopted-from="' + Donor.Index + '"]').forEach(N => N.remove()); // reload survivor: drop the stale copy from this donor before moving the fresh node
             Adopted = Recip.contentDocument.adoptNode(Tar); // same-origin iframes: the node moves with listeners and image data, no reload
             if(atHead) Host.prepend(Adopted); else Host.append(Adopted);
         } catch(Err) { return; }
+        try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); } catch(Err) {}
         const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
         if(Media) Media.BibiAdoptedPicture = true;
         Donor.BibiDonationDonor = true;
