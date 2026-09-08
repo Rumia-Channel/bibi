@@ -15,6 +15,15 @@ import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwo
 
 
 
+const svgNaturalSize = (Ele) => { // intrinsic pixels of a vector picture: viewBox is the truth (% width/height attributes and transient layout boxes never count)
+    if(!Ele || !/^svg$/i.test(Ele.tagName)) return null;
+    const VB = O.getViewportByViewBox(Ele.getAttribute('viewBox'));
+    if(VB && VB.Width > 0 && VB.Height > 0) return [VB.Width, VB.Height];
+    const W = /^\d+$/.test(Ele.getAttribute('width') || '') ? Ele.getAttribute('width') * 1 : 0;
+    const H = /^\d+$/.test(Ele.getAttribute('height') || '') ? Ele.getAttribute('height') * 1 : 0;
+    return (W > 0 && H > 0) ? [W, H] : null;
+};
+const mediaNaturalWidth = (Ele) => /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // raster natively, vector via viewBox; unknown counts as zero (optimistic-big like pending raster)
 R.title = () => {
     const FullTitleFragments = [B.Title];
     if(B.Creator)   FullTitleFragments.push(B.Creator);
@@ -263,12 +272,16 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             else Object.keys(Ele.BibiDefaultStyle).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultStyle[Pro]);
             const EComStyle = getComputedStyle(Ele),               EMarTRBL = TRBL.map(TRBL => parseFloat(EComStyle[ 'margin' + TRBL]) || 0);
             const PComStyle = getComputedStyle(Ele.parentElement), PPadTRBL = TRBL.map(TRBL => parseFloat(PComStyle['padding' + TRBL]) || 0);
-            const ESpacing = Math.max(0, ItemLineAxis == 'horizontal' ? O.getElementCoord(Ele).X + (ItemBDir == 'lr' ? EMarTRBL[1] + PPadTRBL[1] : EMarTRBL[3] + PPadTRBL[3] - Ele.offsetWidth)
-                                                                      : O.getElementCoord(Ele).Y + (ItemBDir == 'tb' ? EMarTRBL[2] + PPadTRBL[2] : EMarTRBL[0] + PPadTRBL[0] - Ele.offsetHeight)); // consumed space before Ele can never be negative: a negative coord is transitional garbage (stale break/width styles in the freshly de-columned state), and it would inflate EMax into slice overflow
+            const EleCoord = O.getElementCoord(Ele), EleOffsetW = Ele.offsetWidth || 0, EleOffsetH = Ele.offsetHeight || 0; // svg has no offsetTop/Left (undefined poisons the max into NaN and silently disables fit): fall back to zero, still page-bounded
+            const ESpacing = Math.max(0, ItemLineAxis == 'horizontal' ? (EleCoord.X || 0) + (ItemBDir == 'lr' ? EMarTRBL[1] + PPadTRBL[1] : EMarTRBL[3] + PPadTRBL[3] - EleOffsetW)
+                                                                      : (EleCoord.Y || 0) + (ItemBDir == 'tb' ? EMarTRBL[2] + PPadTRBL[2] : EMarTRBL[0] + PPadTRBL[0] - EleOffsetH)); // consumed space before Ele can never be negative: a negative coord is transitional garbage (stale break/width styles in the freshly de-columned state), and it would inflate EMax into slice overflow
             let EMaxB = PageCB, EMaxL = PageCL;
             if(S.SLA != ItemLineAxis) EMaxB -= ESpacing, EMaxL -= PPadTRBL[0] + PPadTRBL[2];
             else                      EMaxL -= ESpacing, EMaxB -= PPadTRBL[1] + PPadTRBL[3];
-            let ENatB = Ele['offset' + C.L_SIZE_B], ENatL = Ele['offset' + C.L_SIZE_L];
+            let ENatB = 0, ENatL = 0;
+            const SvgSize = svgNaturalSize(Ele); // vector first: a % -sized svg reports a transient layout box, not its intrinsic size
+            if(SvgSize) { ENatB = (C.L_SIZE_B == 'Width' ? SvgSize[0] : SvgSize[1]); ENatL = (C.L_SIZE_L == 'Width' ? SvgSize[0] : SvgSize[1]); }
+            if(!(ENatB > 0) || !(ENatL > 0)) { ENatB = Ele['offset' + C.L_SIZE_B]; ENatL = Ele['offset' + C.L_SIZE_L]; }
             if(!(ENatB > 0) || !(ENatL > 0)) { const NW = Ele.naturalWidth, NH = Ele.naturalHeight; if(NW > 0 && NH > 0) { ENatB = (C.L_SIZE_B == 'Width' ? NW : NH); ENatL = (C.L_SIZE_L == 'Width' ? NW : NH); } } // unreadable layout size (transient zero during reflow): fit off natural instead of skipping into stale (result stays EMax-bounded either way)
             const EFitRatio = Math.min(EMaxB / ENatB, EMaxL / ENatL);
             if(EFitRatio < 1) sML.style(Ele, { width: 'auto', height: 'auto',
@@ -306,7 +319,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its zone, prose keeps the rest (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
-                if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < PageCB / 2)) {
+                if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName) && !(mediaNaturalWidth(Ele) > 0 && mediaNaturalWidth(Ele) < PageCB / 2)) { // vector pictures share the inline machinery: intrinsic size via viewBox, same zone/middle/clearance verdicts as raster
                     const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
@@ -494,7 +507,7 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
     if(!Item || !Item.Body || !Item.contentDocument || S.RVM != 'paged') return false;
     const Doc = Item.contentDocument;
     let Changed = false;
-    sML.forEach(Item.Body.querySelectorAll('img'))(Ele => {
+    sML.forEach(Item.Body.querySelectorAll('img, svg'))(Ele => {
         const Tar = Ele.BibiPictureZone;
         if(!Tar || !Tar.isConnected || !Tar.contains(Ele)) return;
         const Prev = Tar.previousElementSibling;
@@ -526,7 +539,7 @@ R.alignPicturesToMiddle = (Item) => { // geta: slide solo pictures to the page m
     const ContentLeft = Item.HTML.getBoundingClientRect().left + (Item.Padding ? Item.Padding.Left : 0);
     const Mid = ContentLeft + Item.ColumnBreadth / 2, Half = Item.ColumnBreadth / 2;
     const Tars = [];
-    sML.forEach(Item.Body.querySelectorAll('img'))(Ele => {
+    sML.forEach(Item.Body.querySelectorAll('img, svg'))(Ele => {
         const Tar = Ele.BibiPictureZone;
         if(!Tar || !Tar.isConnected || !Tar.contains(Ele)) return;
         Tar.style.transform = ''; Tars.push([Ele, Tar]); // clear stale shifts; measure pure layout below

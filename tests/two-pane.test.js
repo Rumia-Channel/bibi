@@ -165,4 +165,12 @@ describe("two-pane wiring", () => {
         expect(i).toBeGreaterThan(-1);
         expect(src.slice(i, i + 600)).toContain("getElementInnerText(Doc.body)");
     });
+    test("big vector pictures share the inline picture machinery", () => {
+        // % -sized standalone svg dissolves like raster but rendered tiny: fit read the
+        // transient layout box and the half-zone branch was img-only. viewBox is the truth.
+        const src = reader();
+        expect(src).toContain("svgNaturalSize");
+        expect(src).toContain("/^(img|svg)$/i.test(Ele.tagName)");
+        expect(src).toContain("querySelectorAll('img, svg')");
+    });
 });
