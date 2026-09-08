@@ -312,7 +312,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Tar === Ele) {
                 const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
                 if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
-                if(/^inline/i.test(getComputedStyle(Ele).display)) return;
+                if(/^inline/i.test(getComputedStyle(Ele).display) && !Ele.BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true) return; // inline illustrations stay in the text flow (gaiji and pending pictures wait); big or adopted pictures always claim their zone
             }
             if(/^inline/i.test(getComputedStyle(Tar).display)) Tar.style.display = 'block';
             Tar.style.width = Math.max(0, PageCB) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
@@ -626,12 +626,15 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
         });
     })).then(resolve);
 }).then(() => Item);
-    R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { // dives through single-child wrappers (div > p > img); null-safe
+    R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { // dives through single-child wrappers (div > p > img); empty anchors calibre emits beside pictures are stepped over, never dive-blockers
+        const isVoidSidekick = (El) => !/^(svg|img)$/i.test(El.tagName) && !El.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object') && !((O.getElementInnerText(El) || '').trim()); // no media, no text: layout-invisible (captioned wrappers keep their text and stay reflowable)
         let El = Item.Body ? Item.Body.firstElementChild : null, Guard = 0;
         while(El && Guard++ < 8) {
             if(/^(svg|img)$/i.test(El.tagName)) return El;
-            if(!/^(div|p|figure|section|article|span)$/i.test(El.tagName) || !El.firstElementChild || El.firstElementChild.nextElementSibling) return null;
-            El = El.firstElementChild;
+            if(!/^(div|p|figure|section|article|span)$/i.test(El.tagName) || !El.firstElementChild) return null;
+            const Kids = [...El.children].filter(Kid => !isVoidSidekick(Kid));
+            if(Kids.length !== 1) return null;
+            El = Kids[0];
         }
         return null;
     };

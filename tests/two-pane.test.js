@@ -173,4 +173,18 @@ describe("two-pane wiring", () => {
         expect(src).toContain("/^(img|svg)$/i.test(Ele.tagName)");
         expect(src).toContain("querySelectorAll('img, svg')");
     });
+    test("empty anchors do not block single-picture detection", () => {
+        // calibre emits <a id></a> beside pictures: the strict single-child dive missed
+        // them, stranding image-only pages as unpaginated outsourcing husks (torn pictures).
+        const src = reader();
+        const i = src.indexOf("R.renderPrePaginatedItem.getSingleMediaElement = (Item) =>");
+        expect(i).toBeGreaterThan(-1);
+        expect(src.slice(i, i + 900)).toContain("isVoidSidekick");
+    });
+    test("big bare pictures claim their zone instead of staying inline", () => {
+        // adopted pictures landing directly under body (no wrapper) were mistaken for
+        // gaiji by the inline-display guard and left zoneless (small, unaligned).
+        const src = reader();
+        expect(src).toContain("BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true");
+    });
 });
