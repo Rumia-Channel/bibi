@@ -293,10 +293,11 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
                 if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
                     const HalfW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
-                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats)
+                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it. breakAfter stays: following prose resumes from the next page, never sandwiching the picture into text|image|text
                     if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
                     Ele.style.height = 'auto'; // aspect preserved, never distorted
+                    Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                 } else {
                     Tar.style.cssFloat = 'left'; // narrow pictures only: share the column with prose wrapping beside them
                     Tar.style.width = '';
