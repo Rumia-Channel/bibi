@@ -293,8 +293,9 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
                 if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
                     const HalfW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
-                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats): the picture leads its own column instead of sinking mid-prose into text|image|text
-                    Tar.style.breakAfter = ''; // lift the separator break: following prose flows into the column remainder on the picture's left (text|image) instead of skipping it
+                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats)
+                    Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
+                    Tar.style.breakAfter = ''; // lift the separator break: following prose flows on after the picture instead of skipping a column
                     if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
                     Ele.style.height = 'auto'; // aspect preserved, never distorted
                 } else {
