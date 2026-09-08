@@ -272,7 +272,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
-            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'width', 'maxWidth', 'maxHeight', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); }
+            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
             if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
             if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
             if(!Paged) return;
@@ -289,12 +289,13 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Ele !== Tar) Ele.style.marginLeft = 'auto', Ele.style.marginRight = 'auto';
             if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
-            if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose, picture half fixed: prose keeps the other half (both orders OK, reading order preserved); breaks keep strips untorn. horizontal content and narrow viewports keep shrink-to-fit below.
+            if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its half-zone, prose keeps the other half (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.cssFloat = 'left';
-                if(R.TwoPane && /^img$/i.test(Ele.tagName) && Ele.naturalWidth > 0) {
-                    const FillW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), Ele.naturalWidth); // half the content width, never upscale beyond natural (aspect preserved, stays sharp)
-                    Tar.style.width = FillW + 'px';
-                    Ele.style.width = FillW + 'px'; Ele.style.height = 'auto'; Ele.style.maxWidth = 'none'; Ele.style.maxHeight = 'none';
+                if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
+                    const HalfW = Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2);
+                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size)
+                    if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
+                    Ele.style.height = 'auto'; // aspect preserved, never distorted
                 } else Tar.style.width = '';
             }
         });
