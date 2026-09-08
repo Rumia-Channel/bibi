@@ -291,8 +291,9 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its half-zone, prose keeps the other half (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.cssFloat = 'left';
+                Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
                 if(R.TwoPane && /^img$/i.test(Ele.tagName) && !(Ele.naturalWidth > 0 && Ele.naturalWidth < (R.paneWidthFor(Item) - ItemPaddingSE) / 2)) {
-                    const HalfW = Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2);
+                    const HalfW = Math.min(Math.floor((R.paneWidthFor(Item) - ItemPaddingSE) / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size)
                     if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
                     Ele.style.height = 'auto'; // aspect preserved, never distorted
