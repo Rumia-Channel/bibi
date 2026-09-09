@@ -631,7 +631,7 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
             &&
         (Item['rendition:spread'] == 'both' || R.Orientation == Item['rendition:spread'] || R.Orientation == 'landscape')
     );
-    R.renderPrePaginatedItem.getViewport(Item).then(Vp => R.renderPrePaginatedItem.getScale(Item, Vp).then(Sc => {
+    R.renderPrePaginatedItem.getViewport(Item).then(Vp => R.renderPrePaginatedItem.fitViewportToContent(Item, Vp).then(Vp => R.renderPrePaginatedItem.getScale(Item, Vp).then(Sc => {
         Item.Scale = Sc;
         sML.style(Item.Box, {
             width:  Math.floor(Vp.Width  * Sc) + 'px',
@@ -644,7 +644,17 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
             transformOrigin: '0 0', // scaled box matches Item.Box exactly: center origin drifts content by Vp*(1-Sc)/2 (down-right on upscale, the reported shift)
             transform: 'scale(' + Sc + ')'
         });
-    })).then(resolve);
+    }))).then(resolve);
+    // Single-media pages size their box from the media alone, but authored in-flow space around it (e.g. calibre's .calibre2{margin-top:5%;margin-bottom:3%}) then hangs outside the box: a top gap plus a clipped bottom. Size the iframe to the media viewport first (so % margins resolve), then adopt the scroll size when larger. Meta viewports (fixed layout, may bleed intentionally) and substitutes (no document) are left untouched.
+    R.renderPrePaginatedItem.fitViewportToContent = (Item, Vp) => Promise.resolve().then(() => {
+        if(!Vp || Vp.IsSubstitute || (!Item.OnlySingleSVG && !Item.OnlySingleImg)) return Vp;
+        const Doc = Item.parentElement ? Item.contentDocument : null;
+        if(!Doc || !Doc.body) return Vp;
+        sML.style(Item, { display: 'block', width: Vp.Width + 'px', height: Vp.Height + 'px' }); // pre-size: % margins resolve against this
+        const W = Math.ceil(Math.max(Vp.Width, Doc.documentElement.scrollWidth || 0, Doc.body.scrollWidth || 0));
+        const H = Math.ceil(Math.max(Vp.Height, Doc.documentElement.scrollHeight || 0, Doc.body.scrollHeight || 0));
+        return (W > Vp.Width || H > Vp.Height) ? Item.Viewport = { Width: W, Height: H } : Vp;
+    });
 }).then(() => Item);
     R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { // dives through single-child wrappers (div > p > img); empty anchors calibre emits beside pictures are stepped over, never dive-blockers
         let El = Item.Body ? Item.Body.firstElementChild : null, Guard = 0;
