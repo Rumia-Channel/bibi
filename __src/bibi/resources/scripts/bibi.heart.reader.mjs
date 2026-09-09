@@ -645,11 +645,14 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
             transform: 'scale(' + Sc + ')'
         });
     }))).then(resolve);
-    // Single-media pages size their box from the media alone, but authored in-flow space around it (e.g. calibre's .calibre2{margin-top:5%;margin-bottom:3%}) then hangs outside the box: a top gap plus a clipped bottom. Size the iframe to the media viewport first (so % margins resolve), then adopt the scroll size when larger. Meta viewports (fixed layout, may bleed intentionally) and substitutes (no document) are left untouched.
+    // A single-media page IS the picture: converter boilerplate around it (e.g. calibre's .calibre2{margin-top:5%;margin-bottom:3%} on every solo page, body side margins) only insets and clips the art, while the same art placed inline (chapter frontispieces) renders flush. Neutralize that wrapping space so solos render like the inline ones. Anything remaining (padding etc.) is still adopted below instead of clipped. Meta viewports (fixed layout, may bleed intentionally) and substitutes (no document) are left untouched.
     R.renderPrePaginatedItem.fitViewportToContent = (Item, Vp) => Promise.resolve().then(() => {
         if(!Vp || Vp.IsSubstitute || (!Item.OnlySingleSVG && !Item.OnlySingleImg)) return Vp;
         const Doc = Item.parentElement ? Item.contentDocument : null;
-        if(!Doc || !Doc.body) return Vp;
+        const Media = Doc && Doc.body ? R.renderPrePaginatedItem.getSingleMediaElement(Item) : null;
+        if(!Media) return Vp;
+        Doc.body.style.margin = '0';
+        for(let El = Media; El && El !== Doc.body; El = El.parentElement) { El.style.marginTop = El.style.marginBottom = El.style.marginLeft = El.style.marginRight = '0'; }
         sML.style(Item, { display: 'block', width: Vp.Width + 'px', height: Vp.Height + 'px' }); // pre-size: % margins resolve against this
         const W = Math.ceil(Math.max(Vp.Width, Doc.documentElement.scrollWidth || 0, Doc.body.scrollWidth || 0));
         const H = Math.ceil(Math.max(Vp.Height, Doc.documentElement.scrollHeight || 0, Doc.body.scrollHeight || 0));

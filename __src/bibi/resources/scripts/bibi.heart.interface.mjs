@@ -325,7 +325,7 @@ I.PageObserver = { create: () => {
             const Ratio = (LengthInside <= 0 || !Coord[C.L_SIZE_L] || isNaN(LengthInside)) ? 0 : LengthInside / Coord[C.L_SIZE_L];
             const IntersectionStatus = { Ratio: Ratio };
             if(Ratio <= 0) {} else if(WithDetail) {
-                if(Ratio >= 1) {
+                if(Ratio >= 1 - 0.003) { // subpixel tolerance (~2px): fractional coords flap a full-bleed page between 0.9986 and 1, and non-Contained traps backward moves (StrictDist = 0 in moveBy)
                     IntersectionStatus.Contained = true;
                 } else {
                     const FC_B = PageObserver.Current.Frame.Before * _D, FC_A = PageObserver.Current.Frame.After * _D;
