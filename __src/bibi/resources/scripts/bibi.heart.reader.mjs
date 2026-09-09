@@ -311,9 +311,10 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 if(Sibs.length !== 1 || Sibs[0] !== Tar) break;
                 Tar = Tar.parentElement;
             }
-            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
+            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
-            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
+            if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
+            for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // adopted solos smuggle converter margins (calibre .calibre2{margin-top:5%;margin-bottom:3%}) into foreign flows: neutralize the wrapper chain so adopted and native pictures share one geometry
             if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
             if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
             if(!Paged) return;
@@ -338,7 +339,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                     Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'always' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
                     const NatW = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // intrinsic width (pending loads resolve via the load listener below and re-render)
                     const NatH = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[1] || 0) : (Ele.naturalHeight || 0);
-                    if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; } // contain both ways (shrink AND grow) into the zone: same ratio both axes, never distorted. height-bound rows recompute identically to fit; width-free pictures finally fill their zone instead of floating small inside it
+                    if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(1, HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; } // shrink-only contain: same ratio both axes, never distorted, never grown. growing every non-small picture to zone-fill erased the 挿絵/扉絵 size distinction the art was drawn with
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
                 }
@@ -562,6 +563,28 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
         Tar.BibiPictureRowShared = Shared;
         const Want = Shared ? 'always' : '';
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
+        try { // Authored blank lines around the picture (calibre <br/> runs) collapse into the previous column tail once breaks isolate the zone. Carry their extent into the zone's block margins so the spacing stays visible. Only for forced breaks: shared rows flow naturally and keep their blanks.
+            const BD = (Item.WritingMode || '').split('-')[1] || 'tb';
+            const BSE = { tb: 'top', bt: 'bottom', rl: 'right', lr: 'left' }[BD] || 'top';
+            const BEE = { tb: 'bottom', bt: 'top', rl: 'left', lr: 'right' }[BD] || 'bottom';
+            const blockExtent = (El) => (BD == 'tb' || BD == 'bt') ? (El.offsetHeight || 0) : (El.offsetWidth || 0);
+            const extremes = (Root, edge, first) => { let V = first ? 1e9 : -1e9; const W = Doc.createTreeWalker(Root, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } }); const Rg = Doc.createRange(); while(W.nextNode()) { Rg.selectNodeContents(W.currentNode); const Rs = Rg.getClientRects(); for(let i = 0; i < Rs.length; i++) { const v = Rs[i][edge]; if(first ? v < V : v > V) V = v; } } return V; };
+            const blankRun = (Sib, dir) => { let H = 0; while(Sib && !(Sib.innerText || '').trim() && !Sib.querySelector('img, svg, picture, video, canvas')) { H += blockExtent(Sib); Sib = dir < 0 ? Sib.previousElementSibling : Sib.nextElementSibling; } return [H, Sib]; };
+            let NewMS = null, NewME = null;
+            if(Tar.style.breakBefore == 'always' && Prev) {
+                let [H, Sib] = blankRun(Prev, -1);
+                if(Sib && (Sib.innerText || '').trim()) { const PR = Sib.getBoundingClientRect(); const last = extremes(Sib, BEE, BEE == 'top' || BEE == 'left'); if(Math.abs(last) < 1e8) H += Math.max(0, (BEE == 'top' || BEE == 'left') ? last - PR[BEE] : PR[BEE] - last); }
+                if(H > 0.5) NewMS = Math.round(H) + 'px'; // positive carry only: restored '' stays untouched, so steady rows never report change ('' vs '0px' flap)
+            }
+            const Next = Tar.nextElementSibling;
+            if(Tar.style.breakAfter == 'always' && Next) {
+                let [H, Sib] = blankRun(Next, 1);
+                if(Sib && (Sib.innerText || '').trim()) { const NR = Sib.getBoundingClientRect(); const first = extremes(Sib, BSE, BSE == 'top' || BSE == 'left'); if(Math.abs(first) < 1e8) H += Math.max(0, (BSE == 'top' || BSE == 'left') ? first - NR[BSE] : NR[BSE] - first); }
+                if(H > 0.5) NewME = Math.round(H) + 'px';
+            }
+            if(NewMS !== null && (Tar.style.marginBlockStart || '') !== NewMS) { Tar.style.marginBlockStart = NewMS; Changed = true; }
+            if(NewME !== null && (Tar.style.marginBlockEnd || '') !== NewME) { Tar.style.marginBlockEnd = NewME; Changed = true; }
+        } catch(Err) {}
     });
     return Changed;
 };
