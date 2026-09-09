@@ -336,10 +336,11 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
                     Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'always' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
-                    if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
+                    const NatW = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // intrinsic width (pending loads resolve via the load listener below and re-render)
+                    const NatH = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[1] || 0) : (Ele.naturalHeight || 0);
+                    if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; } // contain both ways (shrink AND grow) into the zone: same ratio both axes, never distorted. height-bound rows recompute identically to fit; width-free pictures finally fill their zone instead of floating small inside it
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
-                    Ele.style.height = 'auto'; // aspect preserved, never distorted
                 }
             }
         });
