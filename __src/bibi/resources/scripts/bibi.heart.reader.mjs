@@ -638,8 +638,10 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
             height: Math.floor(Vp.Height * Sc) + 'px'
         })
         if(Item.parentElement) sML.style(Item, {
-            width:  Vp.Width  + 'px',
+            display: 'block', // iframes are inline by default: text-align/vertical-align of the box would offset the fitted picture (the reported downward shift)
+            width: Vp.Width  + 'px',
             height: Vp.Height + 'px',
+            transformOrigin: '0 0', // scaled box matches Item.Box exactly: center origin drifts content by Vp*(1-Sc)/2 (down-right on upscale, the reported shift)
             transform: 'scale(' + Sc + ')'
         });
     })).then(resolve);
@@ -1367,8 +1369,7 @@ R.getItemCopy = (_, Opt) => new Promise((resolve, reject) => {
     const ItemCopy = Object.assign(sML.create('span', { innerHTML: Item.outerHTML }).firstChild, { className: 'item-copy', IsItemCopy: true, Original: Item, Viewport: ItemViewport });
     ItemCopy.removeAttribute('style');
     const VWidth = ItemViewport.Width, VHeight = ItemViewport.Height;
-    ItemCopy.FittingIn = { Width: VWidth , Height: VHeight, Scale: 1 };
-    sML.style(ItemCopy, { width: VWidth + 'px', height: VHeight + 'px', transform: 'scale(1)' });
+    sML.style(ItemCopy, { display: 'block', width: VWidth + 'px', height: VHeight + 'px', transformOrigin: '0 0', transform: 'scale(1)' });
     ItemCopy.resize = (Size) => { if(!Size || typeof Size != 'object') return false;
         let Width  = (Size.Width  !== undefined || Size.width  === undefined) ? Size.Width  : Size.width ; if(!Number.isFinite(Width ) || Width  <= 0) Width  = undefined;
         let Height = (Size.Height !== undefined || Size.height === undefined) ? Size.Height : Size.height; if(!Number.isFinite(Height) || Height <= 0) Height = undefined;
@@ -1376,7 +1377,7 @@ R.getItemCopy = (_, Opt) => new Promise((resolve, reject) => {
         if( Width  && !Height) Height = Width * VHeight/VWidth;
         if(!Width  &&  Height) Width = Height * VWidth/VHeight;
         Object.assign(ItemCopy.FittingIn, { Width: Width , Height: Height, Scale: Math.min(Width/VWidth, Height/VHeight, 1) });
-        sML.style(ItemCopy, { transform: 'scale(' + ItemCopy.FittingIn.Scale + ')' });
+        sML.style(ItemCopy, { transformOrigin: '0 0', transform: 'scale(' + ItemCopy.FittingIn.Scale + ')' });
         return ItemCopy;
     }
     return ItemCopy;
