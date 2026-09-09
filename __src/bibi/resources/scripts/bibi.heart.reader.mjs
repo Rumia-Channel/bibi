@@ -199,7 +199,7 @@ R.layOutItem = async (Item) => {
         Item.Pages = [];
     }
     await (HuskDissolved ? Promise.resolve() : ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item))); // big single-media pages (even in reflowable books) are fitted pictures, not column text
-    if(Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item)) await R.renderReflowableItem(Item); // picture rows settled (one extra pass max; steady rows never retrigger)
+    for(let AuditSettle = 0; AuditSettle < 3 && Item.Reflowable && !SoloBigPicture && R.auditPictureRows(Item); AuditSettle++) await R.renderReflowableItem(Item); // picture rows settle: verdicts measure post-layout geometry, so one pass can lag transient states (stale breakAfter sandwiches); bounded, converges in practice
     if(Item.Reflowable && !SoloBigPicture) R.clearPictureMargins(Item); // two-line clearance around solo pictures (in-zone nudge, stranding-free)
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
@@ -319,15 +319,15 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             Tar.style.marginLeft = 'auto'; Tar.style.marginRight = 'auto'; Tar.style.textAlign = 'center'; // isolated pictures center in their page (Tar holds no text by construction, or is the picture itself)
             if(Ele !== Tar) { Tar.style.display = 'flex'; Tar.style.alignItems = 'center'; Tar.style.justifyContent = 'center'; } // flex centers on both axes regardless of writing mode (margins/text-align only serve one axis)
             if(Ele !== Tar) Ele.style.marginLeft = 'auto', Ele.style.marginRight = 'auto';
-            if(Tar.previousElementSibling) Tar.style.breakBefore = 'column';
-            if(Tar.nextElementSibling) Tar.style.breakAfter = 'column';
+            if(Tar.previousElementSibling) Tar.style.breakBefore = 'always'; // always (not column: Firefox drops column values, silently disabling isolation)
+            if(Tar.nextElementSibling) Tar.style.breakAfter = 'always'; // always (not column: Firefox drops column values, silently disabling isolation)
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its zone, prose keeps the rest (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
                 if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName) && !(mediaNaturalWidth(Ele) > 0 && mediaNaturalWidth(Ele) < PageCB / 3)) { // pictures wider than a third of the band claim the half zone (narrower ones share the column); medium illustrations must not stay floats (fragment overflow paints over prose)
                     const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
-                    Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'column' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
+                    Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'always' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
                     if(!(parseFloat(Ele.style.maxWidth) > 0 && parseFloat(Ele.style.maxWidth) <= HalfW)) Ele.style.maxWidth = '100%'; // cap at the zone only when fit left it wider (fit limits underneath stay authoritative)
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
@@ -554,7 +554,7 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
             } catch(Err) {}
         }
         Tar.BibiPictureRowShared = Shared;
-        const Want = Shared ? 'column' : '';
+        const Want = Shared ? 'always' : '';
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
     });
     return Changed;

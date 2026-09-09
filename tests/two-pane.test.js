@@ -187,4 +187,12 @@ describe("two-pane wiring", () => {
         const src = reader();
         expect(src).toContain("BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true");
     });
+    test("forced breaks use always, never column", () => {
+        // Firefox drops break-before/after:column as invalid (silently disabling all
+        // picture isolation); always forces the break in every engine. regression pin.
+        const src = reader();
+        expect(src).not.toContain("breakAfter = 'column'");
+        expect(src).not.toContain("breakBefore = 'column'");
+        expect(src).toContain("breakAfter = 'always'");
+    });
 });
