@@ -468,6 +468,25 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
 R.donateSoloPictures = () => { // dissolve standalone title illustrations into adjacent long text: the picture node is adopted into the text flow and processed as an inline illustration (same zone/middle/clearance machinery). idempotent; returns { adopted, recipients }.
     const recipients = new Set();
     let adopted = 0;
+    R.Spreads.forEach(Sp => { // orphan heal: recipient documents replaced after adoption lose the copy while the donor stays empty. recreate from stored markup (no loader, no loops).
+        const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
+        if(!Solo || !Solo.BibiDonationDonor || !Solo.BibiDonatedMarkup || (Solo.BibiHealCount || 0) > 8) return;
+        if(R.renderPrePaginatedItem.getSingleMediaElement(Solo)) return; // donor has content: normal paths handle
+        const To = Solo.BibiDonatedTo, AtHead = Solo.BibiDonatedAtHead !== false;
+        const Recip = Number.isInteger(To) && R.Spreads[To] ? R.Spreads[To].Items[0] : null;
+        if(!Recip || !Recip.Loaded || !Recip.Body || !Recip.contentDocument) return;
+        try { if(Recip.Body.querySelector(':scope [data-bibi-adopted-from="' + Solo.Index + '"]')) return; } catch(Err) { return; } // copy present: settled
+        try {
+            const Tpl = Recip.contentDocument.createElement('template'); Tpl.innerHTML = Solo.BibiDonatedMarkup;
+            const Copy = Tpl.content.firstElementChild; if(!Copy) return;
+            const Host = Recip.Body.querySelector('div.main') || Recip.Body;
+            if(AtHead) Host.prepend(Copy); else Host.append(Copy);
+            const Media = Copy.querySelector('img, svg') || (/^(img|svg)$/i.test(Copy.tagName) ? Copy : null);
+            if(Media) Media.BibiAdoptedPicture = true;
+            Solo.BibiHealCount = (Solo.BibiHealCount || 0) + 1;
+            adopted++; recipients.add(R.Spreads[To]);
+        } catch(Err) {}
+    });
     const Metas = R.Spreads.map(Sp => {
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
@@ -500,11 +519,11 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
             if(/^(img|svg)$/i.test(Tar.tagName)) { const Wrap = Recip.contentDocument.createElement('div'); Wrap.appendChild(Recip.contentDocument.adoptNode(Tar)); Tar = Wrap; } // bare pictures need a wrapper: zones equal to the picture box leave no slack for clearance nudges
             Adopted = Recip.contentDocument.adoptNode(Tar); // same-origin iframes: the node moves with listeners and image data, no reload
         } catch(Err) { return; }
-        try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); } catch(Err) {}
+        try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); Donor.BibiDonatedMarkup = Adopted.outerHTML; } catch(Err) {}
         const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
         if(Media) Media.BibiAdoptedPicture = true;
         Donor.BibiDonationDonor = true;
-        Donor.BibiDonatedTo = to; Donor.BibiAdoptCount = (Donor.BibiAdoptCount || 0) + 1;
+        Donor.BibiDonatedTo = to; Donor.BibiDonatedAtHead = atHead; Donor.BibiAdoptCount = (Donor.BibiAdoptCount || 0) + 1;
         adopted++;
         recipients.add(R.Spreads[to]);
     });
