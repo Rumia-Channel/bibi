@@ -303,25 +303,28 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     }
     { // Separate pictures from prose in paged mode: block-level media gets its own column (= page)
         const Paged = S.RVM == 'paged';
+        const releaseZoneGap = (T) => { try { if(T && T.BibiGapSpacer && T.BibiGapSpacer.isConnected) T.BibiGapSpacer.parentNode.removeChild(T.BibiGapSpacer); } catch(E0) {} if(T) { T.BibiGapSpacer = null; T.BibiCarriedME = null; } }; // resuming-side gap lives in a dedicated spacer right after the zone (prose spans begin pages away, so their box-start padding lands in the wrong place); release here so repurposed/unmarked zones never leak it
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
-            delete Ele.BibiPictureZone; // re-marked below when the big in-flow branch claims it; stale marks must not survive repurposing
+            const PrevZone = Ele.BibiPictureZone; delete Ele.BibiPictureZone; // re-marked below when the big in-flow branch claims it; stale marks must not survive repurposing
             let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture. void sidekicks (empty calibre anchors) never block the climb.
             while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8 && !((Tar.parentElement.innerText || '').trim())) {
                 const Sibs = [...Tar.parentElement.children].filter(Kid => Kid === Tar || !isVoidSidekick(Kid));
                 if(Sibs.length !== 1 || Sibs[0] !== Tar) break;
                 Tar = Tar.parentElement;
             }
+            if(PrevZone && PrevZone !== Tar) releaseZoneGap(PrevZone); // re-climbed elsewhere: the old wrapper releases its gap
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
             for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // adopted solos smuggle converter margins (calibre .calibre2{margin-top:5%;margin-bottom:3%}) into foreign flows: neutralize the wrapper chain so adopted and native pictures share one geometry
-            if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
+            if(Tar.BibiCarriedME != null && Tar.BibiGapSpacer && Tar.BibiGapSpacer.isConnected && Tar.BibiGapSpacer.parentNode === Tar.parentNode && Tar.BibiGapSpacer.previousElementSibling === Tar) Tar.BibiGapSpacer.style.blockSize = Tar.BibiCarriedME; // re-applied here so regroup renders keep the gap without a fresh audit
+            if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) { releaseZoneGap(Tar); return; } } // 384x384 and below stay in flow
             if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
-            if(!Paged) return;
+            if(!Paged) { releaseZoneGap(Tar); return; }
             if(Tar === Ele) {
                 const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
-                if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
-                if(/^inline/i.test(getComputedStyle(Ele).display) && !Ele.BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true) return; // inline illustrations stay in the text flow (gaiji and pending pictures wait); big or adopted pictures always claim their zone
+                if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) { releaseZoneGap(Tar); return; } // inline illustrations stay in the text flow
+                if(/^inline/i.test(getComputedStyle(Ele).display) && !Ele.BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true) { releaseZoneGap(Tar); return; } // inline illustrations stay in the text flow (gaiji and pending pictures wait); big or adopted pictures always claim their zone
             }
             if(/^inline/i.test(getComputedStyle(Tar).display)) Tar.style.display = 'block';
             Tar.style.width = Math.max(0, PageCB) + 'px'; // claim exactly the row width (never narrower = void, never wider = overlap); content was shrink-wrapped to its own size in vertical-rl
@@ -339,7 +342,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                     Tar.style.breakAfter = Tar.BibiPictureRowShared ? 'always' : ''; // shared row (backfill): following prose resumes from the next page, never sandwiching into text|image|text. leading row: prose joins the row (text|image). verdict from the row audit below, self-healing on change
                     const NatW = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // intrinsic width (pending loads resolve via the load listener below and re-render)
                     const NatH = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[1] || 0) : (Ele.naturalHeight || 0);
-                    if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(1, HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; } // shrink-only contain: same ratio both axes, never distorted, never grown. growing every non-small picture to zone-fill erased the 挿絵/扉絵 size distinction the art was drawn with
+                    if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(1, HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; Ele.BibiTobirae = NatH >= PageCL * 0.8; } // shrink-only contain: same ratio both axes, never distorted, never grown. growing every non-small picture to zone-fill erased the 挿絵/扉絵 size distinction the art was drawn with. Tobirae flag (full-height-class pictures, adopted or native) drives the 2-line after-spacing below
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
                 }
@@ -555,7 +558,7 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
                     const Rects = Range.getClientRects();
                     for(let i = 0; i < Rects.length; i++) {
                         const L = Rects[i];
-                        if(Math.min(L.bottom, T.bottom) - Math.max(L.top, T.top) > 100) { Shared = true; break; } // any tail line lives in the picture's row (last-line-only missed ragged short ends)
+                        if(Math.min(L.bottom, T.bottom) - Math.max(L.top, T.top) > 4) { Shared = true; break; } // any tail text in the picture's row, however short: a <100px ragged end beside a tall zone reads as text|image|text once prose joins the other side
                     }
                 }
             } catch(Err) {}
@@ -563,27 +566,28 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
         Tar.BibiPictureRowShared = Shared;
         const Want = Shared ? 'always' : '';
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
-        try { // Authored blank lines around the picture (calibre <br/> runs) collapse into the previous column tail once breaks isolate the zone. Carry their extent into the zone's block margins so the spacing stays visible. Only for forced breaks: shared rows flow naturally and keep their blanks.
+        try { // Authored blank lines around the picture collapse into the previous column tail once breaks isolate the zone; carry the resuming-side extent into a dedicated spacer after the zone (exact placement, truncates nothing). Leading rows flow naturally and keep their blanks; tobirae always keep two lines.
             const BD = (Item.WritingMode || '').split('-')[1] || 'tb';
             const BSE = { tb: 'top', bt: 'bottom', rl: 'right', lr: 'left' }[BD] || 'top';
             const BEE = { tb: 'bottom', bt: 'top', rl: 'left', lr: 'right' }[BD] || 'bottom';
             const blockExtent = (El) => (BD == 'tb' || BD == 'bt') ? (El.offsetHeight || 0) : (El.offsetWidth || 0);
             const extremes = (Root, edge, first) => { let V = first ? 1e9 : -1e9; const W = Doc.createTreeWalker(Root, NodeFilter.SHOW_TEXT, { acceptNode(T) { return T.nodeValue.trim().length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } }); const Rg = Doc.createRange(); while(W.nextNode()) { Rg.selectNodeContents(W.currentNode); const Rs = Rg.getClientRects(); for(let i = 0; i < Rs.length; i++) { const v = Rs[i][edge]; if(first ? v < V : v > V) V = v; } } return V; };
-            const blankRun = (Sib, dir) => { let H = 0; while(Sib && !(Sib.innerText || '').trim() && !Sib.querySelector('img, svg, picture, video, canvas')) { H += blockExtent(Sib); Sib = dir < 0 ? Sib.previousElementSibling : Sib.nextElementSibling; } return [H, Sib]; };
-            let NewMS = null, NewME = null;
-            if(Tar.style.breakBefore == 'always' && Prev) {
-                let [H, Sib] = blankRun(Prev, -1);
-                if(Sib && (Sib.innerText || '').trim()) { const PR = Sib.getBoundingClientRect(); const last = extremes(Sib, BEE, BEE == 'top' || BEE == 'left'); if(Math.abs(last) < 1e8) H += Math.max(0, (BEE == 'top' || BEE == 'left') ? last - PR[BEE] : PR[BEE] - last); }
-                if(H > 0.5) NewMS = Math.round(H) + 'px'; // positive carry only: restored '' stays untouched, so steady rows never report change ('' vs '0px' flap)
-            }
-            const Next = Tar.nextElementSibling;
+            const blankRun = (Sib, dir) => { let H = 0; while(Sib && !Sib.BibiResumeGap && !(Sib.innerText || '').trim() && !Sib.querySelector('img, svg, picture, video, canvas')) { H += blockExtent(Sib); Sib = dir < 0 ? Sib.previousElementSibling : Sib.nextElementSibling; } return [H, Sib]; };
+            let NewME = null; // after-gap only, as a dedicated spacer right after the zone: lead blanks stay in the flowing text (leading rows) or vanish correctly at fragment starts. spacer (not margins/padding on prose spans, whose box starts pages away): exact placement, truncates nothing.
+            let Next = Tar.nextElementSibling;
+            if(Next && Next.BibiResumeGap && Next.BibiResumeGapFor === Ele) Next = Next.nextElementSibling; // measure past our own spacer (else we would delete it every other pass)
             if(Tar.style.breakAfter == 'always' && Next) {
                 let [H, Sib] = blankRun(Next, 1);
                 if(Sib && (Sib.innerText || '').trim()) { const NR = Sib.getBoundingClientRect(); const first = extremes(Sib, BSE, BSE == 'top' || BSE == 'left'); if(Math.abs(first) < 1e8) H += Math.max(0, (BSE == 'top' || BSE == 'left') ? first - NR[BSE] : NR[BSE] - first); }
+                if(Ele.BibiAdoptedPicture || Ele.BibiTobirae) { let Pitch = 0; try { const BR = Doc.body.querySelector('br'); Pitch = BR ? blockExtent(BR) : 0; } catch(E2) {} if(!(Pitch > 0)) { try { Pitch = parseFloat(getComputedStyle(Doc.body).lineHeight) || 0; } catch(E3) {} } if(!(Pitch > 0)) Pitch = 28; H = Math.max(H, Pitch * 2); } // tobirae design: two blank lines between frontispiece and resuming prose
                 if(H > 0.5) NewME = Math.round(H) + 'px';
             }
-            if(NewMS !== null && (Tar.style.marginBlockStart || '') !== NewMS) { Tar.style.marginBlockStart = NewMS; Changed = true; }
-            if(NewME !== null && (Tar.style.marginBlockEnd || '') !== NewME) { Tar.style.marginBlockEnd = NewME; Changed = true; }
+            Tar.BibiCarriedME = NewME;
+            let SP = (Tar.BibiGapSpacer && Tar.BibiGapSpacer.isConnected && Tar.BibiGapSpacer.parentNode === Tar.parentNode && Tar.BibiGapSpacer.previousElementSibling === Tar) ? Tar.BibiGapSpacer : null;
+            if(NewME !== null) {
+                if(!SP) { try { SP = Doc.createElement('span'); SP.BibiResumeGap = true; SP.BibiResumeGapFor = Ele; SP.style.display = 'block'; SP.style.breakInside = 'avoid'; Tar.parentNode.insertBefore(SP, Tar.nextElementSibling); Tar.BibiGapSpacer = SP; Changed = true; } catch(E8) { SP = null; } }
+                if(SP && SP.style.blockSize !== NewME) { SP.style.blockSize = NewME; Changed = true; }
+            } else if(SP) { try { SP.parentNode.removeChild(SP); } catch(E9) {} Tar.BibiGapSpacer = null; Changed = true; }
         } catch(Err) {}
     });
     return Changed;
