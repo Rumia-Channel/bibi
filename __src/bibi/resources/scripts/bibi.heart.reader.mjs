@@ -23,7 +23,13 @@ const svgNaturalSize = (Ele) => { // intrinsic pixels of a vector picture: viewB
     const H = /^\d+$/.test(Ele.getAttribute('height') || '') ? Ele.getAttribute('height') * 1 : 0;
     return (W > 0 && H > 0) ? [W, H] : null;
 };
-const mediaNaturalWidth = (Ele) => /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // raster natively, vector via viewBox; unknown counts as zero (optimistic-big like pending raster)
+const isVoidSidekick = (El) => { // layout-invisible wrapper content (empty calibre anchors): stepped over by single-media dives and picture-zone climbs, never a blocker. captioned wrappers keep their text and stay reflowable.
+    if(!El || /^(svg|img)$/i.test(El.tagName)) return false;
+    try {
+        if(El.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object')) return false;
+        return !((O.getElementInnerText(El) || '').trim());
+    } catch(Err) { return false; }
+};
 R.title = () => {
     const FullTitleFragments = [B.Title];
     if(B.Creator)   FullTitleFragments.push(B.Creator);
@@ -299,10 +305,12 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         const Paged = S.RVM == 'paged';
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
             delete Ele.BibiPictureZone; // re-marked below when the big in-flow branch claims it; stale marks must not survive repurposing
-            let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture
-            while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8
-                && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
-                && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
+            let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture. void sidekicks (empty calibre anchors) never block the climb.
+            while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8 && !((Tar.parentElement.innerText || '').trim())) {
+                const Sibs = [...Tar.parentElement.children].filter(Kid => Kid === Tar || !isVoidSidekick(Kid));
+                if(Sibs.length !== 1 || Sibs[0] !== Tar) break;
+                Tar = Tar.parentElement;
+            }
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginLeft', 'marginRight', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
@@ -323,7 +331,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(Tar.nextElementSibling) Tar.style.breakAfter = 'always'; // always (not column: Firefox drops column values, silently disabling isolation)
             if(ItemLineAxis == 'vertical' && (Tar.previousElementSibling || Tar.nextElementSibling)) { // share the strip with prose: the picture reserves its zone, prose keeps the rest (both orders OK, reading order preserved); the picture itself stays fit-to-screen inside the zone (never taller than the strip); breaks keep strips untorn. horizontal content keeps full-row centering below scope; narrow keeps shrink-to-fit.
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
-                if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName) && !(mediaNaturalWidth(Ele) > 0 && mediaNaturalWidth(Ele) < PageCB / 3)) { // pictures wider than a third of the band claim the half zone (narrower ones share the column); medium illustrations must not stay floats (fragment overflow paints over prose)
+                if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName)) { // every non-small picture claims the half zone (small ones already returned above); floats fragment across columns and paint over prose, so nothing in-flow stays float
                     const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
                     Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
@@ -332,9 +340,6 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = 'auto'; // picture flush to the slot's text edge (same x a text line or a paired-spread picture would take); centering pushed it mid-page
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
                     Ele.style.height = 'auto'; // aspect preserved, never distorted
-                } else {
-                    Tar.style.cssFloat = 'left'; // narrow pictures only: share the column with prose wrapping beside them
-                    Tar.style.width = '';
                 }
             }
         });
@@ -639,7 +644,6 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
     })).then(resolve);
 }).then(() => Item);
     R.renderPrePaginatedItem.getSingleMediaElement = (Item) => { // dives through single-child wrappers (div > p > img); empty anchors calibre emits beside pictures are stepped over, never dive-blockers
-        const isVoidSidekick = (El) => !/^(svg|img)$/i.test(El.tagName) && !El.querySelector('svg[viewBox], img[src], image[*|href], image[href], canvas, video, embed, object') && !((O.getElementInnerText(El) || '').trim()); // no media, no text: layout-invisible (captioned wrappers keep their text and stay reflowable)
         let El = Item.Body ? Item.Body.firstElementChild : null, Guard = 0;
         while(El && Guard++ < 8) {
             if(/^(svg|img)$/i.test(El.tagName)) return El;
