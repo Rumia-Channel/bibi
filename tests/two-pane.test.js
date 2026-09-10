@@ -73,24 +73,17 @@ describe("two-pane geometry", () => {
     });
 });
 
-describe("solo picture donation", () => {
+describe("solo picture donation (suspended: frontispieces stay standalone like the prologue solo)", () => {
     const D = { donor: true };
     const T = (textLen = 20000) => ({ donor: false, textLen });
-    test("title illustration prefers next-head, falls back to prev-tail", () => {
-        expect(planSoloPictureDonations([T(), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
-        expect(planSoloPictureDonations([T(), D])).toEqual([{ from: 1, to: 0, atHead: false }]);
-        expect(planSoloPictureDonations([D, T()])).toEqual([{ from: 0, to: 1, atHead: true }]);
-    });
-    test("short neighbors are gallery context: pictures stay standalone", () => {
+    test("planner dissolves nothing, whatever the neighbors", () => {
+        expect(planSoloPictureDonations([T(), D, T()])).toEqual([]);
+        expect(planSoloPictureDonations([T(), D])).toEqual([]);
+        expect(planSoloPictureDonations([D, T()])).toEqual([]);
         expect(planSoloPictureDonations([T(600), D, T(600)])).toEqual([]);
-        expect(planSoloPictureDonations([T(600), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
-        expect(planSoloPictureDonations([T(), D, T(600)])).toEqual([{ from: 1, to: 0, atHead: false }]);
-        expect(planSoloPictureDonations([{ donor: false, textLen: SOLO_PICTURE_MIN_TEXT_LENGTH }, D])).toEqual([{ from: 1, to: 0, atHead: false }]);
-    });
-    test("non-text neighbors never receive; one donation per recipient end", () => {
-        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
-        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]);
-        expect(planSoloPictureDonations([null, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([D, D, T()])).toEqual([]);
+        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([]);
+        expect(planSoloPictureDonations([null, D, T()])).toEqual([]);
         expect(planSoloPictureDonations([])).toEqual([]);
     });
     test("donation runs pre-layout and converges late pictures via regroup", () => {
