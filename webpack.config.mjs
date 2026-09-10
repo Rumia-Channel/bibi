@@ -11,6 +11,7 @@ const { PACKAGE, WEBSITE_ADDRESS, LICENSE_ADDRESS, SRC, SRC_BC, DIST, ARCHIVES, 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 import Webpack from 'webpack';
+import Crypto from 'node:crypto';
 import CopyPlugin from 'copy-webpack-plugin';
 import RemoveEmptyScriptsPlugin from 'webpack-remove-empty-scripts';
 import MiniCSSExtractPlugin from 'mini-css-extract-plugin';
@@ -50,10 +51,41 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Config.plugins.push(
-    new Webpack.DefinePlugin(ENVARS),
+    new Webpack.DefinePlugin(Object.assign({}, ENVARS, { __BIBI_BUILD_V__: JSON.stringify(Crypto.randomBytes(9).toString('base64url')) })),
     new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'] }),
-    new MiniCSSExtractPlugin({ filename: '[name]' })
+    new MiniCSSExtractPlugin({ filename: '[name]' }),
+    new BibiAssetVersionPlugin()
 );
+
+// Appends ?v=<base64url(sha256(content))> to same-project js/css references inside emitted HTML,
+// so browsers can never serve a stale bundle/script/stylesheet from cache (the query is part of the cache key).
+// Filenames stay fixed (embed publishers reference jo.js/bibi.js by stable path).
+function BibiAssetVersionPlugin() {
+    const digest = (Buf) => Crypto.createHash('sha256').update(Buf).digest('base64url');
+    this.apply = (Compiler) => Compiler.hooks.thisCompilation.tap('BibiAssetVersion', (Compilation) => {
+        Compilation.hooks.processAssets.tap({ name: 'BibiAssetVersion', stage: Webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT }, () => {
+            const Names = new Set(Compilation.getAssets().map(A => A.name));
+            const resolveAsset = (Ref, FromDir) => {
+                const Bare = Ref.split('?')[0].split('#')[0];
+                if(!/\.([cm]?js|css)$/.test(Bare) || /^(?:[a-z]+:)?\/\//i.test(Bare) || Bare.startsWith('data:')) return null;
+                const Hit = normalizePath(FromDir, Bare);
+                return Names.has(Hit) ? Hit : null;
+            };
+            for(const { name } of Compilation.getAssets()) {
+                if(!/\.html?$/.test(name)) continue;
+                const Dir = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '';
+                let Src = Compilation.getAsset(name).source.source().toString(), Touched = false;
+                Src = Src.replace(/(src|href)="([^"]+)"/g, (M, Attr, Ref) => {
+                    const Hit = resolveAsset(Ref, Dir);
+                    if(!Hit) return M;
+                    Touched = true;
+                    return `${Attr}="${Ref.split('?')[0].split('#')[0]}?v=${digest(Compilation.getAsset(Hit).source.source())}"`;
+                });
+                if(Touched) Compilation.updateAsset(name, new Webpack.sources.RawSource(Src));
+            }
+        });
+    });
+}
 
 // =============================================================================================================================
 

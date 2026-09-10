@@ -96,7 +96,7 @@ O.error = (Err) => {
 };
 
 
-O.id = () => (O.id.Count++).toString(36); O.id.Count = 0; // [Date.now(), performance.now(), Math.random()].map(Num => Math.ceil(Num * 9999).toString(36)).join('');
+O.versionedURL = (Url) => Url + (Url.includes('?') ? '&v=' : '?v=') + __BIBI_BUILD_V__; // cache-busting for runtime-loaded app assets (dress/preset/extensions/worker): the per-build id changes every compile, so a stale disk cache can never shadow fresh code
 
 O.chain = (...Args) => {
     const Assurance = typeof Args[0]?.assure !== 'function' ? { assure: () => true } : typeof Args[0] !== 'function' ? Args.shift() : Args[0];

@@ -10,7 +10,7 @@ import { Wand } from './bibi.instruments/Wand.mjs';
 
 //----------------------------------------------------------------------------------------------------------------------------------------------
 
-export const W = new Wand(new Worker(new URL('./bibi.wand.js', document.currentScript.src).href), {
+export const W = new Wand(new Worker(new URL('./bibi.wand.js?v=' + __BIBI_BUILD_V__, document.currentScript.src).href), {
     initialize: () => {
         delete W.initialize;
         W.Logger = O;

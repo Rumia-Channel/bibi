@@ -287,7 +287,7 @@ Bibi.hello = () => {
     if(!document.getElementById('bibi-preset')) {
         const PresetName = D['preset'] || U['preset'] || 'default';
         // if(PresetName === '~') Promises.push(new Promise(resolve => P.preset.resolve = resolve)); else { // DO NOT ALLOW EXTERNAL OBJECT
-            const Preset = sML.create('script', { id: 'bibi-preset', src: 'presets/' + PresetName + '.js' });
+            const Preset = sML.create('script', { id: 'bibi-preset', src: O.versionedURL('presets/' + PresetName + '.js') });
             Promises.push(new Promise(resolve => Preset.addEventListener('load', resolve)));
             document.head.insertBefore(Preset, Bibi.Script.nextSibling);
         // }
@@ -295,7 +295,7 @@ Bibi.hello = () => {
     if(!document.getElementById('bibi-dress')) {
         const DressName = D['dress'] || U['dress'] || 'everyday';
         // if(DressName === '~') Promises.push(new Promise(resolve => P.dress.resolve = resolve)); else { // DO NOT ALLOW EXTERNAL TEXT
-            const Dress = sML.create('link', { id: 'bibi-dress', rel: 'stylesheet', href: 'wardrobe/' + DressName + '/bibi.dress.css' });
+            const Dress = sML.create('link', { id: 'bibi-dress', rel: 'stylesheet', href: O.versionedURL('wardrobe/' + DressName + '/bibi.dress.css') });
             Promises.push(new Promise(resolve => Dress.addEventListener('load', resolve)));
             document.head.insertBefore(Dress, Bibi.Style.nextSibling);
         // }
