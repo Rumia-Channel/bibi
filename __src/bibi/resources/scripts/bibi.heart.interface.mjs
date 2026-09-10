@@ -3992,22 +3992,14 @@ I.Arrows = { create: () => { if(!S['use-arrows']) return I.Arrows = null;
 }};
 
 
-I.BuildStamp = { create: () => { // ?buildstamp=1 overlay: proves which bundle a tab runs (host + bibi.js Last-Modified + age). Settles "is this tab stale?" without DevTools.
+I.BuildStamp = { create: () => { // ?buildstamp=1 overlay: proves which bundle a tab runs (host + the running bibi.js ?v= content hash). Same code everywhere shows the same hash: comparable across servers, no fetch needed.
     if(!/[?&]buildstamp\b/.test(location.search || '')) return;
     E.add('bibi:opened', () => {
         const Badge = O.Body.appendChild(sML.create('div', { id: 'bibi-buildstamp' }));
         sML.appendCSSRule('div#bibi-buildstamp', 'position:fixed;left:8px;bottom:8px;z-index:99999999999;background:rgba(0,0,0,.78);color:#7fff9f;font:12px/1.6 monospace;padding:8px 10px;border-radius:6px;pointer-events:none;white-space:pre;');
-        const paint = (Line) => { Badge.textContent = location.host + '\nbundle: ' + Line; };
-        paint('checking…');
-        const cyrb = (S, seed) => { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for(let i = 0; i < S.length; i++) { const c = S.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (h2 >>> 0).toString(16) + (h1 >>> 0).toString(16); };
-        try {
-            const Src = (document.querySelector('script[src*="bibi"]') || {}).src || location.href;
-            fetch(Src, { method: 'HEAD' }).then(Res => {
-                const LM = Res.headers.get('Last-Modified');
-                if(LM) { paint(LM + ' (' + Math.max(0, Math.round((Date.now() - new Date(LM).getTime()) / 60000)) + ' min ago)'); return null; }
-                return fetch(Src).then(R2 => R2.text()).then(T => paint('code #' + cyrb(T, 7) + ' (' + Math.round(T.length / 1024) + ' KiB, no mtime header: dev server)'));
-            }).catch(() => paint('check failed'));
-        } catch(Err) { paint('error'); }
+        let V = '';
+        try { V = new URL(Bibi.Script.src).searchParams.get('v') || '(no ?v= on script URL)'; } catch(Err) { V = '(unreadable script URL)'; }
+        Badge.textContent = location.host + '\nbundle: code #' + V;
     });
 }};
 

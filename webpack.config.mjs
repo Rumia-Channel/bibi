@@ -31,7 +31,7 @@ const Config = {
     performance  : { maxEntrypointSize: 1000000, maxAssetSize: 1000000, hints: false  },
     output       : { path: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), filename: '[name].js' },
     // Serves DIST for `bun run serve` (replaces browser-sync/bs-config.cjs; port and start path preserved).
-    devServer    : { port: 62222, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true }, // 61671 falls inside Windows' excluded port ranges on some machines (EACCES); 62222 sits clear of them
+    devServer    : { port: 62222, headers: { 'Cache-Control': 'no-store' }, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true }, // 61671 falls inside Windows' excluded port ranges on some machines (EACCES); 62222 sits clear of them. no-store: `bun serve` is the verification environment (README) — a fresh server must never serve stale bundles/HTML from browser cache, so caching is off entirely (the ?v= hashes remain as the production mechanism)
     module       : { rules: [] },
     optimization : { minimizer: [] },
     plugins      : [],
@@ -51,7 +51,7 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Config.plugins.push(
-    new Webpack.DefinePlugin(Object.assign({}, ENVARS, { __BIBI_BUILD_V__: JSON.stringify(Crypto.randomBytes(9).toString('base64url')) })),
+    new Webpack.DefinePlugin(ENVARS),
     new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'] }),
     new MiniCSSExtractPlugin({ filename: '[name]' }),
     new BibiAssetVersionPlugin()
