@@ -568,7 +568,7 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
             } catch(Err) {}
         }
         Tar.BibiPictureRowShared = Shared;
-        const Want = Shared ? 'always' : '';
+        const Want = 'always'; // backfill is the steady state (a mid-text picture reads text|image|text across the spread otherwise); the audit can only KEEP always: the marking pass sets it, no downgrade ever (a flapping downgrade was restoring text|image|text right after the initial text|image paint, the reported flicker)
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
         try { // Authored blank lines around the picture collapse into the previous column tail once breaks isolate the zone; carry the resuming-side extent into the picture's right margin inside its zone (the zone's only content, so it always renders; external margins truncate at fragment starts, and spacer elements kept colliding with the centered picture)
             const BSE = { tb: 'top', bt: 'bottom', rl: 'right', lr: 'left' }[(Item.WritingMode || '').split('-')[1] || 'tb'] || 'top';
