@@ -3222,6 +3222,7 @@ I.Footnotes = { create: () => { if(!S['use-popup-footnotes']) return I.Footnotes
                 FnEle.NoteRef = A;
             };
             E.bind('bibi:loaded-book', () => R.Items.forEach(Item => {
+                if(!Item.Body) return; // items still extracting when the book opens (reboot churn, heavy load) carry no body yet: binding footnotes must not kill the boot
                 Item.Body.querySelectorAll('a[href*="#"]').forEach(BaseA => {
                     const BaseDest = hatch(BaseA.Destination);
                     if(!BaseDest || !BaseDest.Element || !BaseDest.Element.innerHTML) return;
