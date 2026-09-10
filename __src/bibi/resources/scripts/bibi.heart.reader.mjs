@@ -584,7 +584,7 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
                 if(H > 0.5) NewME = Math.round(H) + 'px';
             }
             Tar.BibiCarriedME = NewME;
-            if(ItemLineAxis == 'vertical') { const Want = NewME || ''; if((Ele.style.marginLeft || '') !== Want) { Ele.style.marginLeft = Want; Changed = true; } if((Ele.style.marginRight || '') !== '') { Ele.style.marginRight = ''; Changed = true; } } // the two-line gap rides on the picture's left margin: with column flex-end (main axis = block, resuming edge at the cross end), a left margin pushes the picture toward the zone end, leaving the gap visible next to the resuming prose
+            if(ItemLineAxis == 'vertical' && !Tar.BibiPictureRowShared) { const Want = NewME || ''; if((Ele.style.marginLeft || '') !== Want) { Ele.style.marginLeft = Want; Changed = true; } if((Ele.style.marginRight || '') !== '') { Ele.style.marginRight = ''; Changed = true; } } // the two-line gap rides on the picture's left margin: with column flex-end (main axis = block, resuming edge at the cross end), a left margin pushes the picture toward the zone end, leaving the gap visible next to the resuming prose. shared (leading) rows keep the image flush in its slot: a margin there opens a void beside the prose that reads as text|image|text
         } catch(Err) {}
     });
     return Changed;
