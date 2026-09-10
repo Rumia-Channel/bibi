@@ -337,15 +337,15 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary (a split zone lets the picture overflow its narrower fragment and paint over prose that correctly wraps the fragment box)
                 if(R.TwoPane && /^(img|svg)$/i.test(Ele.tagName)) { // every non-small picture claims the half zone (small ones already returned above); floats fragment across columns and paint over prose, so nothing in-flow stays float
                     const HalfW = Math.min(Math.floor(PageCB / 2), PageCL); // never wider than one column: an oversized zone cannot be kept whole by break-inside and would straddle again
-                    Tar.style.width = HalfW + 'px'; // reserve the picture half (zone, not image size). stays in flow (no float: breaks are ignored on floats). the zone fills its CSS column exactly, so it cannot be shifted to the page grid (column slots are content-anchored); alignment happens inside the zone below
+                    Tar.style.width = (Tar.BibiPictureRowShared ? 'auto' : HalfW + 'px'); // unshared (backfill) rows shrink the zone to the picture (no 200px+ empty slack beside it: that slack reads as text|image|text across the spread); shared (leading) rows keep the full half so prose can join beside the picture
                     Tar.style.breakBefore = ''; // no forced lead: the zone is exactly one column, so it slots into the empty column left by a short text tail (image|text) instead of wasting it
                     Tar.style.breakAfter = 'always'; // a picture with neighbors on both sides is text|image|text across the spread (the reported complaint): following prose always resumes after the zone. The row audit may downgrade this to '' when the picture shares its row with a tail (leading), restoring text|image
                     const NatW = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // intrinsic width (pending loads resolve via the load listener below and re-render)
                     const NatH = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[1] || 0) : (Ele.naturalHeight || 0);
                     if(NatW > 0 && NatH > 0) { const ZoneScale = Math.min(1, HalfW / NatW, PageCL / NatH); Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px'; Ele.BibiTobirae = NatH >= PageCL * 0.8; } // shrink-only contain: same ratio both axes, never distorted, never grown. growing every non-small picture to zone-fill erased the 挿絵/扉絵 size distinction the art was drawn with. Tobirae flag (full-height-class pictures, adopted or native) drives the 2-line after-spacing below
-                    if(ItemLineAxis == 'vertical') { // in vertical-rl a row flex's main axis is the physical Y (block direction), so justify-content is inert on the measured x axis; a column flex packs x via justify-content. pack the picture against the resuming edge and center it on the strip axis, so the two-line gap (next sibling strip) renders visibly
+                    if(ItemLineAxis == 'vertical' && !Tar.BibiPictureRowShared) { // backfill rows: column flex-end packs the picture against the resuming edge so the two-line gap renders visibly. In vertical-rl a row flex's main axis is the physical Y, so justify-content is inert on x; a column flex packs x. shared (leading) rows keep the inherited row flex so prose can line beside the picture (text|image)
                         Tar.style.flexDirection = 'column'; Tar.style.justifyContent = 'flex-end'; Tar.style.alignItems = 'center';
-                    } else { Tar.style.flexDirection = 'row'; Tar.style.justifyContent = 'center'; Tar.style.alignItems = 'center'; }
+                    }
                     Ele.style.marginLeft = '0'; Ele.style.marginRight = '0';
                     Ele.BibiPictureZone = Tar; // audited below for row sharing
                 }
@@ -567,7 +567,9 @@ R.auditPictureRows = (Item) => { // settle big in-flow picture rows: a picture s
                 }
             } catch(Err) {}
         }
+        const WasShared = !!Tar.BibiPictureRowShared;
         Tar.BibiPictureRowShared = Shared;
+        if(WasShared !== Shared && (Item.WritingMode || '').split('-')[1] != 'tb') { Tar.style.flexDirection = ''; Tar.style.justifyContent = ''; Tar.style.alignItems = ''; Changed = true; } // verdict flips re-run marking geometry on the next pass (marking re-applies per-verdict packing); without this a row marked backfill keeps column packing after flipping to shared, leaving a void that reads as text|image|text
         const Want = 'always'; // backfill is the steady state (a mid-text picture reads text|image|text across the spread otherwise); the audit can only KEEP always: the marking pass sets it, no downgrade ever (a flapping downgrade was restoring text|image|text right after the initial text|image paint, the reported flicker)
         if((Tar.style.breakAfter || '') !== Want) { Tar.style.breakAfter = Want; Changed = true; }
         try { // Authored blank lines around the picture collapse into the previous column tail once breaks isolate the zone; carry the resuming-side extent into the picture's right margin inside its zone (the zone's only content, so it always renders; external margins truncate at fragment starts, and spacer elements kept colliding with the centered picture)
