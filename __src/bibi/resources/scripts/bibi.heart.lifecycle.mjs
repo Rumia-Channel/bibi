@@ -649,7 +649,7 @@ Bibi.start = () => {
     //*/
     const LandingPage = R.getPage(Bibi.StartOption.Destination);
     if(!I.History.List.length) {
-        I.History.List = [{ UI: Bibi, Item: LandingPage.Item, ProgressInItem: LandingPage.IndexInItem / LandingPage.Item.Pages.length }];
+        if(LandingPage) I.History.List = [{ UI: Bibi, Item: LandingPage.Item, ProgressInItem: LandingPage.IndexInItem / LandingPage.Item.Pages.length }]; // a destination resolving to a donated/dissolved item returns null: reading .Item off it threw TypeError
         I.History.update();
     }
     E.add('bibi:commands:move-by',     R.moveBy);

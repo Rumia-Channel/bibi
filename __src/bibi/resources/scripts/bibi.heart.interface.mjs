@@ -3586,7 +3586,8 @@ I.RangeFinder = { create: () => {
                 this.paint(Ran, { Emphasized: true });
                 this.FocusedRange = Ran;
             }
-            const Page = R.dest(Ran).Page;
+            const Dest = R.dest(Ran); if(!Dest) return Promise.resolve(); // a range in a donated/dissolved item resolves to null: reading .Page off it threw TypeError
+            const Page = Dest.Page;
             return I.PageObserver.Current.Pages.includes(Page) ? Promise.resolve() : R.focusOn(Page).then(() => this.reserveRepainting(999));
         },
         setSearchResultFocusTo: function(SRoI /* SearchResult-or-Index: Index is better than SearchResult. */) {
@@ -3608,9 +3609,11 @@ I.RangeFinder = { create: () => {
             const SearchResults = this.Search.Results; /**/ if(!SearchResults.length) return Promise.resolve();
             const SearchResultF = SearchResults.Focused;
             if(!Opt) Opt = {};
-            if(SearchResultF && I.PageObserver.Current.Pages.includes(R.dest(SearchResultF.Range).Page)) return this.changeSearchResultFocusBy(Opt.Reverse ? -1 : 1);
+            const FocusedPage = SearchResultF ? R.dest(SearchResultF.Range) : null;
+            if(FocusedPage && I.PageObserver.Current.Pages.includes(FocusedPage.Page)) return this.changeSearchResultFocusBy(Opt.Reverse ? -1 : 1); // dest() can return null for a range in a dissolved item: reading .Page off it threw TypeError
             const NextResultIndex = this.getNearestSearchResultIndex();
-            return this.setSearchResultFocusTo(!Opt.Reverse || I.PageObserver.Current.Pages.includes(R.dest(SearchResults[NextResultIndex].Range).Page) ? NextResultIndex : this.getNearestSearchResultIndex({ Reverse: true }));
+            const NextPage = Number.isInteger(NextResultIndex) && SearchResults[NextResultIndex] ? R.dest(SearchResults[NextResultIndex].Range) : null;
+            return this.setSearchResultFocusTo(!Opt.Reverse || (NextPage && I.PageObserver.Current.Pages.includes(NextPage.Page)) ? NextResultIndex : this.getNearestSearchResultIndex({ Reverse: true }));
         },
         getNearestSearchResultIndex: function(Opt) {
             const SearchResults = this.Search.Results; /**/ if(!SearchResults.length) return NaN;
@@ -3621,8 +3624,9 @@ I.RangeFinder = { create: () => {
             else             Dir = -1, iStart = SearchResults.length - 1, CP = I.PageObserver.Current.Pages.slice(-1)[0];
             if(!CP) return iStart; // Current.Pages can be empty mid-relayout: reading .Item off undefined threw TypeError
             const CII = CP.Item.Index, CPI = CP.Index;
-            for(let i = iStart; SearchResults[i]; i += Dir) { const Ran = SearchResults[i].Range;
-                if(Ran.startContainer.ownerDocument.body.Item.Index * Dir < CII * Dir || R.dest(Ran).Page.Index * Dir < CPI * Dir) continue;
+            for(let i = iStart; SearchResults[i]; i += Dir) { const Ran = SearchResults[i].Range; const RanDest = R.dest(Ran);
+                if(!RanDest) continue; // a range in a dissolved item resolves to null: reading .Page off it threw TypeError
+                if(Ran.startContainer.ownerDocument.body.Item.Index * Dir < CII * Dir || RanDest.Page.Index * Dir < CPI * Dir) continue;
                 return i;
             } return iStart;
         },

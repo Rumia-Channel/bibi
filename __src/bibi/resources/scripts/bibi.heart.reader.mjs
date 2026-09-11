@@ -1238,8 +1238,10 @@ R.dest = (_, Opt) => { if(_ === undefined || _ === null) return null;
     };
 
     R.getPageOfRectHeadInItem = (Rect, Item) => {
+        if(!Item || !Item.Pages || !Item.Pages.length) return null; // a donated/dissolved item has no pages: indexing into [] returned undefined and callers read .Item off it (TypeError)
         const CoordInItem = Rect[C.L_BASE_b];
-        return Item.Pages[Math.floor(Math.max(0, (S.SLD == 'rtl' ? Item.HTML.getBoundingClientRect()[C.L_SIZE_l] - CoordInItem : CoordInItem) / R.Stage[C.L_SIZE_L]))];
+        const Idx = Math.floor(Math.max(0, (S.SLD == 'rtl' ? Item.HTML.getBoundingClientRect()[C.L_SIZE_l] - CoordInItem : CoordInItem) / R.Stage[C.L_SIZE_L]));
+        return Item.Pages[Math.min(Idx, Item.Pages.length - 1)]; // clamp: a rect past the last page (donation shrank the item) must not index out of range
     };
 
     R.getPageOfProgressIn = (In, Progress) => In.Pages[ Progress > 0 ? Math.min(Math.floor(In.Pages.length * Progress), In.Pages.length - 1) : 0 ];
