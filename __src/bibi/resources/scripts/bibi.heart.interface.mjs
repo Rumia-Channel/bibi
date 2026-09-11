@@ -359,6 +359,7 @@ I.PageObserver = { create: () => {
         observePageMove: () => {
             E.bind('bibi:scrolled', () => {
                 const CS = PageObserver.Current.List[0], CE = PageObserver.Current.List.slice(-1)[0]; if(!CS || !CE) return; // a scroll can land while Current is empty (pages being rebuilt after a donation/relayout): reading .Page off undefined threw TypeError
+                const CSP = CS.Page, CEP = CE.Page, CSPIS = CS.PageIntersectionStatus, CEPIS = CE.PageIntersectionStatus;
                 const PS =    PageObserver.Past.List[0], PE =    PageObserver.Past.List.slice(-1)[0], PSP = PS.Page, PEP = PE.Page;
                 const FPI = 0, LPI = R.Pages.length - 1;
                 let Flipped = false, AtTheBeginning = false, AtTheEnd = false;
