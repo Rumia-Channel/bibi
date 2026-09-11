@@ -358,7 +358,7 @@ I.PageObserver = { create: () => {
         Past:    { List: [{ Page: null, PageIntersectionStatus: null }] },
         observePageMove: () => {
             E.bind('bibi:scrolled', () => {
-                const CS = PageObserver.Current.List[0], CE = PageObserver.Current.List.slice(-1)[0], CSP = CS.Page, CEP = CE.Page, CSPIS = CS.PageIntersectionStatus, CEPIS = CE.PageIntersectionStatus;
+                const CS = PageObserver.Current.List[0], CE = PageObserver.Current.List.slice(-1)[0]; if(!CS || !CE) return; // a scroll can land while Current is empty (pages being rebuilt after a donation/relayout): reading .Page off undefined threw TypeError
                 const PS =    PageObserver.Past.List[0], PE =    PageObserver.Past.List.slice(-1)[0], PSP = PS.Page, PEP = PE.Page;
                 const FPI = 0, LPI = R.Pages.length - 1;
                 let Flipped = false, AtTheBeginning = false, AtTheEnd = false;
@@ -848,7 +848,8 @@ I.FlickObserver = { create: () => {
             if(!BibiEvent || !Par) return Promise.resolve();
             O.HTML.classList.add('moving');
             const Dist = C.d2d(Par.Vector.Direction.From);
-            const CurrentList = I.PageObserver.updateCurrent().List, CurrentPage = Dist >= 0 ? CurrentList.slice(-1)[0].Page : CurrentList[0].Page;
+            const CurrentList = I.PageObserver.updateCurrent().List; if(!CurrentList.length) { O.HTML.classList.remove('moving'); return Promise.resolve(); } // empty mid-relayout: reading .Page off undefined threw TypeError
+            const CurrentPage = Dist >= 0 ? CurrentList.slice(-1)[0].Page : CurrentList[0].Page;
             return R.focusOn({ Page: CurrentList.length == 1 && CurrentList[0].SpreadIntersectionStatus.Ratio < 0.5 ? R.Pages[CurrentPage.Index + Dist] || CurrentPage : CurrentPage }, {
                 Duration: !I.isScrollable() ? 0 : I.draggable() ? 333 : 0
             }).then(() => O.HTML.classList.remove('moving'));
@@ -1315,16 +1316,16 @@ I.Flipper = { create: () => {
             if(typeof (Distance *= 1) != 'number' || !isFinite(Distance) || Distance === 0) return Promise.resolve();
             I.ScrollObserver.forceStopScrolling();
             if(B.PrePaginated) { // Preventing flicker.
-                const CIs = [
-                    I.PageObserver.Current.List[          0].Page.Index,
-                    I.PageObserver.Current.List.slice(-1)[0].Page.Index
-                ], TI = CIs[Distance < 0 ? 0 : 1] + Distance;
-                CIs.forEach(CI => { try { R.Pages[CI].Spread.Box.classList.remove('current'); } catch(Err) {} });
-                                    try { R.Pages[TI].Spread.Box.classList.add(   'current'); } catch(Err) {}
+                const C0 = I.PageObserver.Current.List[0], C1 = I.PageObserver.Current.List.slice(-1)[0];
+                if(C0 && C1) {
+                    const CIs = [C0.Page.Index, C1.Page.Index], TI = CIs[Distance < 0 ? 0 : 1] + Distance;
+                    CIs.forEach(CI => { try { R.Pages[CI].Spread.Box.classList.remove('current'); } catch(Err) {} });
+                                        try { R.Pages[TI].Spread.Box.classList.add(   'current'); } catch(Err) {}
+                }
             }
             return R.moveBy(Distance, { Duration: Opt?.Duration || (S.ARA == S.SLA ? 333 : 0) }).then(Destination => {
                 I.PageObserver.updateCurrent();
-                if(!S['manualize-adding-histories']) I.History.add({ UI: Flipper, SumUp: I.History.List.slice(-1)[0].UI == Flipper && (Distance < 0 ? -1 : 1) === (Flipper.PreviousDistance < 0 ? -1 : 1), Destination: Destination });
+                if(!S['manualize-adding-histories']) { const LH = I.History.List.slice(-1)[0]; I.History.add({ UI: Flipper, SumUp: !!(LH && LH.UI == Flipper) && (Distance < 0 ? -1 : 1) === (Flipper.PreviousDistance < 0 ? -1 : 1), Destination: Destination }); } // History.List can be empty on the first flip: reading .UI off undefined threw TypeError
                 Flipper.PreviousDistance = Distance;
                 return Destination;
             });
@@ -2797,10 +2798,11 @@ I.History = {
     update: () => I.History.Updaters.forEach(fun => fun()),
     add: (Opt = {}) => { if(!S['use-histories']) return null;
         if(!Opt.UI) Opt.UI = Bibi;
-        const PageToBeAdded = Opt.Destination ? R.getPage(Opt.Destination) : (() => { I.PageObserver.updateCurrent(); return I.PageObserver.Current.List[0].Page; })();
+        const PageToBeAdded = Opt.Destination ? R.getPage(Opt.Destination) : (() => { I.PageObserver.updateCurrent(); const C0 = I.PageObserver.Current.List[0]; return C0 ? C0.Page : null; })(); // Current.List can be empty mid-relayout: reading .Page off undefined threw TypeError
         let Added = null;
-        if(PageToBeAdded != R.getPage(I.History.List.slice(-1)[0])) {
-            if(Opt.SumUp && I.History.List.slice(-1)[0].UI == Opt.UI) I.History.List.pop();
+        const LastHistory = I.History.List.slice(-1)[0];
+        if(PageToBeAdded != R.getPage(LastHistory)) {
+            if(Opt.SumUp && LastHistory && LastHistory.UI == Opt.UI) I.History.List.pop(); // List can be empty before the first entry: reading .UI off undefined threw TypeError
             Added = { UI: Opt.UI, Page: PageToBeAdded };
             I.History.List.push(Added);
             if(I.History.List.length - 1 > S['max-histories']) { // Not count the first (oldest).
@@ -3616,6 +3618,7 @@ I.RangeFinder = { create: () => {
             let Dir, iStart, CP;
             if(!Opt.Reverse) Dir =  1, iStart = 0,                        CP = I.PageObserver.Current.Pages[0];
             else             Dir = -1, iStart = SearchResults.length - 1, CP = I.PageObserver.Current.Pages.slice(-1)[0];
+            if(!CP) return iStart; // Current.Pages can be empty mid-relayout: reading .Item off undefined threw TypeError
             const CII = CP.Item.Index, CPI = CP.Index;
             for(let i = iStart; SearchResults[i]; i += Dir) { const Ran = SearchResults[i].Range;
                 if(Ran.startContainer.ownerDocument.body.Item.Index * Dir < CII * Dir || R.dest(Ran).Page.Index * Dir < CPI * Dir) continue;

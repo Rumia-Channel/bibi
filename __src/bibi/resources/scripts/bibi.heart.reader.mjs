@@ -1016,7 +1016,7 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
     let Dest = Par?.Destination !== undefined ? Par.Destination : Par;
     Opt = Object.assign({}, Par, Opt ? Opt : {});
     if(!Opt.Distilled) Dest = R.dest(Dest);
-    if(!Dest || !Dest.Page) try { Dest = { Page: I.PageObserver.Current.Pages[0] }; } catch(Err) { return reject(); }
+    if(!Dest || !Dest.Page) try { Dest = { Page: I.PageObserver.Current.Pages[0] }; if(!Dest.Page) return reject(); } catch(Err) { return reject(); } // Current.Pages can be empty mid-relayout (donation/organizePages): reading .Item off undefined threw TypeError
     E.dispatch('bibi:is-going-to:focus-on', Dest);
     R.Moving = true;
     let FocusPoint;
@@ -1641,7 +1641,8 @@ R.moveBy = (Dist, Par) => new Promise((resolve, reject) => {
     delete Par.Distance;
     if(!Dist || typeof Dist != 'number') return reject();
     E.dispatch('bibi:is-going-to:move-by', Dist);
-    const Current = (Dist > 0 ? I.PageObserver.Current.List.slice(-1) : I.PageObserver.Current.List)[0], CurrentPage = Current.Page, CurrentItem = CurrentPage.Item;
+    const Current = (Dist > 0 ? I.PageObserver.Current.List.slice(-1) : I.PageObserver.Current.List)[0]; if(!Current) return reject(); // Current.List can be empty mid-relayout (donation/organizePages): reading .Page off undefined threw TypeError
+    const CurrentPage = Current.Page, CurrentItem = CurrentPage.Item;
     let Promised = null;
     if(
         true /*||
