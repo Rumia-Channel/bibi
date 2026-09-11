@@ -160,11 +160,11 @@ describe("two-pane wiring", () => {
     });
     test("big vector pictures share the inline picture machinery", () => {
         // % -sized standalone svg dissolves like raster but rendered tiny: fit read the
-        // transient layout box and the half-zone branch was img-only. viewBox is the truth.
+        // transient layout box and the zone sizing was img-only. viewBox is the truth.
         const src = reader();
         expect(src).toContain("svgNaturalSize");
         expect(src).toContain("/^(img|svg)$/i.test(Ele.tagName)");
-        expect(src).toContain("querySelectorAll('img, svg')");
+        expect(src).toContain("svgNaturalSize(Ele)"); // zone sizing reads the viewBox for svg, naturalWidth for img
     });
     test("empty anchors do not block single-picture detection", () => {
         // calibre emits <a id></a> beside pictures: the strict single-child dive missed
