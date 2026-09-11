@@ -73,17 +73,17 @@ describe("two-pane geometry", () => {
     });
 });
 
-describe("solo picture donation (suspended: frontispieces stay standalone like the prologue solo)", () => {
+describe("solo picture donation", () => {
     const D = { donor: true };
     const T = (textLen = 20000) => ({ donor: false, textLen });
-    test("planner dissolves nothing, whatever the neighbors", () => {
-        expect(planSoloPictureDonations([T(), D, T()])).toEqual([]);
-        expect(planSoloPictureDonations([T(), D])).toEqual([]);
-        expect(planSoloPictureDonations([D, T()])).toEqual([]);
-        expect(planSoloPictureDonations([T(600), D, T(600)])).toEqual([]);
-        expect(planSoloPictureDonations([D, D, T()])).toEqual([]);
-        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([]);
-        expect(planSoloPictureDonations([null, D, T()])).toEqual([]);
+    test("planner dissolves a standalone picture into adjacent long text", () => {
+        expect(planSoloPictureDonations([T(), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]); // prefers next-head
+        expect(planSoloPictureDonations([T(), D])).toEqual([{ from: 1, to: 0, atHead: false }]); // falls back to prev-tail
+        expect(planSoloPictureDonations([D, T()])).toEqual([{ from: 0, to: 1, atHead: true }]);
+        expect(planSoloPictureDonations([T(600), D, T(600)])).toEqual([]); // short neighbors are front-matter context, not recipients
+        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]); // first donor has no long-text neighbor; second dissolves forward
+        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]); // one donation per recipient end
+        expect(planSoloPictureDonations([null, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
         expect(planSoloPictureDonations([])).toEqual([]);
     });
     test("donation runs pre-layout and converges late pictures via regroup", () => {
