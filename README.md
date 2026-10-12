@@ -56,7 +56,7 @@ Bibi supports 3 ways to read/publish EPUB books:
 
 In all cases,
 
-1. Download Bibi from [GitHub release page](https://github.com/satorumurmur/bibi/releases) or [Bibi website](https://bibi.epub.link/#download).
+1. Download Bibi from [this repository's GitHub release page](https://github.com/Rumia-Channel/bibi/releases).
 2. And unzip it at first.
 
 
@@ -168,7 +168,7 @@ How to Arrange Development Environment
 
 ### Arrangements
 
-1. Clone [this repository](https://github.com/satorumurmur/bibi/). 
+1. Clone [this repository](https://github.com/Rumia-Channel/bibi/).
 2. $ `cd <the local repository>`
 3. $ `bun install`
 
