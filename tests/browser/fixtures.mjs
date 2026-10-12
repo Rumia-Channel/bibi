@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 export const LongText = '読書位置は画面のページ番号ではなく本文の文字に結び付ける。'.repeat(500);
 export const TailText = '終端への移動だけで読了にはしない。'.repeat(80);
 const DateOfFixture = new Date('2000-01-01T00:00:00Z');
-const xhtml = (Title, Body, Vertical) => `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja"><head><title>${Title}</title><style>body{${Vertical ? 'writing-mode:vertical-rl;' : ''}} h1{font-size:1.2em} p{margin:0} img{max-width:100%}</style></head><body>${Body}</body></html>`;
+const xhtml = (Title, Body, Vertical) => `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja"><head><title>${Title}</title><style>body{font-family:"Noto Serif CJK JP","MS Mincho",serif;${Vertical ? 'writing-mode:vertical-rl;' : ''}} h1{font-size:1.2em} p{margin:0} img{max-width:100%}</style></head><body>${Body}</body></html>`;
 export const createReflowFixture = async (Vertical = false, IllustrationFlow = false) => {
     const Zip = new JSZip(), add = (Name, Content, Extra = {}) => Zip.file(Name, Content, { date: DateOfFixture, ...Extra });
     add('mimetype', 'application/epub+zip', { compression: 'STORE' });

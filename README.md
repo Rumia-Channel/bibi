@@ -314,7 +314,7 @@ Only the publishing job has `contents: write`; it uses the built-in `GITHUB_TOKE
 
 * $ `bunx playwright install chromium` then `bun run build && bun run test:browser`
     - Exercises character-level restore across fonts/viewports, TOC and typed Jo navigation, paged/scrolling and fixed layouts, illustration source anchors, lazy spine loading, initial-location precedence, namespaces across deployment/user/revision changes, multiple iframe/session/source isolation, end/load-failure states, cookie authentication, and signed-style CORS/Range redirects.
-    - CI installs Chromium with `--with-deps`; real Wasabi configuration and production CSP/authentication still require host acceptance checks.
+    - CI installs Chromium with `--with-deps` and `fonts-noto-cjk`. Japanese fixtures explicitly select `Noto Serif CJK JP` or Windows `MS Mincho`, rather than relying on a Latin serif fallback with unusable vertical CJK advances. Books require suitable system or embedded fonts; real Wasabi configuration and production CSP/authentication still require host acceptance checks.
     - Failed CI browser checks upload the actual surface as the `browser-failure` artifact. Portrait-flow checks require the illustration on the right and a fully visible source character in the left pane, not a sliver of the following page.
 * $ `bun audit`
     - Checks installed packages for vulnerabilities; a nonzero exit must not be treated as success.
