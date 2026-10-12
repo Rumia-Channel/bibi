@@ -22,6 +22,13 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.0.0
+
+Stable v2 release with wide-screen portrait/prose pagination, reading-position persistence, dark-mode controls, EPUB content sanitization, and development/build-tooling hardening.
+
+The reader and `zzz` packages are versioned `2.0.0`. The root package version supplies the reader and Jo runtime versions; `bun run archive` generates `Bibi-v2.0.0.zip`.
+
+
 ### Table of Contents
 
 1. [How to Setup &amp; Read/Publish EPUB Books](#how-to-setup--readpublish-epub-books) (for Users/Publishers)
