@@ -1,4 +1,4 @@
-import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, getPortraitProseLayout } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
+import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, getPortraitProseLayout, canDonateSoloPicture } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
 describe("two-pane geometry", () => {
     test("viewport rule admits 4:3 landscape and wider, boundary inclusive", () => {
         expect(isTwoPaneViewport(1706, 800)).toBe(true);
@@ -53,6 +53,28 @@ describe("two-pane geometry", () => {
         expect(planTwoPaneGroups([P(), { pairable: true, soloLandscape: true }, P()])).toEqual([[0], [1], [2]]);
         expect(planTwoPaneGroups([S, P(), P(), S])).toEqual([[0], [1, 2], [3]]);
         expect(planTwoPaneGroups([])).toEqual([]);
+    });
+});
+
+describe("mixed-layout illustration adoption", () => {
+    const Book = { Reflowable: true };
+    const Picture = { PrePaginated: true, Reflowable: false, OnlySingleSVG: true, SingleMediaIsBig: true };
+    const Spread = { Index: 10, Items: [Picture] };
+    test("a fixed portrait page inside a reflowable novel remains eligible for adjacent prose", () => {
+        expect(canDonateSoloPicture(Book, Spread)).toBe(true);
+    });
+    test("a wholly fixed-layout book never donates its pages into another document", () => {
+        expect(canDonateSoloPicture({ Reflowable: false }, Spread)).toBe(false);
+    });
+    test("covers and explicit multi-page spreads remain intact", () => {
+        expect(canDonateSoloPicture(Book, { ...Spread, Index: 0 })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [Picture, Picture] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ ...Picture, SpreadPair: {} }] })).toBe(false);
+    });
+    test("small or unresolved single images and non-media pages are not adoption sources", () => {
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ OnlySingleImg: true, SingleMediaIsBig: false }] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ OnlySingleImg: true }] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ Reflowable: true }] })).toBe(false);
     });
 });
 

@@ -3,7 +3,7 @@
 import { Bibi, O, L, R, I, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
 import { W } from './bibi.heart.wand.mjs';
-import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, planSoloPictureDonations, getPortraitProseLayout } from './bibi.heart.twopane.mjs';
+import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, planSoloPictureDonations, getPortraitProseLayout, canDonateSoloPicture } from './bibi.heart.twopane.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -101,6 +101,7 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
     Spread.Pages = [];
     Spread.Items.forEach(Item => Item.Pages.forEach(Page => Page.IndexInSpread = Spread.Pages.push(Page) - 1));
     const SpreadSize = { Width: 0, Height: 0 }, SpreadBox = Spread.Box;
+    SpreadBox.style.display = Spread.Items.length == 1 && Spread.Items[0].BibiDonationDonor && !Spread.Pages.length ? 'none' : ''; // an emptied illustration's fixed viewport/min-height must not leave a blank opening
     if(Spread.Items.length == 1) {
         const Item = Spread.Items[0];
         Spread.Spreaded = Item.Spreaded ? true : false;
@@ -199,7 +200,7 @@ R.layOutItem = async (Item) => {
     const SoloMediaEl = (Item.OnlySingleSVG || Item.OnlySingleImg) ? R.renderPrePaginatedItem.getSingleMediaElement(Item) : null;
     const SoloSizeVerdict = SoloMediaEl ? R.singleMediaIsBig(SoloMediaEl) : null;
     if(SoloSizeVerdict !== null) Item.SingleMediaIsBig = SoloSizeVerdict; // dimensions resolved (e.g. image finished loading)
-    const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false && !Item.BibiDonationDonor; // donated-away husks render reflowable (and collapse to zero pages below), never as fitted solo pictures
+    const SoloBigPicture = (Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false && !Item.BibiDonationDonor; // moved illustrations are no longer fitted solo pages; their empty source items collapse below
     const HuskDissolved = Item.BibiDonationDonor && R.isBlankPageContent(Item); // empty husk: drop pages and skip render (modeless items have no writing mode for the column machinery)
     if(HuskDissolved) {
         Item.Pages.forEach(Page => { delete Page.IsPage; try { I.PageObserver.unobservePageIntersection(Page); } catch(Err) {} if(Page.parentNode) Page.parentNode.removeChild(Page); });
@@ -305,7 +306,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         const ZoneProperties = ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'height', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'];
         const BCS = getComputedStyle(Item.Body);
         const PageWidth = C.L_SIZE_B == 'Width' ? PageCB : PageCL, PageHeight = C.L_SIZE_B == 'Height' ? PageCB : PageCL;
-        const BandWidth = Math.max(0, Math.min(Item.Body.clientWidth || 1e9, PageWidth - Math.max(parseFloat(BCS.marginLeft) || 0, parseFloat(BCS.marginRight) || 0)) - (parseFloat(BCS.paddingLeft) || 0) - (parseFloat(BCS.paddingRight) || 0));
+        const BandWidth = Math.max(0, PageWidth - Math.max(parseFloat(BCS.marginLeft) || 0, parseFloat(BCS.marginRight) || 0) - (parseFloat(BCS.paddingLeft) || 0) - (parseFloat(BCS.paddingRight) || 0)); // use the available band, not the auto-sized body's previous portrait width
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
             const ExistingZone = Ele.BibiPictureZone;
             delete Ele.BibiPictureZone;
@@ -495,7 +496,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
 R.donateSoloPictures = () => { // move standalone illustrations into adjacent text flows after their available panes have been measured
     const recipients = new Set();
     let adopted = 0;
-    if(!R.TwoPane) return { adopted, recipients: [] };
+    if(!R.TwoPane || !B.Reflowable) return { adopted, recipients: [] };
     R.Spreads.forEach(Sp => { // orphan heal: recipient documents replaced after adoption lose the copy while the donor stays empty. recreate from stored markup (no loader, no loops).
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.BibiDonationDonor || !Solo.BibiDonatedMarkup || (Solo.BibiHealCount || 0) > 8) return;
@@ -518,7 +519,7 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
     const Metas = R.Spreads.map(Sp => {
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
-        if(Sp.Index > 0 && Solo.Reflowable && !Solo.PrePaginated && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) {
+        if(canDonateSoloPicture(B, Sp)) {
             const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
             if(Media && !Media.BibiAdoptedPicture && !Media.closest('figure')?.querySelector('figcaption')) {
                 const Aspect = R.getSingleMediaAspect(Solo);

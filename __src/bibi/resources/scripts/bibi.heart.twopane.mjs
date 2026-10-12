@@ -25,6 +25,12 @@ export const planTwoPaneGroups = (Metas) => { // Metas in reading order: [{ pair
     }
     return Groups;
 };
+export const canDonateSoloPicture = (Book, Spread) => {
+    if(!Book.Reflowable || !Spread || Spread.Index < 1 || Spread.Items.length != 1) return false;
+    const Item = Spread.Items[0];
+    return !!((Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig === true && !Item.SpreadPair);
+}; // a reflowable book may declare its standalone illustrations pre-paginated; the book's layout governs adoption
+
 
 export const getPortraitProseLayout = (First, Last, Band, ColumnLength, RTL) => {
     const SpansBands = Math.abs(Last.top - First.top) >= ColumnLength;

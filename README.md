@@ -135,7 +135,8 @@ In paged mode on viewports at least 4:3 wide, portrait illustrations use one pan
 Vertical-text pages can share the other pane with prose without wrapping prose on both sides of a picture.
 A standalone portrait fills the preceding prose's vacant pane when it fits. If that opening is already occupied, the portrait opens the following prose instead: portrait on the right and text on the left for right-to-left books.
 Eligibility uses the rendered prose's occupied width and page bands, not a character-count threshold. Pairing is recomputed after relayout until the pane groups settle, and illustration zones are reused across resizes.
-This is atomic pane placement, not unrestricted floating: landscape illustrations, small inline images, fixed-layout pages, captioned figures, and headings/navigation without prose do not opt into portrait/prose adoption.
+Reflowable books may declare individual illustration pages `pre-paginated`, even with `spread-none` and a centered page spread; those standalone portraits remain eligible. An adopted illustration's emptied source page is removed from the physical scroll flow. Pane widths use the current page band, not the auto-sized body's previous image width.
+This is atomic pane placement, not unrestricted floating: landscape illustrations, small inline images, wholly fixed-layout books, covers, explicit multi-page spreads, captioned figures, and headings/navigation without prose do not opt into portrait/prose adoption.
 Landscape illustrations can still use the full opening. Links to an adopted illustration's original EPUB spine entry remain usable.
 
 
@@ -185,6 +186,7 @@ How to Arrange Development Environment
     1. Source changes are recompiled and served automatically.
     2. HMR applies accepted JavaScript updates. Changes to HTML, standalone CSS, and files in `__dist` reload the browser.
     3. Reader extensions share the reader's webpack runtime so their HMR callbacks cannot overwrite each other. Jo keeps its host-page runtime; Wand keeps its worker runtime.
+    4. Restart the server after changing `webpack.config.mjs`; that configuration is loaded at startup, unlike watched application source files.
 
 `bun run serve` starts the same server directly. For development files on disk, use `bun run develop` (one build) or `bun run develop+watch` (watch without an HTTP server).
 The server listens only on `127.0.0.1`, rejects foreign Host/Origin headers, and sends `Cache-Control: no-store`. Use `bun run serve --no-open` to avoid opening a browser, or `bun run serve --port 62223` to choose a different port.
