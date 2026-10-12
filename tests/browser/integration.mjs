@@ -104,7 +104,8 @@ try {
                 Range.setStart(Node, Offset); Range.setEnd(Node, Offset + 1);
                 const Rect = Range.getBoundingClientRect();
                 const Style = getComputedStyle(Element);
-                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeType: Node.nodeType, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight };
+                const HTMLStyle = getComputedStyle(document.documentElement), BodyStyle = getComputedStyle(document.body);
+                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeType: Node.nodeType, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight, html: { className: document.documentElement.className, writingMode: HTMLStyle.writingMode, width: HTMLStyle.width, height: HTMLStyle.height, columnWidth: HTMLStyle.columnWidth, columnGap: HTMLStyle.columnGap }, body: { width: BodyStyle.width, height: BodyStyle.height }, readerClass: window.frameElement.ownerDocument.documentElement.className };
             }, Offset);
             const Box = await (await Frame.frameElement()).boundingBox(), Viewport = Page.viewportSize();
             assert.ok(Box && Rectangle.width && Rectangle.height, JSON.stringify({ restoredCharacter: Id, offset: Offset, Rectangle, Box, Viewport }));
