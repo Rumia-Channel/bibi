@@ -103,10 +103,11 @@ try {
                 const Node = Element.firstChild, Range = document.createRange();
                 Range.setStart(Node, Offset); Range.setEnd(Node, Offset + 1);
                 const Rect = Range.getBoundingClientRect();
-                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height };
+                const Style = getComputedStyle(Element);
+                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight };
             }, Offset);
             const Box = await (await Frame.frameElement()).boundingBox(), Viewport = Page.viewportSize();
-            assert.ok(Box && Rectangle.width && Rectangle.height, 'The restored character must render.');
+            assert.ok(Box && Rectangle.width && Rectangle.height, JSON.stringify({ restoredCharacter: Id, offset: Offset, Rectangle, Box, Viewport }));
             const Left = Box.x + Rectangle.left, Top = Box.y + Rectangle.top;
             assert.ok(Left < Viewport.width && Left + Rectangle.width > 0 && Top < Viewport.height && Top + Rectangle.height > 0, JSON.stringify({ restoredCharacter: Id, offset: Offset, Left, Top, Rectangle, Viewport }));
             return;
@@ -286,6 +287,7 @@ try {
     // A failed book load intentionally reports a reader error; the public failure is asserted above.
     console.log(JSON.stringify({ browserScenarios: Results, screenshot: path.join(Temp, 'public-api.png'), fixtureTextLength: LongText.length, realWasabiDeploymentVerified: false }));
 } catch(Error) {
+    await Page.screenshot({ path: path.join(Temp, 'failure.png') });
     console.error(JSON.stringify({ completed: Results, browserErrors: Errors, requests: Requests, screenshotDirectory: Temp, message: Error.message }));
     throw Error;
 } finally {
