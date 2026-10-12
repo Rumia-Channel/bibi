@@ -1,4 +1,5 @@
 import './jo.scss';
+import { createBucketAPI, receiveBucketMessage } from './jo.api.mjs';
 
 (() => { 'use strict';
 
@@ -59,6 +60,7 @@ Jo.Bucket = class {
                 ...new Map([
                     'autostart-embedded', 'autostart',
                     'dress',
+                    'book-key', 'content-hash', 'storage-namespace', 'storage-user', 'epubcfi',
                     'fix-reader-view-mode', 'fix-view-mode', 'fix-view',
                     'forget-me',
                     'full-breadth-layout-in-scroll',
@@ -84,7 +86,7 @@ Jo.Bucket = class {
                         case 'nav':                  return                      /^[1-9][0-9]*$/;
                         case 'p':                    return      /^[1-9][0-9]*(\.[1-9][0-9]*)*$/;
                         case 'reader-view-mode':     return /^(auto|paged|horizontal|vertical)$/;
-                        case 'sugar-for-biscuits':   return                               /^.+$/;
+                        case 'sugar-for-biscuits': case 'book-key': case 'content-hash': case 'storage-namespace': case 'storage-user': case 'epubcfi': return /^.+$/;
                     } return                          /^(true|false|1|0|yes|no|mobile|desktop)$/; })().test(V) && [K, V];
                 }).filter(Boolean)).entries(),
                 ['parent-bibi-index', Index]
@@ -96,17 +98,19 @@ Jo.Bucket = class {
             listen:   (EN, fun         ) => BibiEventRE.test(EN) && Bucket.Receiver.addEventListener(EN, Eve => fun.call(Receiver, Eve.detail), false),
             dispatch: (EN, Det = Bucket) => BibiEventRE.test(EN) && Bucket.Receiver.dispatchEvent(new CustomEvent(EN, { detail: Det })),
             receive:  (EN              ) => BibiEventRE.test(EN) && Bucket.Window?.E.add(EN, Det => Bucket.dispatch(EN, Det)),
-            post:     (EN, V           ) => BibiEventRE.test(EN) && Bucket.Window?.postMessage(`{ "${ EN }" : "${ V }" }`, Anchor.origin)
+            post:     (EN, V           ) => BibiEventRE.test(EN) && (Bucket.Frame?.contentWindow || Bucket.Window)?.postMessage(JSON.stringify({ [EN]: V }), Anchor.origin)
         });
+        if(Type === 'Embed') Bucket.api = createBucketAPI(Bucket);
         Bucket.listen('bibi:initialized', (Status) => Bucket.Status = Bucket.Initialized = Status); if(ToReceive.length) Bucket.listen('bibi:initialized', () => ToReceive.forEach(EN => Bucket.receive('' + EN.trim())));
         Bucket.listen('bibi:readied',     (Status) => Bucket.Status = Bucket.Readied     = Status);
         Bucket.listen('bibi:prepared',    (Status) => Bucket.Status = Bucket.Prepared    = Status);
         Bucket.listen('bibi:loaded-book', (Status) => Bucket.Status = Bucket.Loaded      = Status);
         Bucket.listen('bibi:binded-book', (Status) => Bucket.Status = Bucket.Binded      = Status);
         Bucket.listen('bibi:opened',      (Status) => Bucket.Status = Bucket.Opened      = Status);
-        Bucket.listen('bibi:opened',      (      ) => Object.assign(Bucket, {
-            move:        (Distance) => Bucket.post('bibi:commands:move', Distance),
-            focus:       (Target  ) => Bucket.post('bibi:commands:focus', Target),
+        Bucket.listen('bibi:started',     (Status) => Bucket.Status = Bucket.Started = Status);
+        Bucket.listen('bibi:started',     (      ) => Object.assign(Bucket, {
+            move:        (Distance) => Bucket.post('bibi:commands:move-by', Distance),
+            focus:       (Target  ) => Bucket.post('bibi:commands:focus-on', Target),
             changeView:  (RVM     ) => Bucket.post('bibi:commands:change-view', RVM),
             togglePanel: (        ) => Bucket.post('bibi:commands:toggle-panel', '')
         }));
@@ -115,7 +119,6 @@ Jo.Bucket = class {
             Type === 'Open' ? window.open(JoHRef) : (location.href = JoHRef);
             return false;
         })
-        if(Jo.TrustworthyOrigins && !Jo.TrustworthyOrigins.includes(Anchor.origin)) Jo.TrustworthyOrigins.push(Anchor.origin); // It is NOT reflected to S['trustworthy-origins'].
         if(Type == 'Embed') {
             Frame.Bucket = Bucket;
             Frame.classList.add('bibi-frame');
@@ -133,10 +136,8 @@ Jo.Bucket = class {
 };
 
 if(typeof window !== 'undefined') Object.assign(Jo, {
-    TrustworthyOrigins: [location.origin],
     listen:   (EN, fun     ) => BibiEventRE.test(EN) && document.addEventListener(EN, Eve => fun.call(document, Eve.detail)),
     dispatch: (EN, Det = Jo) => BibiEventRE.test(EN) && document.dispatchEvent(new CustomEvent(EN, { detail: Det })),
-    judge: (Msg, Origin) => (Msg && typeof Msg === 'string' && Origin && typeof Origin === 'string' && Jo.TrustworthyOrigins.includes(Origin)),
     process: () => {
         const Processed = [...document.body.querySelectorAll('*[data-bibi]')].map(LoveEle => {
             if(LoveEle.getAttribute('data-bibi-processed')) return;
@@ -151,15 +152,7 @@ if(typeof window !== 'undefined') Object.assign(Jo, {
             case 'Embed': ToBeEmbedded++; Bucket.listen('bibi:initialized', () => { Jo.dispatch('bibi:jo:embedded', Bucket); Embedded.push(Bucket) === ToBeEmbedded && Jo.dispatch('bibi:jo:embedded-all', Embedded); }); Bucket.embed(); break;
         } });
     },
-    message: (Eve) => {
-        if(!Eve || !Jo.judge(Eve.data, Eve.origin)) return false;
-        try {
-            Data = JSON.parse(Data);
-            if(typeof Data != 'object' || !Data) return false;
-            for(let EN in Data) Jo.dispatch(EN, Data[EN]);
-            return true;
-        } catch(Err) {} return false;
-    }
+    message: Eve => receiveBucketMessage(Jo, Eve)
 }) && (() => {
     document.addEventListener('DOMContentLoaded', Jo.process);
       window.addEventListener('load',             Jo.process);

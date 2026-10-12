@@ -36,7 +36,8 @@ FileBranches.push(
             'extensions': [
                 { 'extractor': [
                     'at-once.js',
-                    'on-the-fly.js'
+                    'on-the-fly.js',
+                    'on-the-fly.worker.js'
                 ] },
                 'lamp.js',
                 'sanitizer.js',

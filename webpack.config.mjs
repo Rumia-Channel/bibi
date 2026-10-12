@@ -42,9 +42,9 @@ Composer.FileTree.Process.forEach(({ Origin, Graft, FilePath }) => Config.entry[
 
 if(Composer.IsDeveloping) {
     const ReaderEntry = 'bibi/resources/scripts/bibi';
-    // Reader extensions share the reader runtime/HMR callback. Jo runs in the host page; Wand runs in its worker.
+    // Reader extensions share the reader runtime/HMR callback. Jo runs in the host page; worker entries need standalone runtimes.
     for(const Name of Object.keys(Config.entry)) {
-        if(Name !== ReaderEntry && Name !== 'bibi/and/jo' && Name !== 'bibi/resources/scripts/bibi.wand' && !Name.endsWith('.css')) {
+        if(Name !== ReaderEntry && Name !== 'bibi/and/jo' && Name !== 'bibi/resources/scripts/bibi.wand' && Name !== 'bibi/extensions/extractor/on-the-fly.worker' && !Name.endsWith('.css')) {
             Config.entry[Name] = { import: Config.entry[Name], dependOn: ReaderEntry };
         }
     }
@@ -60,7 +60,7 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 
 Config.plugins.push(
     new Webpack.DefinePlugin(ENVARS),
-    new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'] }),
+    new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'], remove: /\.css\.js$/ }),
     new MiniCSSExtractPlugin({ filename: '[name]' }),
     new BibiAssetVersionPlugin()
 );

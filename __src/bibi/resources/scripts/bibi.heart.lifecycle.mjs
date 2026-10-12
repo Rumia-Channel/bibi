@@ -137,6 +137,11 @@ Bibi.SettingTypes_UserOnly = {
         'epubcfi',
         'p',
         'preset',
+        'book-key',
+        'content-hash',
+        'storage-namespace',
+        'storage-user',
+        'location',
         'sugar-for-biscuits',
         'ui-language'
     ],
@@ -389,7 +394,7 @@ Bibi.initialize = async () => {
         })();
         if(O.JoBucket) {
             O.JoBucket.Window = window, O.JoBucket.Document = document, O.JoBucket.HTML = O.HTML, O.JoBucket.Body = O.Body;
-            ['bibi:initialized', 'bibi:readied', 'bibi:prepared', 'bibi:loaded-book', 'bibi:binded-book', 'bibi:opened'].forEach(EN => E.add(EN, Det => O.JoBucket.dispatch(EN, Det)));
+            ['bibi:initialized', 'bibi:readied', 'bibi:prepared', 'bibi:loaded-book', 'bibi:binded-book', 'bibi:opened', 'bibi:started'].forEach(EN => E.add(EN, Det => O.JoBucket.dispatch(EN, Det)));
             window.addEventListener('message', M.receive, false);
         }
     }
@@ -544,7 +549,8 @@ Bibi.loadBook = (BookInfo) => Promise.resolve().then(() => {
         // addResetter:    () => { window   .addEventListener('resize', Bibi.StartOption.resetter); },
         // removeResetter: () => { window.removeEventListener('resize', Bibi.StartOption.resetter); }
     };
-    if(typeof R.StartOn == 'object') {
+    if(R.StartOn && typeof R.StartOn === 'object') {
+        const HasLocation = Object.hasOwn(R.StartOn, 'Location'), RequestedLocation = R.StartOn.Location;
         const Item = typeof R.StartOn.Item == 'object' ? R.StartOn.Item : (() => {
             if(typeof R.StartOn.ItemIndex == 'number') {
                 let II = R.StartOn.ItemIndex;
@@ -556,7 +562,7 @@ Bibi.loadBook = (BookInfo) => Promise.resolve().then(() => {
                 let IIIS = R.StartOn.ItemIndexInSpine;
                      if(IIIS <  0                     ) IIIS = 0;
                 else if(IIIS >= B.Package.Spine.length) IIIS = B.Package.Spine.length - 1;
-                let Item = B.Package.Spine[R.StartOn.ItemIndexInSpine];
+                let Item = B.Package.Spine[IIIS];
                 if(!Item.Spread) {
                     R.StartOn = { ItemIndex: 0 };
                     Item = R.Items[0];
@@ -588,7 +594,7 @@ Bibi.loadBook = (BookInfo) => Promise.resolve().then(() => {
             Bibi.StartOption.TargetItemIndex = Item.Index;
             Bibi.StartOption.TargetSpreadIndex = Item.Spread.Index;
         }
-        Bibi.StartOption.Destination = R.StartOn;
+        Bibi.StartOption.Destination = HasLocation ? { ...R.StartOn, Location: RequestedLocation } : R.StartOn;
     }
     // Bibi.StartOption.addResetter();
     O.HTML.classList.add('loading-items');

@@ -173,15 +173,71 @@ How to Arrange Development Environment
 3. $ `bun install`
 
 
+### Host integration (2.1.0)
+
+The reader exposes `Bibi.API` directly and Jo exposes `Bucket.api` for iframe embedding. `schemaVersion` is `1`. Jo methods return promises; direct `getState()` and `getPosition()` are synchronous. Subscribe before embedding, then await `Bucket.api.ready` before navigating.
+
+```javascript
+const url = new URL('/vendor/bibi/', location.origin);
+url.search = new URLSearchParams({
+    book: '/epubs/book.epub',
+    'autostart-embedded': 'yes',
+    'book-key': 'book-123',
+    'content-hash': 'file-sha256',
+    'storage-namespace': 'my-library',
+    'storage-user': 'opaque-user-id'
+});
+const bucket = new window['bibi:jo'].Bucket({ 'bibi-href': url.href });
+const unsubscribe = bucket.api.subscribe('bibi:position-changed', event => {
+    console.log(event.bookKey, event.contentHash, event.sessionId, event.position);
+});
+document.body.append(bucket.Anchor);
+bucket.embed();
+await bucket.api.ready;
+const state = await bucket.api.getState();
+const position = await bucket.api.getPosition();
+const restored = await bucket.api.restorePosition(position.location, {
+    bookKey: 'book-123', contentHash: 'file-sha256'
+});
+console.log(state, restored.position);
+// Before replacing or removing this reader:
+unsubscribe();
+bucket.api.dispose();
+bucket.Frame.remove();
+bucket.Anchor.remove();
+```
+
+| API / field | Contract |
+| --- | --- |
+| `getState()` | Identity, `status` (`loading`, `ready`, `error`), `operable`, `error`, and `initialRestore`. A ready reader can temporarily be inoperable during movement or relayout. |
+| `getPosition()` | `{ location: { p, cfi }, progress, progressBasis, atEnd, layout: { iipp, pageIndex, pageCount } }`. Save `location`, not layout diagnostics. |
+| `restorePosition(location, identity?)` | Loads a lazy spine item when necessary, moves to the source point, and returns `{ requestedLocation, position }` with the actual visible position. A page's leading point can precede the requested character. |
+| `subscribe(type, listener)` | Public `bibi:state-changed` and `bibi:position-changed` envelopes; returns an unsubscribe function. Notifications carry schema, session, book, and content identities. |
+| `ready` / `dispose()` | Jo readiness promise / release listeners and outstanding requests. Use a new Bucket when replacing a book. |
+
+Locations refer to the original sanitized source DOM before pagination and illustration transfer. Point CFIs use `/6/<even-spine-step>!/4/...` and UTF-16 text offsets; P identifies a source element and cannot distinguish characters in a long paragraph. CFI takes precedence when both are present. Range CFIs, nested indirections, nonlinear spine targets, missing nodes, and out-of-range offsets are rejected rather than silently clamped or replaced with P.
+
+Progress weights each linear spine item equally. `spine-text` uses the source UTF-16 text fraction inside the item, excluding whitespace-only nodes; fixed-layout and textless items use `(itemIndex + 1) / itemCount` with `spine-items`. Progress does not use rendered page count. `atEnd` means the end is currently visible, **not** that the user has finished the book. The host owns server saving, synchronization, and finished-state decisions.
+
+For initial restoration, put the JSON location in the `location` query parameter using `URLSearchParams`. Explicit `location` / legacy URL destinations take precedence over local Automark, which takes precedence over the book head. `state.initialRestore` reports success or the error and actual position; an invalid explicit location is reported and opens the head instead of being treated as a successful restore. Live errors reject with `code`, including `NOT_READY`, `BUSY`, `INVALID_LOCATION`, `LOCATION_NOT_FOUND`, `INVALID_IDENTITY`, `IDENTITY_MISMATCH`, and `RESTORE_FAILED`; Jo also reports `TIMEOUT`, `SESSION_CHANGED`, and `DISPOSED`.
+
+Jo's request/response transport correlates `requestId` and checks the exact origin and iframe window. Session and host book/file identities separate readers and reject stale notifications. Existing typed `move`, `focus`, `changeView`, and `togglePanel` helpers remain available after startup.
+
+`storage-namespace` replaces the legacy book storage label with a tuple of namespace, `storage-user`, `book-key`, and `content-hash`; book key and hash are required. This isolates users and revisions even when EPUB metadata identifiers match and survives reader/preset path changes within the same origin. It is not cross-origin or cross-device synchronization. Without the namespace, legacy labels remain unchanged: `sugar-for-biscuits` is an **additive** discriminator when enabled, not a replacement for deployment/preset identity.
+
+Serve the complete `bibi/` tree unchanged, preferably on the host's origin. Extensionless ZIP routes such as `/epubs/<hash>` require a host preset with `"extract-if-necessary": [".epub", ".zip", ""]`. Keep `"allow-scripts-in-content": false`. ZIP fetches include same-origin cookies by default; `"request-with-credentials": true` explicitly enables cross-origin credentials. A signed cross-origin redirect needs CORS and exposed Range response headers; do not forward authentication secrets in reader URLs. CSP must permit the reader's scripts, worker/WASM execution, blob content frames, styles, images, fonts, and the intended book endpoints. A restrictive iframe sandbox without script/same-origin permissions is incompatible with the reader; allowing both does not make trusted same-origin reader code an isolation boundary.
+
+
 ### Project structure
 
 * `__src/bibi/resources/scripts/bibi.js` exposes the reader API; `bibi.heart.js` loads the engine modules.
 * `bibi.heart.context.mjs` holds shared state and sML compatibility helpers; `lifecycle` and `settings` handle startup and configuration.
+* `location` records original-source P / point-CFI anchors; `api` exposes versioned state, settled positions, and restoration; `storage` defines host-scoped book labels.
 * `loader` and `operator` handle EPUB packages, resources, and navigation; `reader` handles pagination, destinations, and wide-screen two-pane layouts.
 * `interface` implements controls, search, bookmarks, and reading-position persistence.
 * `__src/bibi/extensions` contains ZIP extraction, content sanitization, and BibiZine YAML support.
 * `__src/bibi/and/jo.js` supports embedding; `wardrobe` and `resources/styles` provide the UI styles. `__src__back-compat` contains the optional legacy URL kit.
-* `zzz` and `webpack.config.mjs` generate `__dist` and release ZIPs. `tests` covers behavior that can run without a browser; rendering still requires browser smoke checks.
+* `zzz` and `webpack.config.mjs` generate `__dist` and release ZIPs. `tests` covers engine/build behavior; `tests/browser` exercises only distribution reader assets in Chromium.
 
 
 ### How to Develop
@@ -192,7 +248,7 @@ How to Arrange Development Environment
 2. Edit source files.
     1. Source changes are recompiled and served automatically.
     2. HMR applies accepted JavaScript updates. Changes to HTML, standalone CSS, and files in `__dist` reload the browser.
-    3. Reader extensions share the reader's webpack runtime so their HMR callbacks cannot overwrite each other. Jo keeps its host-page runtime; Wand keeps its worker runtime.
+    3. Reader extensions share the reader's webpack runtime so their HMR callbacks cannot overwrite each other. Jo keeps its host-page runtime; Wand and the ZIP bootstrap keep standalone worker runtimes.
     4. Restart the server after changing `webpack.config.mjs`; that configuration is loaded at startup, unlike watched application source files.
 
 `bun run serve` starts the same server directly. For development files on disk, use `bun run develop` (one build) or `bun run develop+watch` (watch without an HTTP server).
@@ -218,6 +274,8 @@ If you want to modify them, please edit files in the `Source` column instead of 
 * $ `bun run build`
     - The production version of Bibi is generated in `__dist` folder.
     - You can upload them to your online webserver.
+    - `bibi/build-manifest.json` records version, source commit/dirty state, deterministic timestamp, lockfile SHA-256, toolchain versions, and every reader asset's size/SHA-256. Required reader, Jo, CSS, preset, sanitizer, and ZIP-worker files are checked.
+    - Run `bun run verify:dist` before importing the distribution. Use a clean fixed-ref checkout for publication; a dirty-source manifest is diagnostic evidence, not a clean-release claim.
 
 
 ### How to Make a Ditribution Package (Zip Archive)
@@ -226,11 +284,14 @@ If you want to modify them, please edit files in the `Source` column instead of 
     1. A zipped archive of the production version of Bibi is generated in `__archives` folder.
     2. Temporary output is written under `__archives/.tmp/.dist`, using directory names valid on Windows.
     3. The CLI waits for ZIP completion and exits unsuccessfully if packaging fails.
+    4. Packaging verifies the manifest, required assets, CRC, paths, and each file's digest before reporting success. Jo is required in both build output and ZIP.
+    5. Entries are sorted; DOS timestamps derive from `SOURCE_DATE_EPOCH` or the source commit time, with fixed permissions and UTC handling. Identical source, lockfile, toolchain, and build inputs produce identical ZIP bytes; output folder creation times and timezones do not affect ZIP metadata.
+    6. To verify an existing ZIP, run `bun zzz/distribution.mjs verify-zip <archive-path>`.
 
 
 ### GitHub Releases
 
-The CI workflow tests, audits, and builds branch pushes and pull requests. A `v*` tag push also runs `bun run archive` and publishes `Bibi-<tag>.zip` on GitHub Releases.
+The CI workflow tests, audits, builds, and runs artifact-only Chromium integration scenarios on branch pushes and pull requests. A `v*` tag push also runs `bun run archive` and publishes `Bibi-<tag>.zip` on GitHub Releases.
 
 Update the reader and `zzz` versions and the lockfile on `develop` first, merge into `master` with `--no-ff`, then create and push an annotated `v<version>` tag from `master`. Publishing rejects a tag that does not match `package.json` or whose commit is not included in `master`.
 
@@ -249,6 +310,9 @@ Only the publishing job has `contents: write`; it uses the built-in `GITHUB_TOKE
     - With content scripts disabled, verify that metadata and navigation event handlers do not execute, unsafe navigation links are removed, and ordinary internal links still work.
     - Check development updates: accepted JavaScript modules update without a page reload; HTML and standalone CSS edits refresh the page.
 
+* $ `bunx playwright install chromium` then `bun run build && bun run test:browser`
+    - Exercises character-level restore across fonts/viewports, TOC and typed Jo navigation, paged/scrolling and fixed layouts, illustration source anchors, lazy spine loading, initial-location precedence, namespaces across deployment/user/revision changes, multiple iframe/session/source isolation, end/load-failure states, cookie authentication, and signed-style CORS/Range redirects.
+    - CI installs Chromium with `--with-deps`; real Wasabi configuration and production CSP/authentication still require host acceptance checks.
 * $ `bun audit`
     - Checks installed packages for vulnerabilities; a nonzero exit must not be treated as success.
     - The dependency lockfile includes range-safe fixes for 15 advisories found during the October 2026 review.

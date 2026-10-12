@@ -2,6 +2,7 @@
 
 import { Bibi, O, L, R, I, P, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
+import { getHostBookStorageLabel } from './bibi.heart.storage.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -88,7 +89,7 @@ I.Oven = { create: () => {
                         case 'Bibi': LabelParts.unshift([BibiPath, PresetPath].join(LabelDelimiter));
                         default    : LabelParts.unshift('Bibi:Biscuit');
                     }
-                    const Label = LabelParts.join(LabelDelimiter), Portion = Biscuits.parsePortion(Oven.Spirit?.getItem(Label));
+                    const Label = (Tag === 'Book' && getHostBookStorageLabel(S)) || LabelParts.join(LabelDelimiter), Portion = Biscuits.parsePortion(Oven.Spirit?.getItem(Label));
                     Tin[Tag] = { Label: Label, Portion: Portion };
                     return Tin;
                 }, {});
@@ -286,7 +287,7 @@ I.PageObserver = { create: () => {
             if(CandidateParents.size) {
                 const CandidateItems = new Set();
                 CandidateParents.forEach(CandidateParent => {
-                    if(CandidateParent.IndexInSpine) return CandidateItems.add(CandidateParent); // Item
+                    if(Number.isInteger(CandidateParent.IndexInSpine)) return CandidateItems.add(CandidateParent); // Item, including the first spine entry.
                     if(CandidateParent.Items)        return CandidateParent.Items.forEach(Item => CandidateItems.add(Item)); // Spread
                     if(CandidateParent.Inside)       return CandidateParents.add(CandidateParent.Inside); // ItemBox or SpreadBox
                 });
@@ -380,7 +381,8 @@ I.PageObserver = { create: () => {
             });
         },
         automark: () => { try {
-            I.Oven.Biscuits.memorize('Book', { Automarks: [{ IsAutomark: true, P: R.getP() }] });
+            const Location = R.getLocation();
+            I.Oven.Biscuits.memorize('Book', { Automarks: [{ IsAutomark: true, P: Location.p, Location }] });
         } catch(Err) {} }
     };
     E.bind('bibi:laid-out-for-the-first-time', LayoutOption => {
@@ -390,7 +392,7 @@ I.PageObserver = { create: () => {
     E.bind('bibi:initialized-biscuits', () => {
         if(R.StartOn || !S['resume-from-last-position']) return;
         const Automarks = I.Oven.Biscuits.remember('Book', 'Automarks');
-        if(Array.isArray(Automarks) && Automarks[0]?.P) R.StartOn = Object.assign({}, I.Oven.Biscuits.remember('Book').Automarks[0]);
+        if(Array.isArray(Automarks) && Automarks[0]?.P) R.StartOn = Object.assign({}, Automarks[0]);
     });
     E.bind('bibi:opened', () => {
         PageObserver.updateCurrent();
@@ -405,8 +407,7 @@ I.PageObserver = { create: () => {
             PageObserver.automark();
         });
         // Paged flips, slider/bookmark/history/search jumps funnel through focusOn/scrollBy,
-        // which never touch native scroll: persist those completions too. P only, no %:
-        // percentages depend on viewport/pagination and would go stale across screens.
+        // Store original-source locations, never viewport-dependent percentages.
         E.add(['bibi:focused-on', 'bibi:scrolled-by'], () => PageObserver.automark());
     });
     E.dispatch('bibi:created-page-observer');

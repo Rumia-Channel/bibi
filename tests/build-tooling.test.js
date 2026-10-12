@@ -5,11 +5,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import JSZip from "jszip";
+import { RequiredAssets } from "../zzz/distribution.mjs";
 
 const CLI = fileURLToPath(new URL("../zzz/cli.mjs", import.meta.url));
 const { name, version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const packageName = name === "bibi" ? "Bibi" : name;
-const run = (args, cwd) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", timeout: 10000 });
+const run = (args, cwd, env = {}) => spawnSync(process.execPath, [CLI, ...args], { cwd, env: { ...process.env, ...env }, encoding: "utf8", timeout: 10000 });
 
 const isolated = async (check) => {
     const cwd = mkdtempSync(join(tmpdir(), "bibi-cli-"));
@@ -41,15 +42,45 @@ describe("build CLI failures", () => {
 describe("distribution archive", () => {
     test("waits for ZIP completion and preserves file contents", () => isolated(async cwd => {
         const input = join(cwd, "__archives", ".tmp", ".dist", "bibi");
-        mkdirSync(input, { recursive: true });
-        writeFileSync(join(input, "index.html"), "<h1>Archive contents</h1>");
+        for(const asset of RequiredAssets) {
+            const target = join(input, asset);
+            mkdirSync(join(target, ".."), { recursive: true });
+            writeFileSync(target, asset === "index.html" ? "<h1>Archive contents</h1>" : "archive fixture");
+        }
         const result = run(["--archive"], cwd);
         expect(result.status).toBe(0);
         const archiveRoot = join(cwd, "__archives");
         const output = readdirSync(archiveRoot).find(dir => dir.startsWith(packageName + "_"));
-        const archive = await JSZip.loadAsync(readFileSync(join(archiveRoot, output, `${packageName}-v${version}.zip`)));
+        const archive = await JSZip.loadAsync(readFileSync(join(archiveRoot, output, `${packageName}-v${version}.zip`)), { checkCRC32: true });
         expect(await archive.file(`${packageName}-v${version}/bibi/index.html`).async("string")).toBe("<h1>Archive contents</h1>");
         expect(archive.files[`${packageName}-v${version}/bibi-bookshelf/`].dir).toBe(true);
+    }));
+    test("refuses to publish an archive missing the embedding helper", () => isolated(cwd => {
+        const input = join(cwd, "__archives", ".tmp", ".dist", "bibi");
+        for(const asset of RequiredAssets.filter(asset => asset !== "and/jo.js")) {
+            const target = join(input, asset);
+            mkdirSync(join(target, ".."), { recursive: true });
+            writeFileSync(target, "archive fixture");
+        }
+        const result = run(["--archive"], cwd);
+        expect(result.status).toBe(1);
+        expect(result.stdout).not.toContain("archived");
+    }));
+    test("produces identical ZIP bytes independent of filesystem times and timezone", () => isolated(cwd => {
+        const archives = [];
+        for(const [index, timezone] of ["UTC", "America/Los_Angeles"].entries()) {
+            const work = join(cwd, String(index)), input = join(work, "__archives", ".tmp", ".dist", "bibi");
+            for(const asset of RequiredAssets) {
+                const target = join(input, asset);
+                mkdirSync(join(target, ".."), { recursive: true });
+                writeFileSync(target, "identical distribution input");
+            }
+            const result = run(["--archive"], work, { TZ: timezone });
+            expect(result.status).toBe(0);
+            const root = join(work, "__archives"), output = readdirSync(root).find(dir => dir.startsWith(packageName + "_"));
+            archives.push(readFileSync(join(root, output, `${packageName}-v${version}.zip`)));
+        }
+        expect(archives[0]).toEqual(archives[1]);
     }));
 });
 

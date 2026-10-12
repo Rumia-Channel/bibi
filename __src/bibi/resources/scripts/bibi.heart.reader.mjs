@@ -510,6 +510,7 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
             const Copy = Tpl.content.firstElementChild; if(!Copy) return;
             const Host = Recip.Body.querySelector('div.main') || Recip.Body;
             if(AtHead) Host.prepend(Copy); else Host.append(Copy);
+            R.rebindLocationDonation(Solo, Copy);
             const Media = Copy.querySelector('img, svg') || (/^(img|svg)$/i.test(Copy.tagName) ? Copy : null);
             if(Media) Media.BibiAdoptedPicture = true;
             Solo.BibiHealCount = (Solo.BibiHealCount || 0) + 1;
@@ -574,6 +575,7 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
             if(atHead) Host.prepend(Adopted); else Host.append(Adopted);
         } catch(Err) { return; }
         try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); Donor.BibiDonatedMarkup = Adopted.outerHTML; } catch(Err) {}
+        R.rememberLocationDonation(Donor, Adopted);
         const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
         if(Media) Media.BibiAdoptedPicture = true;
         Donor.BibiDonationDonor = true;
@@ -884,7 +886,20 @@ R.layOutBook = (Opt) => new Promise((resolve, reject) => setTimeout(() => {
             resolve();
         }).catch(reject);
     }), Number.isFinite(Opt.Delay) ? Opt.Delay : 33);
-}, Number.isFinite(Opt?.DelayBefore) ? Opt.DelayBefore : 0)).then(() => {
+}, Number.isFinite(Opt?.DelayBefore) ? Opt.DelayBefore : 0)).then(async () => {
+    if(Opt.Destination && Object.hasOwn(Opt.Destination, 'Location')) {
+        const RequestedLocation = Opt.Destination.Location;
+        try {
+            const Destination = R.resolveLocation(RequestedLocation);
+            const Reached = await R.focusOn(Destination, { Distilled: true, Duration: 0 });
+            if(!Reached) throw Object.assign(new Error('The initial position could not be reached.'), { code: 'RESTORE_FAILED' });
+            Bibi.InitialRestore = { ok: true, requestedLocation: RequestedLocation, error: null };
+            return Reached;
+        } catch(Error) {
+            Bibi.InitialRestore = { ok: false, requestedLocation: RequestedLocation, error: { code: Error.code || 'RESTORE_FAILED', message: Error.message || String(Error) } };
+            return R.focusOn({ Edge: 'head' }, { Duration: 0 });
+        }
+    }
     return R.focusOn(Opt.Destination, { Duration: 0 });
 }).then(() => {
     O.Busy = false;
@@ -983,8 +998,9 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
     let FocusPoint;
     const Page = Dest.Page, Item = Page.Item, Side = Opt.Side != 'after' ? 'before' : 'after';
     if(Item.Reflowable) {
-        if(!R.Paginated && B.WritingMode.split('-')[1] == Item.WritingMode.split('-')[1] && Dest.Element && Dest.Element.ownerDocument != document) {
-            FocusPoint = O.getElementCoord(Item)[C.L_AXIS_L] + (Item.NoPadding ? 0 : Item.Padding[C.L_OOBL_L]) + Dest.Element.getBoundingClientRect()[C.L_BASE_b];
+        if(!R.Paginated && B.WritingMode.split('-')[1] == Item.WritingMode.split('-')[1] && (Dest.Range || (Dest.Element && Dest.Element.ownerDocument !== document))) {
+            const Rect = Dest.Range ? Dest.Range.getBoundingClientRect() : Dest.Element.getBoundingClientRect();
+            FocusPoint = O.getElementCoord(Item)[C.L_AXIS_L] + (Item.NoPadding ? 0 : Item.Padding[C.L_OOBL_L]) + Rect[C.L_BASE_b];
         } else {
             FocusPoint = O.getElementCoord(Page)[C.L_AXIS_L];
             if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
@@ -1008,6 +1024,8 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
     }
     // if(Number.isInteger(Dest.TextNodeIndex)) R.selectTextLocation(Dest); // Colorize Destination with Selection
     const ScrollTarget = { Frame: R.Main, X: 0, Y: 0 };
+    I.PageObserver.Current.Pages = [Page];
+    I.PageObserver.classify(); // Reveal the destination before hit-testing: distant spreads are hidden until classified as current.
     ScrollTarget[C.L_AXIS_L] = FocusPoint; if(!S['use-full-height'] && S.RVM == 'vertical') ScrollTarget.Y -= I.Menu.Height;
     O.HTML.classList.add('moving');
     sML.scrollTo(ScrollTarget, {
@@ -1217,7 +1235,7 @@ R.dest = (_, Opt) => { if(_ === undefined || _ === null) return null;
 
 
 R.getPage = (_, Opt) => {
-    if(_ === undefined || _ === null) return ( R.Paginated ? I.PageObserver.Current.Pages : I.PageObserver.IntersectingPages.filter(ISP => R.Stage[C.L_SIZE_L] * I.PageObserver.getIntersectionStatus(ISP).Ratio > 3) )[0] || null;
+    if(_ === undefined || _ === null) return I.PageObserver.Current.Pages[0] || null; // focusOn synchronizes this list; IntersectionObserver notifications may still describe the previous viewport.
     if(!Opt || !Opt.Distilled)        return                (_ = R.dest(_)) ?                                                                                                                                                        _.Page :  null;
     /**/                              return        _.Page && _.Page.IsPage ?                                                                                                                                                        _.Page :  null;
 };
@@ -1545,29 +1563,6 @@ R.getNearestNavItem = (_) => {
 };
 
 
-// R.selectTextLocation = (_) => {
-//     if(!_ || !Number.isInteger(_.TextNodeIndex) || !_.Element) return false;
-//     const _Node = _.Element.childNodes[_.TextNodeIndex];
-//     if(!_Node || !_Node.textContent) return;
-//     const Sides = { Start: { Node: _Node, Index: 0 }, End: { Node: _Node, Index: _Node.textContent.length } };
-//     if(_.CharacterOffset) {
-//         if(_.CharacterOffset.Preceding || _.CharacterOffset.Following) {
-//             Sides.Start.Index = _.CharacterOffset.Index, Sides.End.Index = _.CharacterOffset.Index;
-//             if(_.CharacterOffset.Preceding) Sides.Start.Index -= _.CharacterOffset.Preceding.length;
-//             if(_.CharacterOffset.Following)   Sides.End.Index += _.CharacterOffset.Following.length;
-//             if(Sides.Start.Index < 0 || _Node.textContent.length < Sides.End.Index) return;
-//             if(_Node.textContent.substring(Sides.Start.Index, Sides.End.Index) != _.CharacterOffset.Preceding + _.CharacterOffset.Following) return;
-//         } else if(_.CharacterOffset.Side && _.CharacterOffset.Side == 'a') {
-//             Sides.Start.Node = _Node.parentNode.firstChild; while(Sides.Start.Node.childNodes.length) Sides.Start.Node = Sides.Start.Node.firstChild;
-//             Sides.End.Index = _.CharacterOffset.Index - 1;
-//         } else {
-//             Sides.Start.Index = _.CharacterOffset.Index;
-//             Sides.End.Node = _Node.parentNode.lastChild; while(Sides.End.Node.childNodes.length) Sides.End.Node = Sides.End.Node.lastChild;
-//             Sides.End.Index = Sides.End.Node.textContent.length;
-//         }
-//     }
-//     return sML.Ranges.selectRange(sML.Ranges.getRange(Sides));
-// };
 
 
 R.scrollBy = (Dist, Par) => new Promise((resolve, reject) => {
