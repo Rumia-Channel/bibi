@@ -217,6 +217,8 @@ bucket.Anchor.remove();
 
 Locations refer to the original sanitized source DOM before pagination and illustration transfer. Point CFIs use `/6/<even-spine-step>!/4/...` and UTF-16 text offsets; P identifies a source element and cannot distinguish characters in a long paragraph. CFI takes precedence when both are present. Range CFIs, nested indirections, nonlinear spine targets, missing nodes, and out-of-range offsets are rejected rather than silently clamped or replaced with P.
 
+On mixed image/prose pages, the leading location can belong to the illustration's original spine item; prose does not override an earlier visible illustration.
+
 Progress weights each linear spine item equally. `spine-text` uses the source UTF-16 text fraction inside the item, excluding whitespace-only nodes; fixed-layout and textless items use `(itemIndex + 1) / itemCount` with `spine-items`. Progress does not use rendered page count. `atEnd` means the end is currently visible, **not** that the user has finished the book. The host owns server saving, synchronization, and finished-state decisions.
 
 For initial restoration, put the JSON location in the `location` query parameter using `URLSearchParams`. Explicit `location` / legacy URL destinations take precedence over local Automark, which takes precedence over the book head. `state.initialRestore` reports the outcome, error, and actual `position` once operable, including the head fallback when an explicit location is invalid; that fallback is not treated as a successful restore. Live errors reject with `code`, including `NOT_READY`, `BUSY`, `INVALID_LOCATION`, `LOCATION_NOT_FOUND`, `INVALID_IDENTITY`, `IDENTITY_MISMATCH`, and `RESTORE_FAILED`; Jo also reports `TIMEOUT`, `SESSION_CHANGED`, and `DISPOSED`.
@@ -313,6 +315,7 @@ Only the publishing job has `contents: write`; it uses the built-in `GITHUB_TOKE
 * $ `bunx playwright install chromium` then `bun run build && bun run test:browser`
     - Exercises character-level restore across fonts/viewports, TOC and typed Jo navigation, paged/scrolling and fixed layouts, illustration source anchors, lazy spine loading, initial-location precedence, namespaces across deployment/user/revision changes, multiple iframe/session/source isolation, end/load-failure states, cookie authentication, and signed-style CORS/Range redirects.
     - CI installs Chromium with `--with-deps`; real Wasabi configuration and production CSP/authentication still require host acceptance checks.
+    - Failed CI browser checks upload the actual surface as the `browser-failure` artifact. Portrait-flow checks require the illustration on the right and a fully visible source character in the left pane, not a sliver of the following page.
 * $ `bun audit`
     - Checks installed packages for vulnerabilities; a nonzero exit must not be treated as success.
     - The dependency lockfile includes range-safe fixes for 15 advisories found during the October 2026 review.

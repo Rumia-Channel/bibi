@@ -67,10 +67,17 @@ const characterRange = (Node, Offset) => {
     Range.setStart(Node, Offset); Range.setEnd(Node, Math.min(Offset + 1, Node.length));
     return Range;
 };
-const firstTextOnPage = (Element, Page) => {
-    const Walker = Element.ownerDocument.createTreeWalker(Element, NodeFilter.SHOW_TEXT);
+const firstPointOnPage = (Element, Page) => {
+    const Walker = Element.ownerDocument.createTreeWalker(Element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
     for(let Node = Walker.nextNode(); Node; Node = Walker.nextNode()) {
-        if(!Node.length || !Node.nodeValue.trim() || !Anchors.has(Node)) continue;
+        if(!Anchors.has(Node)) continue;
+        if(Node.nodeType === 1) {
+            if(!/^(img|svg|image|object)$/i.test(Node.tagName)) continue;
+            const Rect = Node.getBoundingClientRect();
+            if((Rect.width || Rect.height) && R.getPageOfRectHeadInItem(Rect, Page.Item) === Page) return { node: Node };
+            continue;
+        }
+        if(!Node.length || !Node.nodeValue.trim()) continue;
         const First = R.getPageOfRangeHead(characterRange(Node, 0)), Last = R.getPageOfRangeHead(characterRange(Node, Node.length - 1));
         if(!First || !Last || First.Index > Page.Index || Last.Index < Page.Index) continue;
         let Low = 0, High = Node.length - 1;
@@ -90,14 +97,8 @@ R.getLocation = () => {
     if(!Page) throw fail('NOT_READY', 'The current page is unavailable.');
     const Item = Page.Item, Registry = Documents.get(Item);
     if(!Registry) throw fail('NOT_READY', 'The original content is not loaded.');
-    const Text = firstTextOnPage(Item.Body, Page);
-    if(Text) return locationOf(Text.node, Text.offset);
-    const Walker = Item.contentDocument.createTreeWalker(Item.Body, NodeFilter.SHOW_ELEMENT);
-    for(let Node = Walker.nextNode(); Node; Node = Walker.nextNode()) {
-        if(!Anchors.has(Node) || !/^(img|svg|image|object)$/i.test(Node.tagName)) continue;
-        const Rect = Node.getBoundingClientRect();
-        if((Rect.width || Rect.height) && R.getPageOfRectHeadInItem(Rect, Item) === Page) return locationOf(Node);
-    }
+    const Point = firstPointOnPage(Item.Body, Page);
+    if(Point) return locationOf(Point.node, Point.offset);
     return locationOf(Item.Body);
 };
 

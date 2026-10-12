@@ -103,15 +103,13 @@ try {
                 const Node = Element.firstChild, Range = document.createRange();
                 Range.setStart(Node, Offset); Range.setEnd(Node, Offset + 1);
                 const Rect = Range.getBoundingClientRect();
-                const Style = getComputedStyle(Element);
-                const HTMLStyle = getComputedStyle(document.documentElement), BodyStyle = getComputedStyle(document.body);
-                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeType: Node.nodeType, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight, html: { className: document.documentElement.className, writingMode: HTMLStyle.writingMode, width: HTMLStyle.width, height: HTMLStyle.height, columnWidth: HTMLStyle.columnWidth, columnGap: HTMLStyle.columnGap }, body: { width: BodyStyle.width, height: BodyStyle.height }, readerClass: window.frameElement.ownerDocument.documentElement.className };
+                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height };
             }, Offset);
             const Box = await (await Frame.frameElement()).boundingBox(), Viewport = Page.viewportSize();
             assert.ok(Box && Rectangle.width && Rectangle.height, JSON.stringify({ restoredCharacter: Id, offset: Offset, Rectangle, Box, Viewport }));
             const Left = Box.x + Rectangle.left, Top = Box.y + Rectangle.top;
             assert.ok(Left < Viewport.width && Left + Rectangle.width > 0 && Top < Viewport.height && Top + Rectangle.height > 0, JSON.stringify({ restoredCharacter: Id, offset: Offset, Left, Top, Rectangle, Viewport }));
-            return;
+            return { Left, Top, Rectangle };
         }
         assert.fail('The restored source text is absent from the delivered reader.');
     };
@@ -248,8 +246,10 @@ try {
         assert.ok(ImageFrame, 'The illustration must render.');
         const Box = await ImageFrame.locator('img[alt="縦長の挿絵"]').boundingBox();
         assert.ok(Box && Box.x >= 640 && Box.x + Box.width <= 1280 && Box.y >= 0 && Box.y + Box.height <= 900, JSON.stringify(Box));
-        await textVisible(Reader, 'tail', 0);
+        const Prose = await textVisible(Reader, 'tail', 0);
+        assert.ok(Prose.Left >= 0 && Prose.Left + Prose.Rectangle.width <= 640 && Prose.Top >= 0 && Prose.Top + Prose.Rectangle.height <= 900, JSON.stringify(Prose));
         assert.match((await position(Reader)).location.cfi, /^\/6\/4!/);
+        await Page.screenshot({ path: path.join(Temp, 'portrait-donation.png') });
         const StateCount = await Page.evaluate(() => window.states.length);
         await Page.setViewportSize({ width: 1400, height: 900 });
         await Page.waitForFunction(Before => window.states.slice(Before).some(Event => Event.state.operable), StateCount);
