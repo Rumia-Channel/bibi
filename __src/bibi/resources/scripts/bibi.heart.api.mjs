@@ -54,7 +54,7 @@ const publishPosition = () => {
     PositionTimer = null;
     if(!getState().operable) { publishState(); return; }
     const Position = getPosition(), Signature = JSON.stringify(Position);
-    if(Bibi.InitialRestore?.ok && !Bibi.InitialRestore.position) Bibi.InitialRestore.position = Position;
+    if(Bibi.InitialRestore && !Bibi.InitialRestore.position) Bibi.InitialRestore.position = Position;
     publishState();
     if(Signature === LastPosition) return;
     LastPosition = Signature;
@@ -107,7 +107,7 @@ M.handleAPIRequest = async Request => {
 for(const Event of ['bibi:initialized', 'bibi:loaded-book', 'bibi:binded-book']) document.addEventListener(Event, publishState);
 document.addEventListener('bibi:started', () => {
     Status = 'ready';
-    if(Bibi.InitialRestore?.ok && getState().operable) Bibi.InitialRestore.position = getPosition();
+    if(Bibi.InitialRestore && getState().operable) Bibi.InitialRestore.position = getPosition();
     publishState(); settlePosition();
 });
 document.addEventListener('bibi:x_x', Event => {

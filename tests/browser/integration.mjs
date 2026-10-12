@@ -180,6 +180,8 @@ try {
         const State = await Page.evaluate(Index => window.readers[Index].api.getState(), Reader);
         assert.equal(State.status, 'ready'); assert.equal(State.initialRestore.ok, false);
         assert.equal(State.initialRestore.error.code, 'LOCATION_NOT_FOUND');
+        assert.match(State.initialRestore.position?.location.cfi || '', /^\/6\/2!/);
+        await textVisible(Reader, 'long', 0);
         await remove(Reader); Reader = await open();
     });
     await scenario('two reader requests and forged source/session notifications stay isolated', async () => {
@@ -224,7 +226,7 @@ try {
         await remove(Reader);
         Reader = await open({ deployment: '/alternate/bibi/', preset: 'integration', book: '/epubs/reflow' });
         const Resumed = await position(Reader);
-        assert.ok(Number(Resumed.location.cfi.split(':')[1]) > 2000, JSON.stringify({ resumed: Resumed, state: await Page.evaluate(Index => window.readers[Index].api.getState(), Reader), storage: await Page.evaluate(() => Object.fromEntries(Object.entries(localStorage))) }));
+        assert.ok(Number(Resumed.location.cfi.split(':')[1]) > 2000, 'The relocated reader must resume the saved paragraph position.');
         await textVisible(Reader, 'long', Number(Saved.location.cfi.split(':')[1]));
         await remove(Reader);
     });
