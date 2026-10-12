@@ -40,6 +40,16 @@ const Config = {
 
 Composer.FileTree.Process.forEach(({ Origin, Graft, FilePath }) => Config.entry[normalizePath(Graft, FilePath.replace(/\.scss$/, '.css').replace(/\.[cm]?js$/, ''))] = resolvePath(Origin, FilePath));
 
+if(Composer.IsDeveloping) {
+    const ReaderEntry = 'bibi/resources/scripts/bibi';
+    // Reader extensions share the reader runtime/HMR callback. Jo runs in the host page; Wand runs in its worker.
+    for(const Name of Object.keys(Config.entry)) {
+        if(Name !== ReaderEntry && Name !== 'bibi/and/jo' && Name !== 'bibi/resources/scripts/bibi.wand' && !Name.endsWith('.css')) {
+            Config.entry[Name] = { import: Config.entry[Name], dependOn: ReaderEntry };
+        }
+    }
+}
+
 const CopyPatterns = [
     ...Composer.FileTree.Reflect.map(R => Object.assign(R, { transform: (CBuf, P) => /\.(x?html?|xml|css|[mc]?js|json|md|te?xt)$/.test(P) ? Object.entries(ENVARS).reduce((C, [N, V]) => C.replaceAll(N, V), CBuf.toString()) : CBuf })),
     ...Composer.FileTree.Copy

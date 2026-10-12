@@ -3,7 +3,7 @@
 import { Bibi, O, L, R, I, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
 import { W } from './bibi.heart.wand.mjs';
-import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, planSoloPictureDonations } from './bibi.heart.twopane.mjs';
+import { isTwoPaneViewport, shouldSoloLandscapeSpread, isPairableSpread, planTwoPaneGroups, planSoloPictureDonations, getPortraitProseLayout } from './bibi.heart.twopane.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -206,7 +206,6 @@ R.layOutItem = async (Item) => {
         Item.Pages = [];
     }
     await (HuskDissolved ? Promise.resolve() : ((Item.Reflowable && !SoloBigPicture) ? R.renderReflowableItem(Item) : R.renderPrePaginatedItem(Item))); // big single-media pages (even in reflowable books) are fitted pictures, not column text
-    // picture zones are full-width page bands by construction (below): no audit or clearance pass is needed — prose can never share a band with a picture
     R.requestTwoPaneRegroup(); // late-aspect convergence: regroup is signature-guarded, relayout is targeted
     Item.TwoPaneRendered = true;
     if(Item.Reflowable && Item.Spread && Item.Spread.PaneWidthFactor == 0.5 && Item.Pages.length != 1) Item.TwoPaneSoloLocked = true; // half pane overflowed: keep solo from now on (stops pair/solo flapping)
@@ -303,19 +302,21 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     }
     { // Pictures own a pane, not necessarily a whole opening. Portraits share wide vertical-text bands with prose; landscape pictures remain full-band.
         const Paged = S.RVM == 'paged';
+        const ZoneProperties = ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'height', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'];
         const BCS = getComputedStyle(Item.Body);
         const PageWidth = C.L_SIZE_B == 'Width' ? PageCB : PageCL, PageHeight = C.L_SIZE_B == 'Height' ? PageCB : PageCL;
         const BandWidth = Math.max(0, Math.min(Item.Body.clientWidth || 1e9, PageWidth - Math.max(parseFloat(BCS.marginLeft) || 0, parseFloat(BCS.marginRight) || 0)) - (parseFloat(BCS.paddingLeft) || 0) - (parseFloat(BCS.paddingRight) || 0));
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
+            const ExistingZone = Ele.BibiPictureZone;
             delete Ele.BibiPictureZone;
             delete Ele.BibiHalfPane;
-            let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture. void sidekicks (empty calibre anchors) never block the climb.
-            while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8 && !((Tar.parentElement.innerText || '').trim())) {
+            let Tar = ExistingZone || Ele, Guard = 0; // reuse the reader's atomic zone on resize; climb only unprocessed textless single-child wrappers
+            while(!ExistingZone && Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8 && !((Tar.parentElement.innerText || '').trim())) {
                 const Sibs = [...Tar.parentElement.children].filter(Kid => Kid === Tar || !isVoidSidekick(Kid));
                 if(Sibs.length !== 1 || Sibs[0] !== Tar) break;
                 Tar = Tar.parentElement;
             }
-            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'height', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
+            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ZoneProperties.forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
             for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // adopted solos smuggle converter margins (calibre .calibre2{margin-top:5%;margin-bottom:3%}) into foreign flows: neutralize the wrapper chain so adopted and native pictures share one geometry
@@ -327,13 +328,14 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
                 if(/^inline/i.test(getComputedStyle(Ele).display) && !Ele.BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true) return; // inline illustrations stay in the text flow (gaiji and pending pictures wait); big or adopted pictures always claim their zone
                 const Zone = Item.contentDocument.createElement('div'); // keep the picture atomic while its wrapper reserves the pane
+                Zone.BibiDefaultBreaks = {}; ZoneProperties.forEach(Pro => Zone.BibiDefaultBreaks[Pro] = '');
                 Ele.parentNode.insertBefore(Zone, Ele); Zone.appendChild(Ele); Tar = Zone;
             }
             const PrevSib = (() => { let Sib = Tar.previousElementSibling; while(Sib && isVoidSidekick(Sib)) Sib = Sib.previousElementSibling; return Sib; })(); // void sidekicks (empty anchors) must not force a blank lead page
             const NextSib = (() => { let Sib = Tar.nextElementSibling; while(Sib && isVoidSidekick(Sib)) Sib = Sib.nextElementSibling; return Sib; })();
             const Natural = svgNaturalSize(Ele);
             const NatW = Natural ? Natural[0] : (Ele.naturalWidth || 0), NatH = Natural ? Natural[1] : (Ele.naturalHeight || 0);
-            const HalfPane = R.TwoPane && Item.Spread.PaneWidthFactor !== 0.5 && C.L_SIZE_B == 'Width' && ItemLineAxis == 'vertical' && NatH > NatW && NatW > 0;
+            const HalfPane = R.TwoPane && Item.Spread.PaneWidthFactor !== 0.5 && C.L_SIZE_B == 'Width' && ItemLineAxis == 'vertical' && NatH > NatW && NatW > 0 && !Ele.closest('figure')?.querySelector('figcaption');
             const ZoneWidth = HalfPane ? BandWidth / 2 : PrevSib ? PageWidth : BandWidth;
             Tar.style.width = ZoneWidth + 'px';
             Tar.style.height = ItemLineAxis == 'vertical' ? PageHeight + 'px' : Tar.BibiDefaultBreaks?.height || '';
@@ -493,7 +495,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
 R.donateSoloPictures = () => { // move standalone illustrations into adjacent text flows after their available panes have been measured
     const recipients = new Set();
     let adopted = 0;
-    if(!R.Stage.Width) return { adopted, recipients: [] };
+    if(!R.TwoPane) return { adopted, recipients: [] };
     R.Spreads.forEach(Sp => { // orphan heal: recipient documents replaced after adoption lose the copy while the donor stays empty. recreate from stored markup (no loader, no loops).
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.BibiDonationDonor || !Solo.BibiDonatedMarkup || (Solo.BibiHealCount || 0) > 8) return;
@@ -516,30 +518,37 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
     const Metas = R.Spreads.map(Sp => {
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
-        if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) { // re-donates after document reloads (new unflagged nodes); settled pictures are skipped by their adopted flag below
+        if(Sp.Index > 0 && Solo.Reflowable && !Solo.PrePaginated && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) {
             const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
-            if(Media && !Media.BibiAdoptedPicture) {
+            if(Media && !Media.BibiAdoptedPicture && !Media.closest('figure')?.querySelector('figcaption')) {
                 const Aspect = R.getSingleMediaAspect(Solo);
                 return { donor: true, portrait: !!(Aspect && Aspect[1] > Aspect[0]) };
             }
         }
-        if(Solo.Reflowable && Solo.TwoPaneRendered && !Solo.OnlySingleSVG && !Solo.OnlySingleImg) {
-            let textLen = 0;
-            try { textLen = (O.getElementInnerText(Solo.Body) || '').length; } catch(Err) {}
-            let portraitTailFits = false;
-            if(R.TwoPane && Solo.Spread.PaneWidthFactor !== 0.5) {
-                if(S.SLA == 'horizontal' && Solo.Spreaded) portraitTailFits = Solo.Pages.length % 2 == 1;
-                else if(C.L_SIZE_B == 'Width' && /^tb-/.test(Solo.WritingMode)) {
-                    const Walker = Solo.contentDocument.createTreeWalker(Solo.Body, NodeFilter.SHOW_TEXT, { acceptNode: T => T.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
-                    const LastText = Walker.lastChild();
-                    if(LastText) {
-                        const Range = Solo.contentDocument.createRange(); Range.selectNodeContents(LastText);
-                        const Rects = Range.getClientRects(), Last = Rects[Rects.length - 1], BodyRect = Solo.Body.getBoundingClientRect();
-                        if(Last) portraitTailFits = (Solo.WritingMode == 'tb-rl' ? Last.left - BodyRect.left : BodyRect.right - Last.right) >= BodyRect.width / 2;
-                    }
-                }
+        if(Solo.Reflowable && Solo.TwoPaneRendered && Solo.Spread.PaneWidthFactor !== 0.5 && !Solo.OnlySingleSVG && !Solo.OnlySingleImg && Solo.Source !== B.Nav.Source) {
+            const Doc = Solo.contentDocument, Range = Doc.createRange();
+            const Walker = Doc.createTreeWalker(Solo.Body, NodeFilter.SHOW_TEXT, { acceptNode(T) {
+                return T.nodeValue.trim() && !T.parentElement.closest('svg, script, style, nav, a[href], h1, h2, h3, h4, h5, h6, figcaption, rt, rp') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+            } });
+            let First = null, Last = null;
+            for(let T = Walker.firstChild(); T && !First; T = Walker.nextNode()) {
+                Range.selectNodeContents(T);
+                First = Range.getClientRects()[0];
             }
-            return { donor: false, textLen, portraitTailFits };
+            Walker.currentNode = Solo.Body;
+            for(let T = Walker.lastChild(); T && !Last; T = Walker.previousNode()) {
+                Range.selectNodeContents(T);
+                const Rects = Range.getClientRects();
+                Last = Rects[Rects.length - 1];
+            }
+            if(!First || !Last) return null;
+            if(C.L_SIZE_B == 'Width' && /^tb-/.test(Solo.WritingMode)) {
+                const Area = Solo.Pages[0]?.ContentAreaInItem;
+                if(!Area) return null;
+                const HTMLRect = Solo.HTML.getBoundingClientRect(), Band = { left: HTMLRect.left + Area.Left, right: HTMLRect.left + Area.Right, width: Area.Right - Area.Left };
+                return getPortraitProseLayout(First, Last, Band, Solo.ColumnLength || Area.Bottom - Area.Top, Solo.WritingMode == 'tb-rl');
+            }
+            return { recipient: Solo.Pages.length > 1, portraitTailFits: S.SLA == 'horizontal' && Solo.Spreaded && Solo.Pages.length % 2 == 1 };
         }
         return null;
     });
@@ -738,11 +747,11 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
     R.TwoPaneRegroupTimer = setTimeout(async () => {
         if(R.LayingOut) { R.requestTwoPaneRegroup(); return; }
         R.TwoPaneRelaying = true;
-        let Adopted = 0;
+        let Regroup = false;
         try {
             const Donation = R.donateSoloPictures();
-            Adopted = Donation.adopted;
             const { changed, spreads } = R.updateTwoPaneGrouping();
+            Regroup = Donation.adopted || changed;
             Donation.recipients.forEach(Sp => { if(!spreads.includes(Sp)) spreads.push(Sp); });
             if(spreads.length && (changed || Donation.adopted)) {
                 await Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp)));
@@ -753,7 +762,7 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
             }
         } finally {
             R.TwoPaneRelaying = false;
-            if(Adopted) R.requestTwoPaneRegroup();
+            if(Regroup) R.requestTwoPaneRegroup();
         }
     }, 120);
 };
@@ -861,13 +870,13 @@ R.layOutBook = (Opt) => new Promise((resolve, reject) => setTimeout(() => {
         const Promises = [];
         R.Spreads.forEach(Spread => Promises.push(R.layOutSpreadAndItsItems(Spread)));
         Promise.all(Promises).then(async () => {
-            let Donation;
+            let Donation, Grouping;
             do {
                 Donation = R.donateSoloPictures();
-                const Grouping = R.updateTwoPaneGrouping();
+                Grouping = R.updateTwoPaneGrouping();
                 const Spreads = new Set([...Donation.recipients, ...Grouping.spreads]);
                 await Promise.all([...Spreads].map(Sp => R.layOutSpreadAndItsItems(Sp)));
-            } while(Donation.adopted);
+            } while(Donation.adopted || Grouping.changed);
         }).then(() => {
             R.organizePages();
             R.layOutStage();

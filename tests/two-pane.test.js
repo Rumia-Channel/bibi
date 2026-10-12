@@ -1,4 +1,4 @@
-import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, SOLO_PICTURE_MIN_TEXT_LENGTH } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
+import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, getPortraitProseLayout } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
 describe("two-pane geometry", () => {
     test("viewport rule admits 4:3 landscape and wider, boundary inclusive", () => {
         expect(isTwoPaneViewport(1706, 800)).toBe(true);
@@ -57,28 +57,50 @@ describe("two-pane geometry", () => {
 });
 
 describe("solo picture donation", () => {
-    const D = { donor: true };
-    const T = (textLen = 20000) => ({ donor: false, textLen });
-    test("planner dissolves a standalone picture into adjacent long text", () => {
+    const D = { donor: true, portrait: true };
+    const T = () => ({ recipient: true });
+    test("planner places a standalone portrait beside neighboring prose", () => {
         expect(planSoloPictureDonations([T(), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]); // prefers next-head
-        expect(planSoloPictureDonations([T(), D])).toEqual([{ from: 1, to: 0, atHead: false }]); // falls back to prev-tail
+        expect(planSoloPictureDonations([T(), D])).toEqual([]); // no vacant preceding pane and no following prose
         expect(planSoloPictureDonations([D, T()])).toEqual([{ from: 0, to: 1, atHead: true }]);
-        expect(planSoloPictureDonations([T(600), D, T(600)])).toEqual([]); // short neighbors are front-matter context, not recipients
-        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]); // first donor has no long-text neighbor; second dissolves forward
-        expect(planSoloPictureDonations([T(), D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]); // one donation per recipient end
+        expect(planSoloPictureDonations([{ recipient: false }, D, { recipient: false }])).toEqual([]); // gallery captions/headings are not prose recipients
+        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([{ recipient: true, portraitTailFits: true }, D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]); // one donation per recipient end
         expect(planSoloPictureDonations([null, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
         expect(planSoloPictureDonations([])).toEqual([]);
     });
     test("a portrait fills the preceding vacant pane before opening the next chapter", () => {
         const Portrait = { donor: true, portrait: true };
-        const Tail = { donor: false, textLen: 20000, portraitTailFits: true };
+        const Tail = { recipient: true, portraitTailFits: true };
         expect(planSoloPictureDonations([Tail, Portrait, T()])).toEqual([{ from: 1, to: 0, atHead: false }]);
         expect(planSoloPictureDonations([T(), Portrait, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
-        expect(planSoloPictureDonations([Tail, { donor: true, portrait: false }, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([Tail, { donor: true, portrait: false }, T()])).toEqual([]);
     });
-    test("recipient text threshold is inclusive", () => {
-        expect(planSoloPictureDonations([D, T(SOLO_PICTURE_MIN_TEXT_LENGTH - 1)])).toEqual([]);
-        expect(planSoloPictureDonations([D, T(SOLO_PICTURE_MIN_TEXT_LENGTH)])).toEqual([{ from: 0, to: 1, atHead: true }]);
+    test("landscape and unresolved media never enter portrait prose placement", () => {
+        expect(planSoloPictureDonations([{ donor: true, portrait: false }, T()])).toEqual([]);
+        expect(planSoloPictureDonations([{ donor: true }, T()])).toEqual([]);
+    });
+});
+
+describe("portrait prose occupancy", () => {
+    const Band = { left: 0, right: 2000, width: 2000 };
+    test("right-to-left prose extending beyond one pane opens the following image/text spread", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 600, top: 0 }, Band, 900, true))
+            .toEqual({ recipient: true, portraitTailFits: false });
+    });
+    test("a multi-band chapter with a vacant final pane receives a trailing portrait", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 1400, top: 1000 }, Band, 900, true))
+            .toEqual({ recipient: true, portraitTailFits: true });
+    });
+    test("a single pane of text is left to ordinary pairing, boundary inclusive", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 1000, top: 0 }, Band, 900, true))
+            .toEqual({ recipient: false, portraitTailFits: true });
+    });
+    test("left-to-right vertical prose mirrors occupied and vacant panes", () => {
+        expect(getPortraitProseLayout({ left: 0, top: 0 }, { right: 1400, top: 0 }, Band, 900, false))
+            .toEqual({ recipient: true, portraitTailFits: false });
+        expect(getPortraitProseLayout({ left: 0, top: 0 }, { right: 600, top: 1000 }, Band, 900, false))
+            .toEqual({ recipient: true, portraitTailFits: true });
     });
 });
 

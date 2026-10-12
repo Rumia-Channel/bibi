@@ -26,14 +26,20 @@ export const planTwoPaneGroups = (Metas) => { // Metas in reading order: [{ pair
     return Groups;
 };
 
-export const SOLO_PICTURE_MIN_TEXT_LENGTH = 4000; // recipient raw-text threshold: short neighbors are gallery/front-matter context, leave their pictures alone
-export const planSoloPictureDonations = (Metas) => { // [{ donor, portrait, textLen, portraitTailFits }] → [{ from, to, atHead }]; fill a vacant preceding pane first, otherwise open the next long chapter. one donation per recipient end.
+export const getPortraitProseLayout = (First, Last, Band, ColumnLength, RTL) => {
+    const SpansBands = Math.abs(Last.top - First.top) >= ColumnLength;
+    const UsedWidth = RTL ? First.right - Last.left : Last.right - First.left;
+    const FreeTailWidth = RTL ? Last.left - Band.left : Band.right - Last.right;
+    return { recipient: SpansBands || UsedWidth > Band.width / 2, portraitTailFits: FreeTailWidth >= Band.width / 2 };
+};
+
+export const planSoloPictureDonations = (Metas) => { // portrait-only pane placement: preceding vacant pane, otherwise following prose. one donation per recipient end.
     const Plans = [], UsedEnds = new Set();
-    const isRecipient = (M) => M && !M.donor && (M.textLen || 0) >= SOLO_PICTURE_MIN_TEXT_LENGTH;
+    const isRecipient = (M) => M && !M.donor && M.recipient;
     Metas.forEach((M, i) => {
-        if(!M || !M.donor) return;
-        const PreviousFits = M.portrait && isRecipient(Metas[i - 1]) && Metas[i - 1].portraitTailFits;
-        const to = PreviousFits ? i - 1 : isRecipient(Metas[i + 1]) ? i + 1 : isRecipient(Metas[i - 1]) ? i - 1 : -1;
+        if(!M || !M.donor || !M.portrait) return;
+        const PreviousFits = isRecipient(Metas[i - 1]) && Metas[i - 1].portraitTailFits;
+        const to = PreviousFits ? i - 1 : isRecipient(Metas[i + 1]) ? i + 1 : -1;
         if(to < 0) return;
         const atHead = to > i, EndKey = to + (atHead ? ':head' : ':tail');
         if(UsedEnds.has(EndKey)) return;
