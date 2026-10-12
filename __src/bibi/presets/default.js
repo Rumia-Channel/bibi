@@ -259,14 +259,15 @@ Bibi.preset({
     * The file is an EPUB.
         - [AND] The extension of the file is ".epub".
         - [AND] The "extract-if-necessary" option includes ".epub" or "*".
-        - [AND] The MIME-Type sent from the browser is "application/epub+zip".
+        - [AND] The MIME-Type sent from the browser is empty or "application/epub+zip".
     * [OR] The file is a BibiZine.
         - [AND] The extension of the file is ".zip".
         - [AND] The "extract-if-necessary" includes ".zip" or "*".
-        - [AND] The MIME-Type sent from the browser is "application/zip", "application/x-zip", or "application/x-zip-compressed".
+        - [AND] The MIME-Type sent from the browser is empty, "application/zip", "application/x-zip", or "application/x-zip-compressed".
 
     ### Note:
     * Extension of the file is required even if "extract-if-necessary" is "" (or includes "*").
+    * An empty MIME-Type is accepted because browsers may not know the file association. The ZIP contents must still form a valid EPUB or BibiZine.
 
 
 ## <04> Setting "x" for "pagination-method" option

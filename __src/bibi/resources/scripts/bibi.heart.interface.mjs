@@ -47,6 +47,7 @@ I.initialize = () => {
         I.Slider.create();
         I.Flipper.create();
         I.Arrows.create();
+        I.BuildStamp.create();
         I.AxisSwitcher.create();
         I.Spinner.create();
     });
@@ -325,7 +326,7 @@ I.PageObserver = { create: () => {
             const Ratio = (LengthInside <= 0 || !Coord[C.L_SIZE_L] || isNaN(LengthInside)) ? 0 : LengthInside / Coord[C.L_SIZE_L];
             const IntersectionStatus = { Ratio: Ratio };
             if(Ratio <= 0) {} else if(WithDetail) {
-                if(Ratio >= 1) {
+                if(Ratio >= 1 - 0.003) { // subpixel tolerance (~2px): fractional coords flap a full-bleed page between 0.9986 and 1, and non-Contained traps backward moves (StrictDist = 0 in moveBy)
                     IntersectionStatus.Contained = true;
                 } else {
                     const FC_B = PageObserver.Current.Frame.Before * _D, FC_A = PageObserver.Current.Frame.After * _D;
@@ -357,7 +358,8 @@ I.PageObserver = { create: () => {
         Past:    { List: [{ Page: null, PageIntersectionStatus: null }] },
         observePageMove: () => {
             E.bind('bibi:scrolled', () => {
-                const CS = PageObserver.Current.List[0], CE = PageObserver.Current.List.slice(-1)[0], CSP = CS.Page, CEP = CE.Page, CSPIS = CS.PageIntersectionStatus, CEPIS = CE.PageIntersectionStatus;
+                const CS = PageObserver.Current.List[0], CE = PageObserver.Current.List.slice(-1)[0]; if(!CS || !CE) return; // a scroll can land while Current is empty (pages being rebuilt after a donation/relayout): reading .Page off undefined threw TypeError
+                const CSP = CS.Page, CEP = CE.Page, CSPIS = CS.PageIntersectionStatus, CEPIS = CE.PageIntersectionStatus;
                 const PS =    PageObserver.Past.List[0], PE =    PageObserver.Past.List.slice(-1)[0], PSP = PS.Page, PEP = PE.Page;
                 const FPI = 0, LPI = R.Pages.length - 1;
                 let Flipped = false, AtTheBeginning = false, AtTheEnd = false;
@@ -402,6 +404,10 @@ I.PageObserver = { create: () => {
             // PageObserver.Timer_automarkOnScrolled = setTimeout(() => PageObserver.automark(), 99);
             PageObserver.automark();
         });
+        // Paged flips, slider/bookmark/history/search jumps funnel through focusOn/scrollBy,
+        // which never touch native scroll: persist those completions too. P only, no %:
+        // percentages depend on viewport/pagination and would go stale across screens.
+        E.add(['bibi:focused-on', 'bibi:scrolled-by'], () => PageObserver.automark());
     });
     E.dispatch('bibi:created-page-observer');
 }};
@@ -843,7 +849,8 @@ I.FlickObserver = { create: () => {
             if(!BibiEvent || !Par) return Promise.resolve();
             O.HTML.classList.add('moving');
             const Dist = C.d2d(Par.Vector.Direction.From);
-            const CurrentList = I.PageObserver.updateCurrent().List, CurrentPage = Dist >= 0 ? CurrentList.slice(-1)[0].Page : CurrentList[0].Page;
+            const CurrentList = I.PageObserver.updateCurrent().List; if(!CurrentList.length) { O.HTML.classList.remove('moving'); return Promise.resolve(); } // empty mid-relayout: reading .Page off undefined threw TypeError
+            const CurrentPage = Dist >= 0 ? CurrentList.slice(-1)[0].Page : CurrentList[0].Page;
             return R.focusOn({ Page: CurrentList.length == 1 && CurrentList[0].SpreadIntersectionStatus.Ratio < 0.5 ? R.Pages[CurrentPage.Index + Dist] || CurrentPage : CurrentPage }, {
                 Duration: !I.isScrollable() ? 0 : I.draggable() ? 333 : 0
             }).then(() => O.HTML.classList.remove('moving'));
@@ -1310,16 +1317,16 @@ I.Flipper = { create: () => {
             if(typeof (Distance *= 1) != 'number' || !isFinite(Distance) || Distance === 0) return Promise.resolve();
             I.ScrollObserver.forceStopScrolling();
             if(B.PrePaginated) { // Preventing flicker.
-                const CIs = [
-                    I.PageObserver.Current.List[          0].Page.Index,
-                    I.PageObserver.Current.List.slice(-1)[0].Page.Index
-                ], TI = CIs[Distance < 0 ? 0 : 1] + Distance;
-                CIs.forEach(CI => { try { R.Pages[CI].Spread.Box.classList.remove('current'); } catch(Err) {} });
-                                    try { R.Pages[TI].Spread.Box.classList.add(   'current'); } catch(Err) {}
+                const C0 = I.PageObserver.Current.List[0], C1 = I.PageObserver.Current.List.slice(-1)[0];
+                if(C0 && C1) {
+                    const CIs = [C0.Page.Index, C1.Page.Index], TI = CIs[Distance < 0 ? 0 : 1] + Distance;
+                    CIs.forEach(CI => { try { R.Pages[CI].Spread.Box.classList.remove('current'); } catch(Err) {} });
+                                        try { R.Pages[TI].Spread.Box.classList.add(   'current'); } catch(Err) {}
+                }
             }
             return R.moveBy(Distance, { Duration: Opt?.Duration || (S.ARA == S.SLA ? 333 : 0) }).then(Destination => {
                 I.PageObserver.updateCurrent();
-                if(!S['manualize-adding-histories']) I.History.add({ UI: Flipper, SumUp: I.History.List.slice(-1)[0].UI == Flipper && (Distance < 0 ? -1 : 1) === (Flipper.PreviousDistance < 0 ? -1 : 1), Destination: Destination });
+                if(!S['manualize-adding-histories']) { const LH = I.History.List.slice(-1)[0]; I.History.add({ UI: Flipper, SumUp: !!(LH && LH.UI == Flipper) && (Distance < 0 ? -1 : 1) === (Flipper.PreviousDistance < 0 ? -1 : 1), Destination: Destination }); } // History.List can be empty on the first flip: reading .UI off undefined threw TypeError
                 Flipper.PreviousDistance = Distance;
                 return Destination;
             });
@@ -2792,10 +2799,11 @@ I.History = {
     update: () => I.History.Updaters.forEach(fun => fun()),
     add: (Opt = {}) => { if(!S['use-histories']) return null;
         if(!Opt.UI) Opt.UI = Bibi;
-        const PageToBeAdded = Opt.Destination ? R.getPage(Opt.Destination) : (() => { I.PageObserver.updateCurrent(); return I.PageObserver.Current.List[0].Page; })();
+        const PageToBeAdded = Opt.Destination ? R.getPage(Opt.Destination) : (() => { I.PageObserver.updateCurrent(); const C0 = I.PageObserver.Current.List[0]; return C0 ? C0.Page : null; })(); // Current.List can be empty mid-relayout: reading .Page off undefined threw TypeError
         let Added = null;
-        if(PageToBeAdded != R.getPage(I.History.List.slice(-1)[0])) {
-            if(Opt.SumUp && I.History.List.slice(-1)[0].UI == Opt.UI) I.History.List.pop();
+        const LastHistory = I.History.List.slice(-1)[0];
+        if(PageToBeAdded != R.getPage(LastHistory)) {
+            if(Opt.SumUp && LastHistory && LastHistory.UI == Opt.UI) I.History.List.pop(); // List can be empty before the first entry: reading .UI off undefined threw TypeError
             Added = { UI: Opt.UI, Page: PageToBeAdded };
             I.History.List.push(Added);
             if(I.History.List.length - 1 > S['max-histories']) { // Not count the first (oldest).
@@ -3217,6 +3225,7 @@ I.Footnotes = { create: () => { if(!S['use-popup-footnotes']) return I.Footnotes
                 FnEle.NoteRef = A;
             };
             E.bind('bibi:loaded-book', () => R.Items.forEach(Item => {
+                if(!Item.Body) return; // items still extracting when the book opens (reboot churn, heavy load) carry no body yet: binding footnotes must not kill the boot
                 Item.Body.querySelectorAll('a[href*="#"]').forEach(BaseA => {
                     const BaseDest = hatch(BaseA.Destination);
                     if(!BaseDest || !BaseDest.Element || !BaseDest.Element.innerHTML) return;
@@ -3577,7 +3586,8 @@ I.RangeFinder = { create: () => {
                 this.paint(Ran, { Emphasized: true });
                 this.FocusedRange = Ran;
             }
-            const Page = R.dest(Ran).Page;
+            const Dest = R.dest(Ran); if(!Dest) return Promise.resolve(); // a range in a donated/dissolved item resolves to null: reading .Page off it threw TypeError
+            const Page = Dest.Page;
             return I.PageObserver.Current.Pages.includes(Page) ? Promise.resolve() : R.focusOn(Page).then(() => this.reserveRepainting(999));
         },
         setSearchResultFocusTo: function(SRoI /* SearchResult-or-Index: Index is better than SearchResult. */) {
@@ -3599,9 +3609,11 @@ I.RangeFinder = { create: () => {
             const SearchResults = this.Search.Results; /**/ if(!SearchResults.length) return Promise.resolve();
             const SearchResultF = SearchResults.Focused;
             if(!Opt) Opt = {};
-            if(SearchResultF && I.PageObserver.Current.Pages.includes(R.dest(SearchResultF.Range).Page)) return this.changeSearchResultFocusBy(Opt.Reverse ? -1 : 1);
+            const FocusedPage = SearchResultF ? R.dest(SearchResultF.Range) : null;
+            if(FocusedPage && I.PageObserver.Current.Pages.includes(FocusedPage.Page)) return this.changeSearchResultFocusBy(Opt.Reverse ? -1 : 1); // dest() can return null for a range in a dissolved item: reading .Page off it threw TypeError
             const NextResultIndex = this.getNearestSearchResultIndex();
-            return this.setSearchResultFocusTo(!Opt.Reverse || I.PageObserver.Current.Pages.includes(R.dest(SearchResults[NextResultIndex].Range).Page) ? NextResultIndex : this.getNearestSearchResultIndex({ Reverse: true }));
+            const NextPage = Number.isInteger(NextResultIndex) && SearchResults[NextResultIndex] ? R.dest(SearchResults[NextResultIndex].Range) : null;
+            return this.setSearchResultFocusTo(!Opt.Reverse || (NextPage && I.PageObserver.Current.Pages.includes(NextPage.Page)) ? NextResultIndex : this.getNearestSearchResultIndex({ Reverse: true }));
         },
         getNearestSearchResultIndex: function(Opt) {
             const SearchResults = this.Search.Results; /**/ if(!SearchResults.length) return NaN;
@@ -3610,9 +3622,11 @@ I.RangeFinder = { create: () => {
             let Dir, iStart, CP;
             if(!Opt.Reverse) Dir =  1, iStart = 0,                        CP = I.PageObserver.Current.Pages[0];
             else             Dir = -1, iStart = SearchResults.length - 1, CP = I.PageObserver.Current.Pages.slice(-1)[0];
+            if(!CP) return iStart; // Current.Pages can be empty mid-relayout: reading .Item off undefined threw TypeError
             const CII = CP.Item.Index, CPI = CP.Index;
-            for(let i = iStart; SearchResults[i]; i += Dir) { const Ran = SearchResults[i].Range;
-                if(Ran.startContainer.ownerDocument.body.Item.Index * Dir < CII * Dir || R.dest(Ran).Page.Index * Dir < CPI * Dir) continue;
+            for(let i = iStart; SearchResults[i]; i += Dir) { const Ran = SearchResults[i].Range; const RanDest = R.dest(Ran);
+                if(!RanDest) continue; // a range in a dissolved item resolves to null: reading .Page off it threw TypeError
+                if(Ran.startContainer.ownerDocument.body.Item.Index * Dir < CII * Dir || RanDest.Page.Index * Dir < CPI * Dir) continue;
                 return i;
             } return iStart;
         },
@@ -3983,6 +3997,18 @@ I.Arrows = { create: () => { if(!S['use-arrows']) return I.Arrows = null;
         `${ Context } div.bibi-arrow.bibi-arrow-${ Dir }`,
         `${ Side }: ${ O.Scrollbars.Width }px;`
     ));
+}};
+
+
+I.BuildStamp = { create: () => { // ?buildstamp=1 overlay: proves which bundle a tab runs (host + the running bibi.js ?v= content hash). Same code everywhere shows the same hash: comparable across servers, no fetch needed.
+    if(!/[?&]buildstamp\b/.test(location.search || '')) return;
+    E.add('bibi:opened', () => {
+        const Badge = O.Body.appendChild(sML.create('div', { id: 'bibi-buildstamp' }));
+        sML.appendCSSRule('div#bibi-buildstamp', 'position:fixed;left:8px;bottom:8px;z-index:99999999999;background:rgba(0,0,0,.78);color:#7fff9f;font:12px/1.6 monospace;padding:8px 10px;border-radius:6px;pointer-events:none;white-space:pre;');
+        let V = '';
+        try { V = new URL(Bibi.Script.src).searchParams.get('v') || '(no ?v= on script URL)'; } catch(Err) { V = '(unreadable script URL)'; }
+        Badge.textContent = location.host + '\nbundle: code #' + V;
+    });
 }};
 
 

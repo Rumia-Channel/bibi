@@ -13,7 +13,7 @@ import { Bibi, O, S, E, X } from './bibi.heart.context.mjs';
 
 X.list = () => {
     const SystemExtensions = [];
-    const extension = XP => ({ 'src': new URL('../../extensions/' + XP, Bibi.Script.src).href });
+    const extension = XP => ({ 'src': O.versionedURL(new URL('../../extensions/' + XP, Bibi.Script.src).href) });
     let ReadyForExtraction = false, ReadyForBibiZine = false;
     if(S['book']) {
         if(O.isToBeExtractedIfNecessary(S['book'])) ReadyForExtraction = true;

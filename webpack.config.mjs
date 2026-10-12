@@ -11,6 +11,7 @@ const { PACKAGE, WEBSITE_ADDRESS, LICENSE_ADDRESS, SRC, SRC_BC, DIST, ARCHIVES, 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 import Webpack from 'webpack';
+import Crypto from 'node:crypto';
 import CopyPlugin from 'copy-webpack-plugin';
 import RemoveEmptyScriptsPlugin from 'webpack-remove-empty-scripts';
 import MiniCSSExtractPlugin from 'mini-css-extract-plugin';
@@ -29,8 +30,6 @@ const Config = {
     devtool      : Composer.IsDeveloping ? 'inline-source-map' : undefined,
     performance  : { maxEntrypointSize: 1000000, maxAssetSize: 1000000, hints: false  },
     output       : { path: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), filename: '[name].js' },
-    // Serves DIST for `bun run serve` (replaces browser-sync/bs-config.cjs; port and start path preserved).
-    devServer    : { port: 61671, static: { directory: resolvePath(Composer.IsArchiving ? ARCHIVES_TMP_DIST : DIST), watch: true }, open: ['bibi/?book='], compress: true },
     module       : { rules: [] },
     optimization : { minimizer: [] },
     plugins      : [],
@@ -40,6 +39,16 @@ const Config = {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Composer.FileTree.Process.forEach(({ Origin, Graft, FilePath }) => Config.entry[normalizePath(Graft, FilePath.replace(/\.scss$/, '.css').replace(/\.[cm]?js$/, ''))] = resolvePath(Origin, FilePath));
+
+if(Composer.IsDeveloping) {
+    const ReaderEntry = 'bibi/resources/scripts/bibi';
+    // Reader extensions share the reader runtime/HMR callback. Jo runs in the host page; Wand runs in its worker.
+    for(const Name of Object.keys(Config.entry)) {
+        if(Name !== ReaderEntry && Name !== 'bibi/and/jo' && Name !== 'bibi/resources/scripts/bibi.wand' && !Name.endsWith('.css')) {
+            Config.entry[Name] = { import: Config.entry[Name], dependOn: ReaderEntry };
+        }
+    }
+}
 
 const CopyPatterns = [
     ...Composer.FileTree.Reflect.map(R => Object.assign(R, { transform: (CBuf, P) => /\.(x?html?|xml|css|[mc]?js|json|md|te?xt)$/.test(P) ? Object.entries(ENVARS).reduce((C, [N, V]) => C.replaceAll(N, V), CBuf.toString()) : CBuf })),
@@ -52,8 +61,39 @@ if(CopyPatterns.length) Config.plugins.push(new CopyPlugin({ patterns: CopyPatte
 Config.plugins.push(
     new Webpack.DefinePlugin(ENVARS),
     new RemoveEmptyScriptsPlugin({ extensions: ['css', 'scss'] }),
-    new MiniCSSExtractPlugin({ filename: '[name]' })
+    new MiniCSSExtractPlugin({ filename: '[name]' }),
+    new BibiAssetVersionPlugin()
 );
+
+// Appends ?v=<base64url(sha256(content))> to same-project js/css references inside emitted HTML,
+// so browsers can never serve a stale bundle/script/stylesheet from cache (the query is part of the cache key).
+// Filenames stay fixed (embed publishers reference jo.js/bibi.js by stable path).
+function BibiAssetVersionPlugin() {
+    const digest = (Buf) => Crypto.createHash('sha256').update(Buf).digest('base64url');
+    this.apply = (Compiler) => Compiler.hooks.thisCompilation.tap('BibiAssetVersion', (Compilation) => {
+        Compilation.hooks.processAssets.tap({ name: 'BibiAssetVersion', stage: Webpack.Compilation.PROCESS_ASSETS_STAGE_REPORT }, () => {
+            const Names = new Set(Compilation.getAssets().map(A => A.name));
+            const resolveAsset = (Ref, FromDir) => {
+                const Bare = Ref.split('?')[0].split('#')[0];
+                if(!/\.([cm]?js|css)$/.test(Bare) || /^(?:[a-z]+:)?\/\//i.test(Bare) || Bare.startsWith('data:')) return null;
+                const Hit = normalizePath(FromDir, Bare);
+                return Names.has(Hit) ? Hit : null;
+            };
+            for(const { name } of Compilation.getAssets()) {
+                if(!/\.html?$/.test(name)) continue;
+                const Dir = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : '';
+                let Src = Compilation.getAsset(name).source.source().toString(), Touched = false;
+                Src = Src.replace(/(src|href)="([^"]+)"/g, (M, Attr, Ref) => {
+                    const Hit = resolveAsset(Ref, Dir);
+                    if(!Hit) return M;
+                    Touched = true;
+                    return `${Attr}="${Ref.split('?')[0].split('#')[0]}?v=${digest(Compilation.getAsset(Hit).source.source())}"`;
+                });
+                if(Touched) Compilation.updateAsset(name, new Webpack.sources.RawSource(Src));
+            }
+        });
+    });
+}
 
 // =============================================================================================================================
 

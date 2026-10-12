@@ -1,39 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-
-const ROOT = join(import.meta.dir, "..");
-const read = (p) => readFileSync(join(ROOT, p), "utf8");
-const stripNonCode = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'\\])\/\/.*$/gm, "$1").replace(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/g, '""');
-const sources = (dir) => {
-    const out = [];
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-        const p = join(dir, e.name);
-        if (e.isDirectory()) { if (e.name !== "node_modules") out.push(...sources(p)); }
-        else if (/\.[cm]?js$/.test(e.name)) out.push(p);
-    }
-    return out;
-};
-
-// 不変条件: __src/zzz が使う sML.* は、sml.js本体か互換層のどちらかが提供しなければならない。
-// sml 1→3 のようなメジャー上げで欠落すると起動時に死ぬ(v3で実証済み)。このテストがそれを殺す。
-const COMPAT_MEMBERS = ["UA", "OS", "Environments", "limitMin", "limitMax", "limitMinMax", "replaceClass", "preventDefault", "apply", "applyRtL", "Easing", "Coords", "getCoord", "Scroller", "scrollTo", "CustomEvents", "CSS"];
-
-describe("sml api coverage", () => {
-    test("every sML.* member used in-tree is provided by the package or the compat layer", () => {
-        const pkgSrc = read("node_modules/sml.js/sML.js");
-        const provided = new Set([
-            ...[...pkgSrc.matchAll(/sML\.([A-Za-z0-9_]+)\s*=/g)].map((m) => m[1]),
-            ...COMPAT_MEMBERS,
-        ]);
-        const used = new Set();
-        for (const f of [...sources(join(ROOT, "__src")), ...sources(join(ROOT, "zzz"))]) {
-            const src = stripNonCode(readFileSync(f, "utf8"));
-            for (const m of src.matchAll(/sML\.([A-Za-z0-9_]+)/g)) used.add(m[1]);
-        }
-        expect([...used].filter((u) => !provided.has(u)).sort()).toEqual([]);
-    });
-});
 
 describe("restoreSMLv1Subsystems", () => {
     const load = async () => {

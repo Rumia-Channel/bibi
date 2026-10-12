@@ -92,3 +92,19 @@ html > foot > bibi-paints {
 		}
 	}
 }
+
+/* Dark Mode (prefers-color-scheme: dark) — reflowable prose only by effect.
+ * Fixed-layout image pages keep their pixels; only the document canvas and
+ * default text follow the scheme. Publisher !important still wins by design. */
+@media (prefers-color-scheme: dark) {
+	html {
+		color-scheme: dark;
+	}
+	html body {
+		background-color: #0d1117 !important;
+		color: #e6edf3 !important;
+	}
+	html body a[href] {
+		color: #58a6ff !important;
+	}
+}

@@ -1,0 +1,56 @@
+// Two-Pane geometry and grouping (pure, DOM-free: unit-testable, no imports).
+// Paged 2-up pairs consecutive pairable solo spreads on wide viewports.
+// No structural change: spreads keep one item each, pages flow untouched.
+
+export const isTwoPaneViewport = (W, H) => W * 3 >= H * 4; // 4:3 landscape and wider (iPad landscape included); narrower stays solo
+
+export const shouldSoloLandscapeSpread = (VpW, VpH, StageW, StageH) =>
+    VpW >= VpH && (VpW / VpH) >= (StageW / StageH) / 2 && VpW >= StageW / 2; // portraits always use one pane, even when they must shrink to its width
+export const isPairableSpread = (Sp) => {
+    if(!Sp || Sp.Items.length != 1) return false; // explicit pairs stay atomic
+    if(Sp.Index < 1) return false; // the opening spread (usually the cover) always stands alone
+    const Solo = Sp.Items[0];
+    if(Solo.SpreadPair) return false;
+    if(Solo.Pages.length != 1) return false; // multi-page strips stay solo (re-evaluated as pages resolve)
+    if(Solo.TwoPaneSoloLocked) return false; // reflowable that outgrew a half pane: never re-pair (flap guard)
+    return !!(Solo.PrePaginated || Solo.OnlySingleSVG || Solo.OnlySingleImg || (Solo.Reflowable && Solo.TwoPaneRendered));
+};
+
+export const planTwoPaneGroups = (Metas) => { // Metas in reading order: [{ pairable, soloLandscape }] → [[spreadIdx, ...]]; pic|pic, text|pic, pic|text, text|text all pair — areas stay separate per pane
+    const joinable = (M) => M && M.pairable && !M.soloLandscape;
+    const Groups = [];
+    for(let i = 0; i < Metas.length; i++) {
+        if(joinable(Metas[i]) && joinable(Metas[i + 1])) Groups.push([i, i + 1]), i++;
+        else Groups.push([i]);
+    }
+    return Groups;
+};
+export const canDonateSoloPicture = (Book, Spread) => {
+    if(!Book.Reflowable || !Spread || Spread.Index < 1 || Spread.Items.length != 1) return false;
+    const Item = Spread.Items[0];
+    return !!((Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig === true && !Item.SpreadPair);
+}; // a reflowable book may declare its standalone illustrations pre-paginated; the book's layout governs adoption
+
+
+export const getPortraitProseLayout = (First, Last, Band, ColumnLength, RTL) => {
+    const SpansBands = Math.abs(Last.top - First.top) >= ColumnLength;
+    const UsedWidth = RTL ? First.right - Last.left : Last.right - First.left;
+    const FreeTailWidth = RTL ? Last.left - Band.left : Band.right - Last.right;
+    return { recipient: SpansBands || UsedWidth > Band.width / 2, portraitTailFits: FreeTailWidth >= Band.width / 2 };
+};
+
+export const planSoloPictureDonations = (Metas) => { // portrait-only pane placement: preceding vacant pane, otherwise following prose. one donation per recipient end.
+    const Plans = [], UsedEnds = new Set();
+    const isRecipient = (M) => M && !M.donor && M.recipient;
+    Metas.forEach((M, i) => {
+        if(!M || !M.donor || !M.portrait) return;
+        const PreviousFits = isRecipient(Metas[i - 1]) && Metas[i - 1].portraitTailFits;
+        const to = PreviousFits ? i - 1 : isRecipient(Metas[i + 1]) ? i + 1 : -1;
+        if(to < 0) return;
+        const atHead = to > i, EndKey = to + (atHead ? ':head' : ':tail');
+        if(UsedEnds.has(EndKey)) return;
+        UsedEnds.add(EndKey);
+        Plans.push({ from: i, to, atHead });
+    });
+    return Plans;
+};

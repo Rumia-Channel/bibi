@@ -8,7 +8,7 @@
 // + Subpanel
 // --------------------------------------------------------------------------------
 
-$Subpanel_KeyColor: color.adjust(steelblue, $saturation: 20%);
+$Subpanel_KeyColor: var(--bibi-subpanel-key-color, color.adjust(steelblue, $saturation: 20%));
 // [ja] └ Subpanel 内のキーカラー（アイコンや文字色の一貫性を保つための共通／事前定義）
 
 $Subpanel-Icon_Size: 21px;
@@ -16,8 +16,8 @@ $Subpanel-Icon_Size: 21px;
 
 $Subpanel_Margin: 4px;
 $Subpanel_BorderRadius: 4px;
-$Subpanel_BackgroundColor: rgba(252,252,252, 0.96);
-$Subpanel_BoxShadow: rgba(black, 0.1) 0 2px 2px;
+$Subpanel_BackgroundColor: var(--bibi-subpanel-background-color, rgba(252,252,252, 0.96));
+$Subpanel_BoxShadow: var(--bibi-subpanel-box-shadow, rgba(black, 0.1) 0 2px 2px);
 $Subpanel_TransitionTimingFunction__Open: cubic-bezier(.2,.8,.8,1.1);
 $Subpanel_TransitionTimingFunction__Close: ease-out;
 
@@ -26,12 +26,12 @@ $Subpanel_TransitionTimingFunction__Close: ease-out;
 // --------------------------------------------------------------------------------
 
 $Subpanel-Scrollbar-Track_Size: 6px;
-$Subpanel-Scrollbar-Track_BackgroundColor: rgb(248,248,248);
+$Subpanel-Scrollbar-Track_BackgroundColor: var(--bibi-subpanel-scrollbar-track-background-color, rgb(248,248,248));
 
 $Subpanel-Scrollbar-Thumb_Size: 2px;
-$Subpanel-Scrollbar-Thumb_BackgroundColor: rgb(195,195,195);
-$Subpanel-Scrollbar-Thumb_BackgroundColor__Hover: rgb(125,125,125);
-$Subpanel-Scrollbar-Thumb_BackgroundColor__Active: $Subpanel-Scrollbar-Thumb_BackgroundColor__Hover;
+$Subpanel-Scrollbar-Thumb_BackgroundColor: var(--bibi-subpanel-scrollbar-thumb-background-color, rgb(195,195,195));
+$Subpanel-Scrollbar-Thumb_BackgroundColor__Hover: var(--bibi-subpanel-scrollbar-thumb-background-color-hover, rgb(125,125,125));
+$Subpanel-Scrollbar-Thumb_BackgroundColor__Active: var(--bibi-subpanel-scrollbar-thumb-background-color-active, $Subpanel-Scrollbar-Thumb_BackgroundColor__Hover);
 
 
 // - Sub Panel > Section
@@ -40,29 +40,29 @@ $Subpanel-Scrollbar-Thumb_BackgroundColor__Active: $Subpanel-Scrollbar-Thumb_Bac
 $Subpanel-Section_VerticalMargin: 16px;
 
 $Subpanel-Heading_HorizontalPadding: 8px;
-$Subpanel-Heading_Color: rgb(64,64,64);
+$Subpanel-Heading_Color: var(--bibi-subpanel-heading-color, rgb(64,64,64));
 
 $Subpanel-ButtonGroup_VerticalMargin: 6px;
-$Subpanel-ButtonGroup_BorderColor: rgba(black, 0.1);
+$Subpanel-ButtonGroup_BorderColor: var(--bibi-subpanel-button-group-border-color, rgba(black, 0.1));
 
 $Subpanel-Button_HorizontalPadding: 8px;
 $Subpanel-Button_Height: 38px;
 $Subpanel-Button-FontSize: 13px;
 
-          $Subpanel-Button_Color: rgb(64,64,64);
-    $Subpanel-Button-Check_Color: rgb(160,160,160);
-    $Subpanel-Button_BorderColor: rgba(black, 0.1);
-$Subpanel-Button_BackgroundColor: white;
+          $Subpanel-Button_Color: var(--bibi-subpanel-button-color, rgb(64,64,64));
+    $Subpanel-Button-Check_Color: var(--bibi-subpanel-button-check-color, rgb(160,160,160));
+    $Subpanel-Button_BorderColor: var(--bibi-subpanel-button-border-color, rgba(black, 0.1));
+$Subpanel-Button_BackgroundColor: var(--bibi-subpanel-button-background-color, white);
 
-          $Subpanel-Button_Color__Active: $Subpanel-Button_Color;
-    $Subpanel-Button-Check_Color__Active: $Subpanel_KeyColor;
-    $Subpanel-Button_BorderColor__Active: $Subpanel-Button_BorderColor;
-$Subpanel-Button_BackgroundColor__Active: $Subpanel-Button_BackgroundColor;
+          $Subpanel-Button_Color__Active: var(--bibi-subpanel-button-color-active, $Subpanel-Button_Color);
+    $Subpanel-Button-Check_Color__Active: var(--bibi-subpanel-button-check-color-active, $Subpanel_KeyColor);
+    $Subpanel-Button_BorderColor__Active: var(--bibi-subpanel-button-border-color-active, $Subpanel-Button_BorderColor);
+$Subpanel-Button_BackgroundColor__Active: var(--bibi-subpanel-button-background-color-active, $Subpanel-Button_BackgroundColor);
 
-          $Subpanel-Button_Color__Hover: $Subpanel_KeyColor;
-    $Subpanel-Button-Check_Color__Hover: rgba($Subpanel_KeyColor, 0.8);
-    $Subpanel-Button_BorderColor__Hover: rgba($Subpanel_KeyColor, 0.1);
-$Subpanel-Button_BackgroundColor__Hover: rgba(240,245,255, 1);//rgba(244,248,252, 0.8);
+          $Subpanel-Button_Color__Hover: var(--bibi-subpanel-button-color-hover, $Subpanel_KeyColor);
+    $Subpanel-Button-Check_Color__Hover: var(--bibi-subpanel-button-check-color-hover, rgba(color.adjust(steelblue, $saturation: 20%), 0.8));
+    $Subpanel-Button_BorderColor__Hover: var(--bibi-subpanel-button-border-color-hover, rgba(color.adjust(steelblue, $saturation: 20%), 0.1));
+$Subpanel-Button_BackgroundColor__Hover: var(--bibi-subpanel-button-background-color-hover, rgba(240,245,255, 1));//rgba(244,248,252, 0.8);
 
 $Subpanel-Icon_MarginRight: 6px;
 
@@ -70,7 +70,7 @@ $Subpanel-Icon_MarginRight: 6px;
 // - Sub Panel: Bookmarks
 // --------------------------------------------------------------------------------
 
-$BookmarkSubpanel-Button_BackgroundColor__Hot: rgba(gold, .125);
+$BookmarkSubpanel-Button_BackgroundColor__Hot: var(--bibi-bookmark-subpanel-button-background-color-hot, rgba(gold, .125));
 
 @mixin BookmarkSubpanel-Button-Label() {
 	.bibi-bookmark-page {
@@ -132,7 +132,7 @@ $BookmarkSubpanel-Button_BackgroundColor__Hot: rgba(gold, .125);
 			font-size: .8em;
 			font-weight: bold;
 			color: $Subpanel_KeyColor;
-			background: rgba($Subpanel_KeyColor, .125);
+			background: var(--bibi-bookmark-is-current-background, rgba(color.adjust(steelblue, $saturation: 20%), .125));
 		}
 		&.bibi-bookmark-is-current-ja:before {
 			content: " 現在のページ";
@@ -148,7 +148,7 @@ $BookmarkSubpanel-Button_BackgroundColor__Hot: rgba(gold, .125);
 	margin: auto;
 	width: $Subpanel-Icon_Size;
 	height: $Subpanel-Icon_Size;
-	color: rgba($Subpanel-Button_Color, .75);
+	color: var(--bibi-bookmark-remove-icon-color, rgba(rgb(64,64,64), .75));
 	opacity: 1;
 }
 
@@ -174,39 +174,39 @@ $BookmarkSubpanel-Button_BackgroundColor__Hot: rgba(gold, .125);
 // --------------------------------------------------------------------------------
 
 // [In Subpanel] Default
-$Subpanel-Icon-Font_PaintColor:    rgb(128,128,128);
+$Subpanel-Icon-Font_PaintColor: var(--bibi-subpanel-icon-font-paint-color, rgb(128,128,128));
 $Subpanel-Icon-Font_OutlineColor:  transparent;
-$Subpanel-Icon-Shape_PaintColor:   white;
-$Subpanel-Icon-Shape_OutlineColor: rgb(144,144,144);
-$Subpanel-Icon_BackgroundColor:    rgb(248,248,248);
-$Subpanel-Icon_BorderColor:        rgb(192,192,192);
+$Subpanel-Icon-Shape_PaintColor: var(--bibi-subpanel-icon-shape-paint-color, white);
+$Subpanel-Icon-Shape_OutlineColor: var(--bibi-subpanel-icon-shape-outline-color, rgb(144,144,144));
+$Subpanel-Icon_BackgroundColor: var(--bibi-subpanel-icon-background-color, rgb(248,248,248));
+$Subpanel-Icon_BorderColor: var(--bibi-subpanel-icon-border-color, rgb(192,192,192));
 $Subpanel-Icon_Transform:          none;
 
 // [In Subpanel] Default:Hover
-$Subpanel-Icon-Font_PaintColor__Hover:    $Subpanel_KeyColor;
+$Subpanel-Icon-Font_PaintColor__Hover: var(--bibi-subpanel-icon-font-paint-color-hover, $Subpanel_KeyColor);
 $Subpanel-Icon-Font_OutlineColor__Hover:  transparent;
-$Subpanel-Icon-Shape_PaintColor__Hover:   white;
-$Subpanel-Icon-Shape_OutlineColor__Hover: $Subpanel_KeyColor;
-$Subpanel-Icon_BackgroundColor__Hover:    color.adjust($Subpanel_KeyColor, $lightness: 45%);
-$Subpanel-Icon_BorderColor__Hover:        $Subpanel_KeyColor;
+$Subpanel-Icon-Shape_PaintColor__Hover: var(--bibi-subpanel-icon-shape-paint-color-hover, white);
+$Subpanel-Icon-Shape_OutlineColor__Hover: var(--bibi-subpanel-icon-shape-outline-color-hover, $Subpanel_KeyColor);
+$Subpanel-Icon_BackgroundColor__Hover: var(--bibi-subpanel-icon-background-color-hover, color.adjust(color.adjust(steelblue, $saturation: 20%), $lightness: 45%));
+$Subpanel-Icon_BorderColor__Hover: var(--bibi-subpanel-icon-border-color-hover, $Subpanel_KeyColor);
 $Subpanel-Icon_Transform__Hover:          $Subpanel-Icon_Transform;
 
 // [In Subpanel] Active
-$Subpanel-Icon-Font_PaintColor__Active:    white;
+$Subpanel-Icon-Font_PaintColor__Active: var(--bibi-subpanel-icon-font-paint-color-active, white);
 $Subpanel-Icon-Font_OutlineColor__Active:  transparent;
-$Subpanel-Icon-Shape_PaintColor__Active:   white;
-$Subpanel-Icon-Shape_OutlineColor__Active: $Subpanel_KeyColor;
-$Subpanel-Icon_BackgroundColor__Active:    $Subpanel_KeyColor;
-$Subpanel-Icon_BorderColor__Active:        $Subpanel_KeyColor;
+$Subpanel-Icon-Shape_PaintColor__Active: var(--bibi-subpanel-icon-shape-paint-color-active, white);
+$Subpanel-Icon-Shape_OutlineColor__Active: var(--bibi-subpanel-icon-shape-outline-color-active, $Subpanel_KeyColor);
+$Subpanel-Icon_BackgroundColor__Active: var(--bibi-subpanel-icon-background-color-active, $Subpanel_KeyColor);
+$Subpanel-Icon_BorderColor__Active: var(--bibi-subpanel-icon-border-color-active, $Subpanel_KeyColor);
 $Subpanel-Icon_Transform__Active:          rotate(360deg);
 
 // [In Subpanel] Active:Hover
-$Subpanel-Icon-Font_PaintColor__Active-Hover:    white;
+$Subpanel-Icon-Font_PaintColor__Active-Hover: var(--bibi-subpanel-icon-font-paint-color-active-hover, white);
 $Subpanel-Icon-Font_OutlineColor__Active-Hover:  transparent;
-$Subpanel-Icon-Shape_PaintColor__Active-Hover:   white;
-$Subpanel-Icon-Shape_OutlineColor__Active-Hover: $Subpanel_KeyColor;
-$Subpanel-Icon_BackgroundColor__Active-Hover:    color.adjust($Subpanel_KeyColor, $lightness: 20%);
-$Subpanel-Icon_BorderColor__Active-Hover:        $Subpanel_KeyColor;
+$Subpanel-Icon-Shape_PaintColor__Active-Hover: var(--bibi-subpanel-icon-shape-paint-color-active-hover, white);
+$Subpanel-Icon-Shape_OutlineColor__Active-Hover: var(--bibi-subpanel-icon-shape-outline-color-active-hover, $Subpanel_KeyColor);
+$Subpanel-Icon_BackgroundColor__Active-Hover: var(--bibi-subpanel-icon-background-color-active-hover, color.adjust(color.adjust(steelblue, $saturation: 20%), $lightness: 20%));
+$Subpanel-Icon_BorderColor__Active-Hover: var(--bibi-subpanel-icon-border-color-active-hover, $Subpanel_KeyColor);
 $Subpanel-Icon_Transform__Active-Hover:          $Subpanel-Icon_Transform__Active;
 
 // [In Subpanel] Transition

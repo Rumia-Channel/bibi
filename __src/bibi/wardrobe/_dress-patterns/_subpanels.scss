@@ -64,9 +64,9 @@ div.bibi-subpanel {
 				@include padding-h($Subpanel-Heading_HorizontalPadding);
 				color: $Subpanel-Heading_Color;
 				>small {
-					color: color.adjust($Subpanel-Heading_Color, $lightness: 12%);
+					color: var(--bibi-subpanel-heading-small-color, color.adjust(rgb(64,64,64), $lightness: 12%));
 					&:before {
-						color: color.adjust($Subpanel-Heading_Color, $lightness: 24%);
+						color: var(--bibi-subpanel-heading-small-marker-color, color.adjust(rgb(64,64,64), $lightness: 24%));
 					}
 				}
 			}
@@ -143,12 +143,12 @@ div.bibi-subpanel {
 				}
 				&:before {
 					color: $Subpanel-Button_BackgroundColor;
-					html:not(.Trident) & { background-image: linear-gradient(to bottom,
-						transparent calc(50% - .5px),
-						rgba($Subpanel-Button-Check_Color, .8) calc(50% - .5px),
-						rgba($Subpanel-Button-Check_Color, .4) calc(50% + .5px),
-						transparent calc(50% + .5px)
-					); }
+				html:not(.Trident) & { background-image: linear-gradient(to bottom,
+					transparent calc(50% - .5px),
+					var(--bibi-subpanel-steps-check-color-strong, rgba(rgb(160,160,160), .8)) calc(50% - .5px),
+					var(--bibi-subpanel-steps-check-color-soft, rgba(rgb(160,160,160), .4)) calc(50% + .5px),
+					transparent calc(50% + .5px)
+				); }
 				}
 				&:not(:active):not(.active).hover:before { color: $Subpanel-Button_BackgroundColor__Hover; }
 			}

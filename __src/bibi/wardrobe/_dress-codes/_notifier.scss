@@ -12,15 +12,15 @@ $Notifier_Height: $Menu_Height;
 $Notifier_FontFamily: AvenirNext-DemiBold, sans-serif;
 $Notifier_FontWeight: normal;
 $Notifier_FontSize: 12px;
-$Notifier_Color: rgb(77,88,99);
+$Notifier_Color: var(--bibi-notifier-color, rgb(77,88,99));
 
 $Notifier_FontFamily__Error: $Notifier_FontFamily;
 $Notifier_FontWeight__Error: $Notifier_FontWeight;
 $Notifier_FontSize__Error: $Notifier_FontSize;
-$Notifier_Color__Error: rgb(192,64,0);
+$Notifier_Color__Error: var(--bibi-notifier-color-error, rgb(192,64,0));
 
-$Notifier_Background: rgba(252,252,252,0.96);
-$Notifier_BoxShadow: 0 2px 4px rgba(0,0,0,0.125);
+$Notifier_Background: var(--bibi-notifier-background, rgba(252,252,252,0.96));
+$Notifier_BoxShadow: var(--bibi-notifier-box-shadow, 0 2px 4px rgba(0,0,0,0.125));
 
 @mixin Notifier_Transition() { // div#bibi-notifier
     & { // general
