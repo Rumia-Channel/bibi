@@ -29,7 +29,7 @@ LICENSE_ADDRESS = typeof CONFIG.LICENSE_ADDRESS === 'string' ? CONFIG.LICENSE_AD
 
 SRC             = typeof CONFIG.SRC      === 'string' ? CONFIG.SRC      : '__src';       SRC_BC = SRC + '__back-compat';
 DIST            = typeof CONFIG.DIST     === 'string' ? CONFIG.DIST     : '__dist';
-ARCHIVES        = typeof CONFIG.ARCHIVES === 'string' ? CONFIG.ARCHIVES : '__archives';  ARCHIVES_TMP = ARCHIVES + '/.tmp.';  ARCHIVES_TMP_DIST = ARCHIVES_TMP + '/.dist.';
+ARCHIVES        = typeof CONFIG.ARCHIVES === 'string' ? CONFIG.ARCHIVES : '__archives';  ARCHIVES_TMP = ARCHIVES + '/.tmp';  ARCHIVES_TMP_DIST = ARCHIVES_TMP + '/.dist';
 
 LOG_CHARM       = typeof CONFIG.LOG_CHARM  === 'string' ? CONFIG.LOG_CHARM  : `/(('_-)`;
 LOG_HEADER      = typeof CONFIG.LOG_HEADER === 'string' ? CONFIG.LOG_HEADER : `zzZ: `;

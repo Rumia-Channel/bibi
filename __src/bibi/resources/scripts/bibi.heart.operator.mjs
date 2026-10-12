@@ -97,6 +97,8 @@ O.error = (Err) => {
 
 
 O.id = () => (O.id.Count++).toString(36); O.id.Count = 0; // [Date.now(), performance.now(), Math.random()].map(Num => Math.ceil(Num * 9999).toString(36)).join('');
+O.scriptVersion = () => { try { return new URL(Bibi.Script.src).searchParams.get('v') || ''; } catch(Err) { return ''; } }; // the running bundle's own content hash (index.html carries ?v=<sha256> per compile): deterministic per source state, comparable across servers, never stale. Falls back per call site.
+O.versionedURL = (Url) => { const V = O.scriptVersion() || Date.now().toString(36); return Url + (Url.includes('?') ? '&v=' : '?v=') + V; }; // cache-busting for runtime-loaded app assets (dress/preset/extensions/worker): same code everywhere serves the same query, so a stale disk cache can never shadow fresh code
 
 O.chain = (...Args) => {
     const Assurance = typeof Args[0]?.assure !== 'function' ? { assure: () => true } : typeof Args[0] !== 'function' ? Args.shift() : Args[0];

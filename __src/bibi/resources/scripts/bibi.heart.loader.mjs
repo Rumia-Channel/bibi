@@ -54,7 +54,7 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
     const BookDataFormat =
         typeof BookInfo.Book     == 'string' ? 'URI' :
         typeof BookInfo.BookData == 'string' ? 'Base64' :
-        typeof BookInfo.BookData == 'object' && BookInfo.BookData.size && BookInfo.BookData.type ? (BookInfo.BookData.name ? 'File' : 'Blob') : '';
+        typeof BookInfo.BookData == 'object' && BookInfo.BookData.size && (BookInfo.BookData.name || BookInfo.BookData.type) ? (BookInfo.BookData.name ? 'File' : 'Blob') : '';
     if(!BookDataFormat) return reject_failedToOpenTheBook(Bibi.ErrorMessages.DataInvalid);
     B.Type = !S['book'] ? '' : S['zine'] ? 'Zine' : 'EPUB';
     if(B.Type != 'EPUB') B.ZineData = { Source: { Path: 'zine.yaml' } };
@@ -411,7 +411,8 @@ L.createCover = () => {
         [B.Publisher, 'span']
     ].map(BookMetaAndTagName => {
         const [BookMeta, TagName] = BookMetaAndTagName;
-        return BookMeta ? `<` + TagName + `><span>` + BookMeta.replace(/([ 　・／]+)/g, '</span><span>$1') + `</span></` + TagName + `>` : '';
+        const Text = BookMeta && BookMeta.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return Text ? `<` + TagName + `><span>` + Text.replace(/([ 　・／]+)/g, '</span><span>$1') + `</span></` + TagName + `>` : '';
     }).filter(TaggedBookMeta => TaggedBookMeta).join(' ');
     let VCoverIcon = null, PCoverIcon = null, AltShown = false;
     const TimerID_showAlt = setTimeout(() => {
@@ -441,6 +442,9 @@ L.createCover = () => {
 
 
 L.loadNavigation = () => O.openDocument(B.Nav.Source).then(Doc => {
+    if(B.Nav.Type == 'Navigation Document' && !S['allow-scripts-in-content']) {
+        Doc = O.parseDOM(O.sanitizeItemSourceText(Doc.documentElement.outerHTML, { As: 'XHTML' }), 'text/html');
+    }
     const PNav = I.Panel.BookInfo.Navigation = I.Panel.BookInfo.insertBefore(sML.create('div', { id: 'bibi-panel-bookinfo-navigation' }), I.Panel.BookInfo.firstElementChild);
     PNav.innerHTML = '';
     const NavContent = document.createDocumentFragment();
@@ -461,12 +465,11 @@ L.loadNavigation = () => O.openDocument(B.Nav.Source).then(Doc => {
             for(let l = ChildNodes.length, i = 0; i < l; i++) {
                 if(ChildNodes[i].nodeType != 1 || !/^navPoint$/i.test(ChildNodes[i].tagName)) continue;
                 const NavPoint = ChildNodes[i];
-                const NavLabel = NavPoint.getElementsByTagName('navLabel')[0];
                 const Content  = NavPoint.getElementsByTagName('content')[0];
                 const Text = NavPoint.getElementsByTagName('text')[0];
                 if(!OL) OL = document.createElement('ol');
                 const LI = sML.create('li', { id: NavPoint.getAttribute('id') }); LI.setAttribute('playorder', NavPoint.getAttribute('playorder'));
-                const A  = sML.create('a', { href: Content.getAttribute('src'), innerHTML: Text.innerHTML.trim() });
+                const A  = sML.create('a', { href: Content.getAttribute('src'), textContent: Text.textContent.trim() });
                 OL.appendChild(LI).appendChild(A);
                 const ChildOL = makeNavOLTree(NavPoint);
                 if(ChildOL) LI.appendChild(ChildOL);
@@ -474,7 +477,12 @@ L.loadNavigation = () => O.openDocument(B.Nav.Source).then(Doc => {
             return OL;
         };
         const NavOL = makeNavOLTree(Doc.getElementsByTagName('navMap')[0]);
-        if(NavOL) NavContent.appendChild(document.createElement('nav')).appendChild(NavOL);
+        if(NavOL) {
+            const Nav = document.createElement('nav');
+            if(S['allow-scripts-in-content']) Nav.appendChild(NavOL);
+            else Nav.innerHTML = O.sanitizeItemSourceText(NavOL.outerHTML, { As: 'XHTML' });
+            NavContent.appendChild(Nav);
+        }
     }
     PNav.appendChild(NavContent);
     L.coordinateLinkages({ RootElement: PNav, BasePath: B.Nav.Source.Path, InNav: true });

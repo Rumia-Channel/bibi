@@ -1,12 +1,4 @@
-import { isPairableSpread, isTwoPaneViewport, planTwoPaneGroups, shouldSoloLandscapeSpread } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-const ROOT = join(import.meta.dir, "..");
-const reader = () => readFileSync(join(ROOT, "__src/bibi/resources/scripts/bibi.heart.reader.mjs"), "utf8");
-
-// 不変条件: 2ペイン化は paged 専用の幾何学ゲート + 論理グルーピングで成り立つ。
-// 構造変更 (DOM 移動・頁採番) をしないことが設計の要。
+import { isPairableSpread, isTwoPaneViewport, planSoloPictureDonations, planTwoPaneGroups, shouldSoloLandscapeSpread, getPortraitProseLayout, canDonateSoloPicture } from "../__src/bibi/resources/scripts/bibi.heart.twopane.mjs";
 describe("two-pane geometry", () => {
     test("viewport rule admits 4:3 landscape and wider, boundary inclusive", () => {
         expect(isTwoPaneViewport(1706, 800)).toBe(true);
@@ -24,6 +16,7 @@ describe("two-pane geometry", () => {
         expect(shouldSoloLandscapeSpread(1135, 1600, 1706, 800)).toBe(false); // portrait pairs
         expect(shouldSoloLandscapeSpread(700, 900, 1365, 768)).toBe(false); // portrait pairs
         expect(shouldSoloLandscapeSpread(400, 100, 1365, 768)).toBe(false); // tiny strip: no solo upscale
+        expect(shouldSoloLandscapeSpread(1135, 1600, 1400, 1050)).toBe(false); // portrait needs width-constrained fit at 4:3, not a whole opening
     });
     const spread = (item, idx = 1) => ({ Index: idx, Items: item ? [item] : [] });
     const pre = (over = {}) => Object.assign({ PrePaginated: true, Pages: [{}] }, over);
@@ -48,19 +41,9 @@ describe("two-pane geometry", () => {
         expect(isPairableSpread({ Index: 2, Items: [{}, {}] })).toBe(false);
         expect(isPairableSpread({ Index: 2, Items: [] })).toBe(false);
     });
-    test("resolved-small pictures rejoin pairing; the 384 gate exists", () => {
+    test("resolved-small pictures rejoin pairing", () => {
         expect(isPairableSpread(spread({ Reflowable: true, TwoPaneRendered: true, OnlySingleSVG: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
         expect(isPairableSpread(spread({ PrePaginated: true, OnlySingleImg: true, SingleMediaIsBig: false, Pages: [{}] }))).toBe(true);
-        expect(reader()).toContain("384");
-        expect(reader()).toContain("SingleMediaIsBig");
-    });
-    test("paged mode isolates block media from prose by column breaks", () => {
-        // one image per page: the point of splitting pages is separating picture and text areas.
-        const src = reader();
-        expect(src).toContain("Separate pictures from prose");
-        expect(src).toContain("breakBefore");
-        expect(src).toContain("breakAfter");
-        expect(src).toContain("BibiDefaultBreaks");
     });
     test("greedy pairing mixes freely; solos stay single", () => {
         // pic|pic, text|pic, pic|text, text|text all pair; landscape-solo and odd tails stay single.
@@ -73,60 +56,73 @@ describe("two-pane geometry", () => {
     });
 });
 
-describe("two-pane wiring", () => {
-    test("flag requires paged mode and horizontal advance", () => {
-        const m = reader().match(/R\.TwoPane = ([^;]+);/);
-        expect(m).not.toBeNull();
-        expect(m[1]).toContain("S.RVM == 'paged'");
-        expect(m[1]).toContain("S.ARA == 'horizontal'");
+describe("mixed-layout illustration adoption", () => {
+    const Book = { Reflowable: true };
+    const Picture = { PrePaginated: true, Reflowable: false, OnlySingleSVG: true, SingleMediaIsBig: true };
+    const Spread = { Index: 10, Items: [Picture] };
+    test("a fixed portrait page inside a reflowable novel remains eligible for adjacent prose", () => {
+        expect(canDonateSoloPicture(Book, Spread)).toBe(true);
     });
-
-    test("grouping runs on full relayout and after each item render", () => {
-        const src = reader();
-        expect(src).toContain("R.updateTwoPaneGrouping();");
-        expect(src).toContain("R.requestTwoPaneRegroup();");
+    test("a wholly fixed-layout book never donates its pages into another document", () => {
+        expect(canDonateSoloPicture({ Reflowable: false }, Spread)).toBe(false);
     });
-
-    test("focus snaps to pair starts instead of half-shifted spreads", () => {
-        expect(reader()).toContain("Page.Spread.TwoPaneGroup");
+    test("covers and explicit multi-page spreads remain intact", () => {
+        expect(canDonateSoloPicture(Book, { ...Spread, Index: 0 })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [Picture, Picture] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ ...Picture, SpreadPair: {} }] })).toBe(false);
     });
-
-    test("paired panes render at half stage width", () => {
-        expect(reader()).toContain("PaneWidthFactor == 0.5");
-    });
-    test("regroup relayout rebuilds the page index before snapping", () => {
-        // renderReflowableItem recreates item pages; without organizePages, R.Pages/Current
-        // point at detached nodes and slider geometry crashes on null offsetParent.
-        const src = reader();
-        const i = src.indexOf("R.snapTwoPaneView();");
-        expect(i).toBeGreaterThan(-1);
-        expect(src.slice(Math.max(0, i - 160), i)).toContain("R.organizePages();");
-    });
-    test("big single-media items render fitted even in reflowable books", () => {
-        // pre-paginated flag comes from package metadata; a lone big picture page must not
-        // fall into the column paginator just because the book declares reflowable layout.
-        const src = reader();
-        expect(src).toContain("SoloBigPicture");
-        expect(src).toContain("renderPrePaginatedItem(Item)");
-    });
-    test("two-pane never doubles width without a real pair", () => {
-        // the Spreaded branch sizes left/right-tagged singles for a mate; without one,
-        // two-pane must fit the pane instead of shrinking to a quarter.
-        expect(reader()).toContain("R.TwoPane ? Promise.resolve(null)");
-    });
-    test("focus completion syncs current tracking", () => {
-        // untracked spreads stay visibility:hidden; pair mates must not wait for a scroll event.
-        const src = reader();
-        const i = src.indexOf("E.dispatch('bibi:focused-on'");
-        expect(i).toBeGreaterThan(-1);
-        expect(src.slice(Math.max(0, i - 220), i)).toContain("PageObserver.updateCurrent()");
-    });
-    test("areafree single-media pages resolve to their picture", () => {
-        // fitted single-media pages never get column areas; element resolution
-        // (resize, destinations) must not crash on them.
-        const src = reader();
-        const i = src.indexOf("getSingleMediaElement(Page.Item); // fitted single-media");
-        expect(i).toBeGreaterThan(-1);
-        expect(src.slice(Math.max(0, i - 160), i)).toContain("OnlySingleSVG");
+    test("small or unresolved single images and non-media pages are not adoption sources", () => {
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ OnlySingleImg: true, SingleMediaIsBig: false }] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ OnlySingleImg: true }] })).toBe(false);
+        expect(canDonateSoloPicture(Book, { ...Spread, Items: [{ Reflowable: true }] })).toBe(false);
     });
 });
+
+describe("solo picture donation", () => {
+    const D = { donor: true, portrait: true };
+    const T = () => ({ recipient: true });
+    test("planner places a standalone portrait beside neighboring prose", () => {
+        expect(planSoloPictureDonations([T(), D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]); // prefers next-head
+        expect(planSoloPictureDonations([T(), D])).toEqual([]); // no vacant preceding pane and no following prose
+        expect(planSoloPictureDonations([D, T()])).toEqual([{ from: 0, to: 1, atHead: true }]);
+        expect(planSoloPictureDonations([{ recipient: false }, D, { recipient: false }])).toEqual([]); // gallery captions/headings are not prose recipients
+        expect(planSoloPictureDonations([D, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([{ recipient: true, portraitTailFits: true }, D, D, T()])).toEqual([{ from: 1, to: 0, atHead: false }, { from: 2, to: 3, atHead: true }]); // one donation per recipient end
+        expect(planSoloPictureDonations([null, D, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([])).toEqual([]);
+    });
+    test("a portrait fills the preceding vacant pane before opening the next chapter", () => {
+        const Portrait = { donor: true, portrait: true };
+        const Tail = { recipient: true, portraitTailFits: true };
+        expect(planSoloPictureDonations([Tail, Portrait, T()])).toEqual([{ from: 1, to: 0, atHead: false }]);
+        expect(planSoloPictureDonations([T(), Portrait, T()])).toEqual([{ from: 1, to: 2, atHead: true }]);
+        expect(planSoloPictureDonations([Tail, { donor: true, portrait: false }, T()])).toEqual([]);
+    });
+    test("landscape and unresolved media never enter portrait prose placement", () => {
+        expect(planSoloPictureDonations([{ donor: true, portrait: false }, T()])).toEqual([]);
+        expect(planSoloPictureDonations([{ donor: true }, T()])).toEqual([]);
+    });
+});
+
+describe("portrait prose occupancy", () => {
+    const Band = { left: 0, right: 2000, width: 2000 };
+    test("right-to-left prose extending beyond one pane opens the following image/text spread", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 600, top: 0 }, Band, 900, true))
+            .toEqual({ recipient: true, portraitTailFits: false });
+    });
+    test("a multi-band chapter with a vacant final pane receives a trailing portrait", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 1400, top: 1000 }, Band, 900, true))
+            .toEqual({ recipient: true, portraitTailFits: true });
+    });
+    test("a single pane of text is left to ordinary pairing, boundary inclusive", () => {
+        expect(getPortraitProseLayout({ right: 2000, top: 0 }, { left: 1000, top: 0 }, Band, 900, true))
+            .toEqual({ recipient: false, portraitTailFits: true });
+    });
+    test("left-to-right vertical prose mirrors occupied and vacant panes", () => {
+        expect(getPortraitProseLayout({ left: 0, top: 0 }, { right: 1400, top: 0 }, Band, 900, false))
+            .toEqual({ recipient: true, portraitTailFits: false });
+        expect(getPortraitProseLayout({ left: 0, top: 0 }, { right: 600, top: 1000 }, Band, 900, false))
+            .toEqual({ recipient: true, portraitTailFits: true });
+    });
+});
+

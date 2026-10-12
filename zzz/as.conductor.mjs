@@ -53,6 +53,7 @@ Object.assign(Conductor.Baton, {  // ===========================================
 
     'weave': (Opt) => { if(typeof Opt !== 'string') return;
         const Matched = Opt.match(/^(\w+)(?:@(\w+))?(?:\+(\w+))?(?:\:(\w+))?$/);
+        if(!Matched) throw new Error(`Invalid weave option: ${ Opt }`);
         Conductor.log(
             Matched[4] ? 'wove' : `is weaving` + (Matched[3] ? ` & watching` : '') + '...',
             `(${ Matched[1] })` + (Matched[2] ? ' ' + Conductor.log.w(`w/back-compat-kit`) : '')
@@ -78,14 +79,18 @@ Object.assign(Conductor.Baton, {  // ===========================================
         const PackageName = PACKAGE.name == 'bibi' ? 'Bibi' : PACKAGE.name;
         const ArchiveName = PackageName + '-v' + PACKAGE.version;
         const BCKPostfix = '+BackCompatKit';
-        const zip = (ArchiveName) => new Promise(resolve => {
+        const zip = (ArchiveName) => new Promise((resolve, reject) => {
             const PackageZipName = ArchiveName + '.zip';
             const WriteStream = Conductor.createWriteStream(ARCHIVES_TMP + '/' + PackageZipName);
             const Zip = new ZipArchive({ forceLocalTime: true, zlib: { level: 9 } });
+            const fail = Err => { Zip.abort(); WriteStream.destroy(); reject(Err); };
+            WriteStream.on('error', fail);
+            WriteStream.on('close', () => resolve([PackageZipName, Zip.pointer()]));
+            Zip.on('error', fail);
+            Zip.on('warning', fail);
             Zip.pipe(WriteStream);
             Zip.directory(ARCHIVES_TMP_DIST, ArchiveName);
-            Zip.finalize();
-            WriteStream.on('close', () => resolve([PackageZipName, Zip.pointer()]));
+            Zip.finalize().catch(fail);
         });
         const formatNum = (Num) => {
             let NumStr = String(Num), Matched = null;
@@ -94,10 +99,9 @@ Object.assign(Conductor.Baton, {  // ===========================================
         };
         const Results = [], addResult = (Result) => Results.push(Result);
         const Now = Conductor.now();
-        Promise.resolve(Conductor.makeDirectory(ARCHIVES_TMP_DIST + '/bibi-bookshelf'))
+        return Promise.resolve(Conductor.makeDirectory(ARCHIVES_TMP_DIST + '/bibi-bookshelf'))
             .then(() => WithBCK && zip(ArchiveName + BCKPostfix).then(addResult).then(() => Conductor.deleteIn(ARCHIVES_TMP_DIST, ['bib', 'README.BackCompatKit.md'])))
             .then(() => zip(ArchiveName).then(addResult))
-            .catch(console.error)
             .then(() => Results.forEach((Result, i) => {
                 const Dest = ARCHIVES + '/' + PackageName + '_' + Now;
                 Conductor.move(ARCHIVES_TMP + '/' + Result[0], Dest);
@@ -107,11 +111,15 @@ Object.assign(Conductor.Baton, {  // ===========================================
 
 });  // ========================================================================================================================
 
-import { deleteSync } from 'del';
-import fs from 'fs'; // import path from 'path';
+import fs from 'node:fs';
+import Path from 'node:path';
 import { ZipArchive } from 'archiver';
 
-Conductor.wave = (Wave) => (Arg) => { try { Conductor.Baton[Wave].call(Conductor, Arg) } catch(Err) { console.error(Err); } };
+Conductor.wave = (Wave) => (Arg) => {
+    const Action = Conductor.Baton[Wave];
+    if(typeof Action != 'function') throw new Error(`Unknown operation: ${ Wave }`);
+    return Action.call(Conductor, Arg);
+};
 
 Object.assign(Conductor.log = (Verb, What = '') => console.log(Conductor.log.f(Conductor.log.H + Conductor.log.bw(Verb) + ' ' + What)), {
     R: '\x1b[0m', f: Str => Str.replace(/(<r>)+/g, Conductor.log.R).replace(/(<b>)+/g, Conductor.log.B).replace(/(<w>)+/g, Conductor.log.W),
@@ -122,11 +130,25 @@ Object.assign(Conductor.log = (Verb, What = '') => console.log(Conductor.log.f(C
 
 Conductor.now = () => new Date(Date.now() + 1000 * 60 * 60 * (new Date().getTimezoneOffset() / -60)).toISOString().split('.')[0].replace(/[:-]/g, '').replace('T', '-');
 
+const deleteTargets = Targets => {
+    const Root = Path.resolve('.');
+    const Paths = new Set();
+    for(const Pattern of Array.isArray(Targets) ? Targets : [Targets]) {
+        for(const Target of new Bun.Glob(Pattern.replaceAll('\\', '/')).scanSync({ cwd: Root, absolute: true, dot: true, onlyFiles: false, followSymlinks: false })) {
+            const Relative = Path.relative(Root, Target);
+            if(!Relative || Relative == '..' || Relative.startsWith('..' + Path.sep) || Path.isAbsolute(Relative)) throw new Error(`Refusing to delete the working directory or a path outside it: ${ Target }`);
+            Paths.add(Target);
+        }
+    }
+    for(const Target of Paths) fs.rmSync(Target, { recursive: true, force: true });
+    return [...Paths];
+};
+
 Object.assign(Conductor, {
     // copy: (From, To) => fs.cpSync(From, To, { recursive: true }),
     copyIn: (In, From, To) => fs.cpSync(In + '/' + From, In + '/' + To, { recursive: true }),
-    delete: (Targets) => deleteSync(Targets),
-    deleteIn: (In, Targets) => deleteSync((Array.isArray(Targets) ? Targets : [Targets]).map(Target => In + '/' + Target)),
+    delete: deleteTargets,
+    deleteIn: (In, Targets) => deleteTargets((Array.isArray(Targets) ? Targets : [Targets]).map(Target => In + '/' + Target)),
     makeDirectory: (DirName) => fs.existsSync(DirName) || fs.mkdirSync(DirName) || true,
     // removeDirectory: (DirName) => fs.rmdirSync(DirName),
     removeDirectoryIfEmpty: (DirName) => fs.existsSync(DirName) && fs.statSync(DirName).isDirectory() && !fs.readdirSync(DirName).length && fs.rmdirSync(DirName),
