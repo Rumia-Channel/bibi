@@ -34,9 +34,9 @@ R.title = () => {
     const FullTitleFragments = [B.Title];
     if(B.Creator)   FullTitleFragments.push(B.Creator);
     if(B.Publisher) FullTitleFragments.push(B.Publisher);
-    B.FullTitle = FullTitleFragments.join(' - ').replace(/&amp;?/gi, '&').replace(/&lt;?/gi, '<').replace(/&gt;?/gi, '>');
-    O.Title.innerHTML = ''; O.Title.appendChild(document.createTextNode(B.FullTitle + ' | ' + (S['website-name-in-title'] ? S['website-name-in-title'] : 'Published with Bibi')));
-    try { O.Info.querySelector('h1').innerHTML = document.title; } catch(Err) {}
+    B.FullTitle = FullTitleFragments.join(' - ');
+    O.Title.textContent = B.FullTitle + ' | ' + (S['website-name-in-title'] ? S['website-name-in-title'] : 'Published with Bibi');
+    try { O.Info.querySelector('h1').textContent = document.title; } catch(Err) {}
 };
 
 
@@ -78,6 +78,7 @@ R.resetStage = () => {
     if(S['content-margin'] > 0) R.Main.Book.style['padding' + C.L_BASE_S] = R.Main.Book.style['padding' + C.L_BASE_E] = S['content-margin'] + 'px';
     //R.Main.style['background'] = S['book-background'] ? S['book-background'] : '';
     R.TwoPane = S.RVM == 'paged' && S.ARA == 'horizontal' && R.isTwoPaneViewport(R.Stage.Width, R.Stage.Height); // paged 2-up only; scroll modes, vertical advance, and narrow viewports behave exactly as before
+    R.Main.Book.style.setProperty('--bibi-pane-width', R.Stage.Width / 2 + 'px'); // half of the viewport, not half of the entire horizontal book strip
     O.HTML.classList.toggle('two-pane', !!R.TwoPane);
 };
 
@@ -300,19 +301,21 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             });
         });
     }
-    { // Separate pictures from prose in paged mode: every big picture claims a full page band, so prose can never sit beside it (no text|image|text by construction) and every picture renders at the solo-frontispiece size
+    { // Pictures own a pane, not necessarily a whole opening. Portraits share wide vertical-text bands with prose; landscape pictures remain full-band.
         const Paged = S.RVM == 'paged';
         const BCS = getComputedStyle(Item.Body);
-        const BandB = Math.max(0, Math.min(Item.Body.clientWidth || 1e9, PageCB - Math.max(parseFloat(BCS.marginLeft) || 0, parseFloat(BCS.marginRight) || 0)) - (parseFloat(BCS.paddingLeft) || 0) - (parseFloat(BCS.paddingRight) || 0)); // the real band width: the column box minus body margins (over-constrained block margins keep only the start side, so take the larger). PageCB alone overflows body margins and a body-level zone fragments a sliver into the next band
+        const PageWidth = C.L_SIZE_B == 'Width' ? PageCB : PageCL, PageHeight = C.L_SIZE_B == 'Height' ? PageCB : PageCL;
+        const BandWidth = Math.max(0, Math.min(Item.Body.clientWidth || 1e9, PageWidth - Math.max(parseFloat(BCS.marginLeft) || 0, parseFloat(BCS.marginRight) || 0)) - (parseFloat(BCS.paddingLeft) || 0) - (parseFloat(BCS.paddingRight) || 0));
         sML.forEach(Item.Body.querySelectorAll('img, svg, picture, video, canvas'))(Ele => {
-            delete Ele.BibiPictureZone; // re-marked below when the big in-flow branch claims it; stale marks must not survive repurposing
+            delete Ele.BibiPictureZone;
+            delete Ele.BibiHalfPane;
             let Tar = Ele, Guard = 0; // climb through textless single-child wrappers (p > img): breaks go on the lone paragraph, not the inline picture. void sidekicks (empty calibre anchors) never block the climb.
             while(Tar.parentElement && Tar.parentElement !== Item.Body && Guard++ < 8 && !((Tar.parentElement.innerText || '').trim())) {
                 const Sibs = [...Tar.parentElement.children].filter(Kid => Kid === Tar || !isVoidSidekick(Kid));
                 if(Sibs.length !== 1 || Sibs[0] !== Tar) break;
                 Tar = Tar.parentElement;
             }
-            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
+            if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ['breakBefore', 'breakAfter', 'breakInside', 'columnSpan', 'display', 'width', 'height', 'cssFloat', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginBlockStart', 'marginBlockEnd', 'textAlign', 'alignItems', 'justifyContent'].forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
             for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // adopted solos smuggle converter margins (calibre .calibre2{margin-top:5%;margin-bottom:3%}) into foreign flows: neutralize the wrapper chain so adopted and native pictures share one geometry
@@ -323,22 +326,25 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
                 const ParentTag = Ele.parentElement ? Ele.parentElement.tagName : '';
                 if(/^(p|span|a|ruby|rt|rp|h1|h2|h3|h4|h5|h6|strong|em|small|sub|sup|button|label)$/i.test(ParentTag)) return; // inline illustrations stay in the text flow
                 if(/^inline/i.test(getComputedStyle(Ele).display) && !Ele.BibiAdoptedPicture && R.singleMediaIsBig(Ele) !== true) return; // inline illustrations stay in the text flow (gaiji and pending pictures wait); big or adopted pictures always claim their zone
-                const Zone = Item.contentDocument.createElement('div'); // a bare picture cannot be its own zone (a replaced element's box IS the picture): wrap it so the zone claims the full band while the picture sizes itself inside
+                const Zone = Item.contentDocument.createElement('div'); // keep the picture atomic while its wrapper reserves the pane
                 Ele.parentNode.insertBefore(Zone, Ele); Zone.appendChild(Ele); Tar = Zone;
             }
             const PrevSib = (() => { let Sib = Tar.previousElementSibling; while(Sib && isVoidSidekick(Sib)) Sib = Sib.previousElementSibling; return Sib; })(); // void sidekicks (empty anchors) must not force a blank lead page
             const NextSib = (() => { let Sib = Tar.nextElementSibling; while(Sib && isVoidSidekick(Sib)) Sib = Sib.nextElementSibling; return Sib; })();
-            Tar.style.width = (PrevSib ? PageCB : BandB) + 'px'; // the zone must always occupy its band alone (break-before is inert in this multicol). mid-flow zones go slightly over-wide (PageCB > band): too wide to partially fit after a text tail, so the fragmenter places them whole in a fresh band. head zones start at a band edge where an over-wide box would split a sliver into the next band, so they take the exact band width instead
-            Tar.style.marginLeft = 'auto'; Tar.style.marginRight = 'auto'; Tar.style.textAlign = 'center';
+            const Natural = svgNaturalSize(Ele);
+            const NatW = Natural ? Natural[0] : (Ele.naturalWidth || 0), NatH = Natural ? Natural[1] : (Ele.naturalHeight || 0);
+            const HalfPane = R.TwoPane && Item.Spread.PaneWidthFactor !== 0.5 && C.L_SIZE_B == 'Width' && ItemLineAxis == 'vertical' && NatH > NatW && NatW > 0;
+            const ZoneWidth = HalfPane ? BandWidth / 2 : PrevSib ? PageWidth : BandWidth;
+            Tar.style.width = ZoneWidth + 'px';
+            Tar.style.height = ItemLineAxis == 'vertical' ? PageHeight + 'px' : Tar.BibiDefaultBreaks?.height || '';
+            Tar.style.marginLeft = Tar.style.marginRight = HalfPane ? '0' : 'auto'; Tar.style.textAlign = 'center';
             Tar.style.display = 'flex'; Tar.style.alignItems = 'center'; Tar.style.justifyContent = 'center'; // flex centers on both axes regardless of writing mode (margins/text-align only serve one axis)
-            if(PrevSib) Tar.style.breakBefore = 'always'; // always (not column: Firefox drops column values, silently disabling isolation)
-            if(NextSib) Tar.style.breakAfter = 'always';
+            Tar.style.breakBefore = HalfPane ? 'auto' : PrevSib ? 'always' : 'auto';
+            Tar.style.breakAfter = HalfPane ? 'auto' : NextSib ? 'always' : 'auto';
             Tar.style.breakInside = 'avoid'; // the picture zone is one atomic rendering region: it must never straddle a column boundary
-            if(ItemLineAxis == 'vertical' && /^(img|svg)$/i.test(Ele.tagName)) { // vertical books: grow every big picture to the full pane length like the solo frontispieces. contain both ways, never distorted.
-                const NatW = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[0] || 0) : (Ele.naturalWidth || 0); // intrinsic width (pending loads resolve via the load listener above and re-render)
-                const NatH = /^svg$/i.test(Ele.tagName) ? ((svgNaturalSize(Ele) || [])[1] || 0) : (Ele.naturalHeight || 0);
+            if(ItemLineAxis == 'vertical' && /^(img|svg)$/i.test(Ele.tagName)) {
                 if(NatW > 0 && NatH > 0) {
-                    const ZoneScale = Math.min(BandB / NatW, R.Stage[C.L_SIZE_L] / NatH); // pane-length bound: the picture fills the pane like a solo frontispiece; the excess over the column length bleeds into the band gap below, never over prose
+                    const ZoneScale = Math.min(ZoneWidth / NatW, PageHeight / NatH); // contain in physical width/height for either pagination axis
                     Ele.style.width = Math.floor(NatW * ZoneScale) + 'px'; Ele.style.height = Math.floor(NatH * ZoneScale) + 'px';
                     Ele.style['max' + C.L_SIZE_B] = 'none'; Ele.style['max' + C.L_SIZE_L] = 'none'; // the fit pass capped the picture at the column length; the explicit size above replaces it
                     Ele.style.marginTop = Ele.style.marginBottom = 'auto'; // auto margins center a fitting picture and top-anchor an overflowing one — no negative margins: an upward bleed is clipped when the page is focused at its band top (the reported top cut)
@@ -347,6 +353,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             }
             Ele.style.marginLeft = 'auto'; Ele.style.marginRight = 'auto'; // center the picture in its page
             Ele.BibiPictureZone = Tar;
+            Ele.BibiHalfPane = HalfPane;
         });
     }
     if(sML.UA.Gecko) { // Part 1/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
@@ -409,6 +416,15 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         } else if(Item.HTML['offset'+ C.L_SIZE_B] < PageCB) {
             Item.HTML.style[C.L_SIZE_b] = Math.floor(parseFloat(getComputedStyle(Item.HTML)[C.L_SIZE_b]) + (PageCB - Item.HTML['offset'+ C.L_SIZE_B])) + 'px';
         }
+    }
+    if(ItemLineAxis == 'vertical' && C.L_SIZE_B == 'Width') {
+        const BodyRect = Item.Body.getBoundingClientRect(), RTL = Item.WritingMode == 'tb-rl';
+        sML.forEach(Item.Body.querySelectorAll('img, svg'))(Ele => {
+            if(!Ele.BibiHalfPane) return;
+            const Zone = Ele.BibiPictureZone, Rect = Zone.getBoundingClientRect(), PaneWidth = parseFloat(Zone.style.width);
+            const Used = RTL ? BodyRect.right - Rect.right : Rect.left - BodyRect.left;
+            if(Used > 1 && Used < PaneWidth) Zone.style[RTL ? 'marginRight' : 'marginLeft'] = Math.floor(PaneWidth - Used) + 'px'; // text tail stays in the first pane, picture starts at the second; no prose|picture|prose slivers
+        });
     }
     sML.deleteCSSRule(Item.contentDocument, WordWrappingStyleSheetIndex); ////
     if(sML.UA.Gecko) { // Part 2/2: Assist Gecko in the rendering of the orthogonal flow of writing-mode.
@@ -474,9 +490,10 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
     //*/
     resolve();
 }).then(() => Item);
-R.donateSoloPictures = () => { // dissolve standalone title illustrations into adjacent long text: the picture node is adopted into the text flow and processed as a full-page picture zone (same machinery as inline illustrations). idempotent; returns { adopted, recipients }.
+R.donateSoloPictures = () => { // move standalone illustrations into adjacent text flows after their available panes have been measured
     const recipients = new Set();
     let adopted = 0;
+    if(!R.Stage.Width) return { adopted, recipients: [] };
     R.Spreads.forEach(Sp => { // orphan heal: recipient documents replaced after adoption lose the copy while the donor stays empty. recreate from stored markup (no loader, no loops).
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.BibiDonationDonor || !Solo.BibiDonatedMarkup || (Solo.BibiHealCount || 0) > 8) return;
@@ -501,16 +518,33 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
         if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
         if(Sp.Index > 0 && (Solo.OnlySingleSVG || Solo.OnlySingleImg) && Solo.SingleMediaIsBig === true) { // re-donates after document reloads (new unflagged nodes); settled pictures are skipped by their adopted flag below
             const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
-            if(Media && !Media.BibiAdoptedPicture) return { donor: true };
+            if(Media && !Media.BibiAdoptedPicture) {
+                const Aspect = R.getSingleMediaAspect(Solo);
+                return { donor: true, portrait: !!(Aspect && Aspect[1] > Aspect[0]) };
+            }
         }
-        if(Solo.Reflowable && !Solo.OnlySingleSVG && !Solo.OnlySingleImg) {
+        if(Solo.Reflowable && Solo.TwoPaneRendered && !Solo.OnlySingleSVG && !Solo.OnlySingleImg) {
             let textLen = 0;
             try { textLen = (O.getElementInnerText(Solo.Body) || '').length; } catch(Err) {}
-            return { donor: false, textLen };
+            let portraitTailFits = false;
+            if(R.TwoPane && Solo.Spread.PaneWidthFactor !== 0.5) {
+                if(S.SLA == 'horizontal' && Solo.Spreaded) portraitTailFits = Solo.Pages.length % 2 == 1;
+                else if(C.L_SIZE_B == 'Width' && /^tb-/.test(Solo.WritingMode)) {
+                    const Walker = Solo.contentDocument.createTreeWalker(Solo.Body, NodeFilter.SHOW_TEXT, { acceptNode: T => T.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+                    const LastText = Walker.lastChild();
+                    if(LastText) {
+                        const Range = Solo.contentDocument.createRange(); Range.selectNodeContents(LastText);
+                        const Rects = Range.getClientRects(), Last = Rects[Rects.length - 1], BodyRect = Solo.Body.getBoundingClientRect();
+                        if(Last) portraitTailFits = (Solo.WritingMode == 'tb-rl' ? Last.left - BodyRect.left : BodyRect.right - Last.right) >= BodyRect.width / 2;
+                    }
+                }
+            }
+            return { donor: false, textLen, portraitTailFits };
         }
         return null;
     });
     planSoloPictureDonations(Metas).forEach(({ from, to, atHead }) => {
+        if(adopted) return; // each move changes the recipient's remaining pane; measure again after it has reflowed
         const Donor = R.Spreads[from].Items[0], Recip = R.Spreads[to].Items[0];
         if(!Donor.Body || !Recip.Body || !Recip.contentDocument) return;
         if(Donor.BibiDonatedTo === to) { try { if(Recip.Body.querySelector(':scope [data-bibi-adopted-from="' + Donor.Index + '"]')) return; } catch(Err) {} } // settled: copy present, nothing to do (no churn across sweeps)
@@ -527,6 +561,7 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
             Host.querySelectorAll(':scope [data-bibi-adopted-from="' + Donor.Index + '"]').forEach(N => N.remove()); // reload survivor: drop the stale copy from this donor before moving the fresh node
             if(/^(img|svg)$/i.test(Tar.tagName)) { const Wrap = Recip.contentDocument.createElement('div'); Wrap.appendChild(Recip.contentDocument.adoptNode(Tar)); Tar = Wrap; } // bare pictures need a wrapper: zones equal to the picture box leave no slack for clearance nudges
             Adopted = Recip.contentDocument.adoptNode(Tar); // same-origin iframes: the node moves with listeners and image data, no reload
+            if(atHead) Host.prepend(Adopted); else Host.append(Adopted);
         } catch(Err) { return; }
         try { Adopted.setAttribute('data-bibi-adopted-from', Donor.Index); Donor.BibiDonatedMarkup = Adopted.outerHTML; } catch(Err) {}
         const Media = Adopted.querySelector('img, svg') || (/^(img|svg)$/i.test(Adopted.tagName) ? Adopted : null);
@@ -535,6 +570,7 @@ R.donateSoloPictures = () => { // dissolve standalone title illustrations into a
         Donor.BibiDonatedTo = to; Donor.BibiDonatedAtHead = atHead; Donor.BibiAdoptCount = (Donor.BibiAdoptCount || 0) + 1;
         adopted++;
         recipients.add(R.Spreads[to]);
+        recipients.add(R.Spreads[from]); // collapse the emptied source as well; otherwise its stale page becomes a blank opening
     });
     return { adopted, recipients: [...recipients] };
 };
@@ -699,15 +735,26 @@ R.updateTwoPaneGrouping = () => {
 R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signature-guarded and storm-safe
     if(!R.Spreads.length || R.TwoPaneRelaying) return;
     clearTimeout(R.TwoPaneRegroupTimer);
-    R.TwoPaneRegroupTimer = setTimeout(() => {
+    R.TwoPaneRegroupTimer = setTimeout(async () => {
         if(R.LayingOut) { R.requestTwoPaneRegroup(); return; }
         R.TwoPaneRelaying = true;
+        let Adopted = 0;
         try {
-            const Donation = R.donateSoloPictures(); // late-resolving pictures dissolve here (bulk pass runs pre-layout in layOutBook); recipients join the relayout even when grouping is unchanged for them
+            const Donation = R.donateSoloPictures();
+            Adopted = Donation.adopted;
             const { changed, spreads } = R.updateTwoPaneGrouping();
             Donation.recipients.forEach(Sp => { if(!spreads.includes(Sp)) spreads.push(Sp); });
-            if(spreads.length && (changed || Donation.adopted)) Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp))).then(() => { R.organizePages(); try { I.PageObserver.updateCurrent(); } catch(Err) {} R.snapTwoPaneView(); }); // layOutSpread rebuilds Spread.Pages from recreated item pages but leaves R.Pages/Current pointing at detached nodes (slider math crashes on them) — rebuild both
-        } finally { R.TwoPaneRelaying = false; }
+            if(spreads.length && (changed || Donation.adopted)) {
+                await Promise.all(spreads.map(Sp => R.layOutSpreadAndItsItems(Sp)));
+                R.organizePages();
+                R.layOutStage();
+                try { I.PageObserver.updateCurrent(); } catch(Err) {}
+                R.snapTwoPaneView();
+            }
+        } finally {
+            R.TwoPaneRelaying = false;
+            if(Adopted) R.requestTwoPaneRegroup();
+        }
     }, 120);
 };
 R.isTwoPanePairAligned = (Pair) => {
@@ -759,14 +806,14 @@ R.replacePages = (OldPages, NewPages) => {
 R.layOutStage = () => {
     //E.dispatch('bibi:is-going-to:lay-out-stage');
     let MainContentLayoutLength = 0;
-    if(R.TwoPane) { // paired spreads share one row: count each pair once at the taller member
+    if(R.TwoPane) { // paired panes share a row's height vertically, but both slots contribute to a horizontal strip's width
         const Seen = new Set();
         R.Spreads.forEach(Spread => {
             const Key = Spread.TwoPaneGroupKey !== undefined ? Spread.TwoPaneGroupKey : Spread.Index;
             if(Seen.has(Key)) return;
             Seen.add(Key);
             const Members = (Spread.TwoPaneGroup && Spread.TwoPaneGroup.length > 1) ? Spread.TwoPaneGroup : [Spread];
-            MainContentLayoutLength += Math.max(...Members.map(Sp => Sp.Box['offset' + C.L_SIZE_L]));
+            MainContentLayoutLength += C.L_AXIS_L == 'X' ? Members.reduce((Length, Sp) => Length + Sp.Box.offsetWidth, 0) : Math.max(...Members.map(Sp => Sp.Box.offsetHeight));
         });
     } else R.Spreads.forEach(Spread => MainContentLayoutLength += Spread.Box['offset' + C.L_SIZE_L]);
     const SpreadGap = B.Reflowable || S.RVM == 'paged' || (() => { switch(S['concatenate-spreads'][S.RVM == 'horizontal' ? 0 : 1]) {
@@ -810,15 +857,22 @@ R.layOutBook = (Opt) => new Promise((resolve, reject) => setTimeout(() => {
     setTimeout(() => Promise.resolve().then(() => typeof Opt.before == 'function' ? Opt.before() : true).then(() => {
         if(!Opt.Reset) return resolve();
         if(!Opt.ResetOnlyContent) R.resetStage();
-        R.donateSoloPictures(); // bulk pass: standalone pictures dissolve into adjacent long text before pagination (late-resolving ones follow via regroup)
         R.updateTwoPaneGrouping(); // signature-guarded: first layout, resizes, and setting changes converge here
         const Promises = [];
         R.Spreads.forEach(Spread => Promises.push(R.layOutSpreadAndItsItems(Spread)));
-        Promise.all(Promises).then(() => {
+        Promise.all(Promises).then(async () => {
+            let Donation;
+            do {
+                Donation = R.donateSoloPictures();
+                const Grouping = R.updateTwoPaneGrouping();
+                const Spreads = new Set([...Donation.recipients, ...Grouping.spreads]);
+                await Promise.all([...Spreads].map(Sp => R.layOutSpreadAndItsItems(Sp)));
+            } while(Donation.adopted);
+        }).then(() => {
             R.organizePages();
             R.layOutStage();
             resolve();
-        });
+        }).catch(reject);
     }), Number.isFinite(Opt.Delay) ? Opt.Delay : 33);
 }, Number.isFinite(Opt?.DelayBefore) ? Opt.DelayBefore : 0)).then(() => {
     return R.focusOn(Opt.Destination, { Duration: 0 });
@@ -1106,6 +1160,11 @@ R.dest = (_, Opt) => { if(_ === undefined || _ === null) return null;
             }
         }
     }
+    if(DD.Item && DD.Item.BibiDonationDonor && !DD.Item.Pages.length) {
+        const Donor = DD.Item, Recipient = R.Spreads[Donor.BibiDonatedTo]?.Items[0];
+        const Picture = Recipient?.Body?.querySelector('[data-bibi-adopted-from="' + Donor.Index + '"]');
+        if(Picture) { DD.Item = Recipient; DD.Element = Picture; } // original spine/TOC links still reach the moved illustration
+    }
     const Page = !Object.keys(DD).length ? _.Page :
         DD.Range   ? R.getPageOfRangeHead(DD.Range) :
         DD.Element ? R.getPageOfElementHead(DD.Element) :
@@ -1136,9 +1195,11 @@ R.dest = (_, Opt) => { if(_ === undefined || _ === null) return null;
 
     R.getPageOfRectHeadInItem = (Rect, Item) => {
         if(!Item || !Item.Pages || !Item.Pages.length) return null; // a donated/dissolved item has no pages: indexing into [] returned undefined and callers read .Item off it (TypeError)
-        const CoordInItem = Rect[C.L_BASE_b];
-        const Idx = Math.floor(Math.max(0, (S.SLD == 'rtl' ? Item.HTML.getBoundingClientRect()[C.L_SIZE_l] - CoordInItem : CoordInItem) / R.Stage[C.L_SIZE_L]));
-        return Item.Pages[Math.min(Idx, Item.Pages.length - 1)]; // clamp: a rect past the last page (donation shrank the item) must not index out of range
+        if(Item.Pages.length == 1) return Item.Pages[0]; // fitted single-media items have no content areas
+        const Start = C.L_BASE_B, First = Item.Pages[0].ContentAreaInItem;
+        const PageStep = Item.Pages[1].ContentAreaInItem[Start] - First[Start];
+        const Idx = Math.floor((Rect[C.L_BASE_b] - First[Start]) / PageStep);
+        return Item.Pages[Math.max(0, Math.min(Idx, Item.Pages.length - 1))]; // use actual pane widths/gutters; negative steps handle right-to-left pagination
     };
 
     R.getPageOfProgressIn = (In, Progress) => In.Pages[ Progress > 0 ? Math.min(Math.floor(In.Pages.length * Progress), In.Pages.length - 1) : 0 ];

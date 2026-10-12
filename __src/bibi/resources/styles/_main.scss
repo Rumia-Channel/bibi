@@ -326,18 +326,17 @@ html.two-pane {
 		justify-content: flex-start;
 		align-content: flex-start;
 	}
+	&.spread-horizontal div#bibi-main-book {
+		flex-wrap: nowrap; // horizontal strips advance along x; wrapping puts later pages below the viewport
+	}
 	// Vertical-advance books flow top-down by default; pairs open side by side,
 	div.spread-box.two-pane-paired {
-		flex: 0 0 50%; // halves share a row by construction: exact px sums break on subpixel/chrome losses and wrap apart
+		flex: 0 0 var(--bibi-pane-width); // the book can span many viewports horizontally
 		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
 		min-height: 0 !important; // beats book-type min-height:100vh
 	}
 	&.spread-ttb.appearance-rtl div#bibi-main-book {
 		flex-direction: row-reverse;
-	}
-	div.spread-box.two-pane-paired {
-		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
-		min-height: 0 !important; // beats book-type min-height:100vh
 	}
 	// Pair contents hug the shared spine instead of centering in their pane.
 	&.spread-ltr div.spread-box.two-pane-pair-first div.item-box,

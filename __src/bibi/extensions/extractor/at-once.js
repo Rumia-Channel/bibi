@@ -13,10 +13,11 @@ Bibi.x({
 
     O.loadZippedBookData = (BookData) => new Promise(resolve => {
         if(S['autostart']) return resolve(BookData);
-        I.Veil.Cover.Info.innerHTML = [
-            `<strong>${ O.Touch ? 'Tap' : 'Click' } to Open</strong>`,
-            `<small>${ B.Path.replace(/.*?([^\/]+)$/, '$1') }</small>`
-        ].join(' ');
+        I.Veil.Cover.Info.replaceChildren(
+            sML.create('strong', { textContent: `${ O.Touch ? 'Tap' : 'Click' } to Open` }),
+            document.createTextNode(' '),
+            sML.create('small', { textContent: B.Path.replace(/.*?([^\/]+)$/, '$1') })
+        );
         I.Veil.Cover.classList.add('without-cover-image', 'waiting-for-unzipping');
         I.Veil.Cover.appendChild(I.getBookIcon());
         L.wait().then(() => resolve(BookData));
@@ -26,7 +27,7 @@ Bibi.x({
 
     const load = (BookData) => ( // resolve(ArrayBuffer)
         typeof BookData == 'string' ? fetch(BookData).then(Res => Res.ok ? Res.arrayBuffer() : Promise.reject()).catch(() => Promise.reject(Bibi.ErrorMessages.Unidentified)) :
-        BookData.size && BookData.type ? new Promise((resolve, reject) => { const FR = new FileReader(); FR.onerror = () => reject(Bibi.ErrorMessages.DataInvalid); FR.onload = () => resolve(FR.result); FR.readAsArrayBuffer(BookData); }) :
+        BookData.size ? BookData.arrayBuffer().catch(() => Promise.reject(Bibi.ErrorMessages.DataInvalid)) :
         Promise.reject(Bibi.ErrorMessages.DataInvalid)
     ).then(ArrayBuffer => JSZip.loadAsync(ArrayBuffer).catch(Err => Promise.reject(Bibi.ErrorMessages.DataInvalid)));
 
@@ -122,7 +123,7 @@ Bibi.x({
             }
             O.log(`Extracted. (${ Total } File${ Total > 1 ? 's' : '' })`, '</g>');
             resolve();
-        });
+        }).catch(reject);
     });
 
 });
