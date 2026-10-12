@@ -15,7 +15,7 @@ const Reflow = await createReflowFixture(), Vertical = await createReflowFixture
 const Fixed = await fs.readFile(path.join(Repository, '__src/bibi-bookshelf/__samples/Sample_Pre-Paginated_LtR.epub'));
 const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/fixed.epub', Fixed]]);
 const Requests = [], Errors = [], Results = [];
-let HostOrigin, SignedOrigin, Browser;
+let HostOrigin, SignedOrigin, Browser, Page;
 const Temp = await fs.mkdtemp(path.join(os.tmpdir(), 'bibi-browser-'));
 const HostPage = `<!doctype html><html><head><meta charset="utf-8"><title>Bibi public API smoke</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe.bibi-frame{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><script src="/vendor/bibi/and/jo.js"></script><script>
 window.readers=[];window.positions=[];window.states=[];
@@ -76,7 +76,7 @@ const scenario = async (Name, Run) => { await Run(); Results.push(Name); console
 try {
     HostOrigin = await listen(Server); SignedOrigin = await listen(SignedServer);
     Browser = await chromium.launch();
-    const Page = await Browser.newPage({ viewport: { width: 1280, height: 900 } });
+    Page = await Browser.newPage({ viewport: { width: 1280, height: 900 } });
     Page.on('pageerror', Error => Errors.push(Error.message));
     await Page.goto(HostOrigin + '/host');
     const open = async Options => {
@@ -104,7 +104,7 @@ try {
                 Range.setStart(Node, Offset); Range.setEnd(Node, Offset + 1);
                 const Rect = Range.getBoundingClientRect();
                 const Style = getComputedStyle(Element);
-                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight };
+                return { left: Rect.left, top: Rect.top, width: Rect.width, height: Rect.height, nodeType: Node.nodeType, nodeLength: Node.length, writingMode: Style.writingMode, fontSize: Style.fontSize, fontFamily: Style.fontFamily, lineHeight: Style.lineHeight };
             }, Offset);
             const Box = await (await Frame.frameElement()).boundingBox(), Viewport = Page.viewportSize();
             assert.ok(Box && Rectangle.width && Rectangle.height, JSON.stringify({ restoredCharacter: Id, offset: Offset, Rectangle, Box, Viewport }));
@@ -287,7 +287,7 @@ try {
     // A failed book load intentionally reports a reader error; the public failure is asserted above.
     console.log(JSON.stringify({ browserScenarios: Results, screenshot: path.join(Temp, 'public-api.png'), fixtureTextLength: LongText.length, realWasabiDeploymentVerified: false }));
 } catch(Error) {
-    await Page.screenshot({ path: path.join(Temp, 'failure.png') });
+    if(Page) await Page.screenshot({ path: path.join(Temp, 'failure.png') }).catch(ScreenshotError => console.error(ScreenshotError));
     console.error(JSON.stringify({ completed: Results, browserErrors: Errors, requests: Requests, screenshotDirectory: Temp, message: Error.message }));
     throw Error;
 } finally {
