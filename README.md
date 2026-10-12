@@ -227,6 +227,17 @@ If you want to modify them, please edit files in the `Source` column instead of 
     2. Temporary output is written under `__archives/.tmp/.dist`, using directory names valid on Windows.
     3. The CLI waits for ZIP completion and exits unsuccessfully if packaging fails.
 
+
+### GitHub Releases
+
+The CI workflow tests, audits, and builds branch pushes and pull requests. A `v*` tag push also runs `bun run archive` and publishes `Bibi-<tag>.zip` on GitHub Releases.
+
+Update the reader and `zzz` versions and the lockfile on `develop` first, merge into `master` with `--no-ff`, then create and push an annotated `v<version>` tag from `master`. Publishing rejects a tag that does not match `package.json` or whose commit is not included in `master`.
+
+For an existing tag, run the **CI** workflow manually with its `tag` input, or use `gh workflow run ci.yml --ref master -f tag=v2.0.0`. The build checks out that tag, not the current branch, so existing tags do not need to be moved.
+
+Only the publishing job has `contents: write`; it uses the built-in `GITHUB_TOKEN`, without a separate secret. New releases stay drafts until the ZIP has been attached. Prerelease versions are marked as prereleases. Re-running the workflow reuses the release and replaces its matching ZIP asset without replacing its title or notes.
+
 ### How to Verify
 
 * $ `bun test`
