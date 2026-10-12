@@ -21,6 +21,10 @@
   "readmeFilename": "README.md",
   "type": "module",
   "packageManager": "bun@1.4.2",
+  "engines": {
+    "node": ">=24.2.0",
+    "bun": ">=1.4.2"
+  },
   "workspaces": [
     "zzz"
   ],
@@ -37,17 +41,21 @@
     "make:dress-template": "zzz --make:dress-template",
     "archive": "zzz --clean tmp --weave archive && webpack --progress --config-name archive && zzz --archive",
     "archive@wbck": "zzz --clean tmp --weave archive@wbck && webpack --progress --config-name archive@wbck && zzz --archive wbck",
-    "serve": "webpack serve --progress --config-name development",
+    "serve": "node zzz/serve.mjs --config-name development",
     "demo": "bun run build@wbck && bun run serve",
-    "start": "bun run develop+watch",
+    "start": "bun run serve",
     "test": "bun test"
   },
   "devDependencies": {
     "zzz": "workspace:*",
     "copy-webpack-plugin": "^14.0.0",
+    "chokidar": "^5.0.0",
+    "compression": "^1.8.2",
+    "express": "^5.2.1",
     "css-loader": "^7.1.5",
     "cssnano": "^9.0.3",
     "mini-css-extract-plugin": "^2.9.4",
+    "open": "^11.0.0",
     "postcss": "^8.5.28",
     "postcss-loader": "^8.2.0",
     "postcss-preset-env": "^11.5.1",
@@ -57,7 +65,7 @@
     "terser-webpack-plugin": "^5.3.14",
     "webpack": "^5.110.3",
     "webpack-cli": "^7.2.3",
-    "webpack-dev-server": "^6.0.0",
+    "webpack-dev-middleware": "^8.3.0",
     "webpack-remove-empty-scripts": "^1.1.1"
   },
   "dependencies": {

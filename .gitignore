@@ -13,3 +13,8 @@ npm-debug.log
 .DS_Store
 Icon
 Thumbs.db
+# CocoIndex Code (ccc)
+/.cocoindex_code/
+
+# Serena
+/.serena/

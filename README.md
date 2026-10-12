@@ -120,7 +120,21 @@ You can use different directory for the bookshelf instead of 'bibi-bookshelf' by
 2. Navigate visitors to `https://your.web.site/somewhere/bibi/`.
 3. Visitors can read one's local EPUBs by draging and dropping EPUBs into the window.
 
-If you want to terminate this feature, set "no" to "accept-files" in `bibi/presets/default.js`.
+If you want to disable local file loading, set `"accept-local-file"` to `"no"` in `bibi/presets/default.js`.
+
+### Book content and script policy
+
+`allow-scripts-in-content` defaults to `false` in `bibi/presets/default.js`.
+With this setting, Bibi sanitizes EPUB content and navigation documents, including EPUB 2 NCX links.
+Book titles, authors, publishers, and local filenames are displayed as text, not executable HTML.
+Only enable content scripts for books you trust; book content runs in the reader's origin.
+
+### Paged illustrations
+
+In paged mode on viewports at least 4:3 wide, portrait illustrations use one pane rather than a whole opening.
+Vertical-text pages can share the other pane with prose without wrapping prose on both sides of a picture.
+A standalone illustration fills the preceding chapter's vacant pane when it fits; otherwise it opens the next long chapter.
+Landscape illustrations can still use the full opening. Links to an adopted illustration's original EPUB spine entry remain usable.
 
 
 
@@ -132,9 +146,12 @@ How to Arrange Development Environment
 
 ### Requirements
 
-* [Bun](https://bun.sh/)
+* [Bun](https://bun.sh/) 1.4.2 or newer
     - [Installation](https://bun.sh/docs/installation/).
-    - Bun bundles its own JavaScript/TypeScript runtime and package manager, so Node.js is not required. (No native build tools like Python / Visual C++ are needed, either.)
+    - Used for dependency installation, tests, and the local `zzz` CLI.
+* [Node.js](https://nodejs.org/) 24.2 or newer (24 LTS recommended)
+    - Used for webpack and the development server. The full webpack watch build was observed to become unresponsive with growing CPU/memory usage under Bun on Windows; the server deliberately uses Node.js.
+    - No native build tools like Python / Visual C++ are needed.
 * Note for Windows: this repository renames the local build tool directory `zzz...` (named so in the upstream repository) to `zzz`, because trailing dots are not a valid directory name on Windows/NTFS.
 
 
@@ -146,18 +163,29 @@ How to Arrange Development Environment
 3. $ `bun install`
 
 
+### Project structure
+
+* `__src/bibi/resources/scripts/bibi.js` exposes the reader API; `bibi.heart.js` loads the engine modules.
+* `bibi.heart.context.mjs` holds shared state and sML compatibility helpers; `lifecycle` and `settings` handle startup and configuration.
+* `loader` and `operator` handle EPUB packages, resources, and navigation; `reader` handles pagination, destinations, and wide-screen two-pane layouts.
+* `interface` implements controls, search, bookmarks, and reading-position persistence.
+* `__src/bibi/extensions` contains ZIP extraction, content sanitization, and BibiZine YAML support.
+* `__src/bibi/and/jo.js` supports embedding; `wardrobe` and `resources/styles` provide the UI styles. `__src__back-compat` contains the optional legacy URL kit.
+* `zzz` and `webpack.config.mjs` generate `__dist` and release ZIPs. `tests` covers behavior that can run without a browser; rendering still requires browser smoke checks.
+
 
 ### How to Develop
 
 1. $ `bun start`
-    1. webpack generates development version of Bibi to `__dist` folder, and start to watch changes of the files in `__src` folder.
-    2. BrowserSync webserver launches and navigate your browser to `http://localhost:62222/bibi/?book=`.
+    1. `zzz/serve.mjs` uses `webpack-dev-middleware` on Node.js to compile the development version in memory and watch its sources.
+    2. It opens `http://localhost:62222/bibi/?book=` in your browser.
 2. Edit source files.
-    1. If you modify source files in `__src` folder, development version of the file(s) are updated in `__dist` folder automaticaly.
-    2. BrowserSync reloads your browser(s) or inject changes of CSS.
+    1. Source changes are recompiled and served automatically.
+    2. HMR applies accepted JavaScript updates. Changes to HTML, standalone CSS, and files in `__dist` reload the browser.
 
-Files in `__dist` folder generated with `bun start` are development version.
-Please don't forget to run `bun run build` and build production version before you upload.
+`bun run serve` starts the same server directly. For development files on disk, use `bun run develop` (one build) or `bun run develop+watch` (watch without an HTTP server).
+The server listens only on `127.0.0.1`, rejects foreign Host/Origin headers, and sends `Cache-Control: no-store`. Use `bun run serve --no-open` to avoid opening a browser, or `bun run serve --port 62223` to choose a different port.
+Always run `bun run build` to generate production files in `__dist` before publishing; do not publish the development server's bundles.
 
 | Distribution                            | Source                                                                                                |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -169,7 +197,7 @@ Please don't forget to run `bun run build` and build production version before y
 | `__dist/bibi/resources/styles/bibi.css` | `__src/bibi/resources/styles/*.scss`                                                                  |
 | `__dist/bibi/wardrobe/**/*.css`         | Read documents in `__src/bibi/wardrobe/README-DRESS_ja` (Sorry..., currently README is Japanese only) |
 
-Files in the `Distribution` column of the table are overwritten with the files updated by `bun start` or `bun run build`.
+Files in the `Distribution` column are written by `bun run develop`, `bun run develop+watch`, or `bun run build`; `bun start` serves the corresponding development assets in memory.
 If you want to modify them, please edit files in the `Source` column instead of editing these files in `__dist` directly.
 
 
@@ -184,13 +212,26 @@ If you want to modify them, please edit files in the `Source` column instead of 
 
 * $ `bun run archive`
     1. A zipped archive of the production version of Bibi is generated in `__archives` folder.
+    2. Temporary output is written under `__archives/.tmp/.dist`, using directory names valid on Windows.
+    3. The CLI waits for ZIP completion and exits unsuccessfully if packaging fails.
 
 ### How to Verify
 
+* $ `bun test`
+    - Exercises two-pane grouping and destination geometry (LTR, RTL, and vertical), sML compatibility behavior, real ZIP extraction, CLI/archive success and failure paths, cleanup preservation of user books, and development-server host/origin protection and ZIP byte ranges.
+    - Tests of source spelling/import wiring have been removed; they did not exercise the reader.
+* Browser smoke checks:
+    - Open both sample EPUBs, use the index and page controls, and check paged and scrolling modes.
+    - Open a local reflowable EPUB and verify navigation, pagination, and resizing. In wide-screen two-pane mode, index links and search ranges must resolve against actual page spacing, not the full viewport width.
+    - With content scripts disabled, verify that metadata and navigation event handlers do not execute, unsafe navigation links are removed, and ordinary internal links still work.
+    - Check development updates: accepted JavaScript modules update without a page reload; HTML and standalone CSS edits refresh the page.
+
 * $ `bun audit`
-    - Checks installed packages for vulnerabilities. Expect `No vulnerabilities found`.
-    - `qs`/`immutable` are force-pinned via `overrides` as belt and suspenders; `webpack-dev-server@6` (sockjs-free) removed the last advisory chain.
-    - If new advisories appear, `bun audit fix --dry-run` previews range-safe fixes.
+    - Checks installed packages for vulnerabilities; a nonzero exit must not be treated as success.
+    - The dependency lockfile includes range-safe fixes for 15 advisories found during the October 2026 review.
+    - The remaining [`braces`, GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) dependency was removed: the server no longer uses `webpack-dev-server`/`http-proxy-middleware`, and cleanup uses Bun's native Glob plus `fs.rmSync` instead of `del`/`globby`/`fast-glob`. Deletion outside the working directory remains forbidden.
+    - The reviewed lockfile reports no known vulnerabilities. No advisory suppression, fabricated patched version, or local dependency fork is used. Re-run `bun audit` after dependency updates; a clean audit is not a guarantee against undisclosed vulnerabilities.
+    - `bun audit fix --dry-run` previews range-safe fixes before changing the lockfile.
 * $ `bun outdated`
     - Lists dependencies newer than the pinned ranges. Empty output means fully tracking latest.
 * $ `bun run build`
