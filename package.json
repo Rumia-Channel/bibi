@@ -1,6 +1,6 @@
 {
   "name": "bibi",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "Satoru Matsushima"
   },
@@ -34,9 +34,9 @@
     "develop+watch": "zzz --clean --weave development+watch && webpack --progress --config-name development --watch",
     "develop@wbck": "zzz --clean --weave development@wbck && webpack --progress --config-name development@wbck && zzz --wove development@wbck",
     "develop@wbck+watch": "zzz --clean --weave development@wbck+watch && webpack --progress --config-name development@wbck --watch",
-    "build": "zzz --clean --weave production && webpack --progress --config-name production && zzz --wove production",
+    "build": "zzz --clean --weave production && webpack --progress --config-name production && zzz --wove production && bun zzz/distribution.mjs finalize __dist/bibi",
     "build+watch": "zzz --clean --weave production+watch && webpack --progress --config-name production --watch",
-    "build@wbck": "zzz --clean --weave production@wbck && webpack --progress --config-name production@wbck && zzz --wove production@wbck",
+    "build@wbck": "zzz --clean --weave production@wbck && webpack --progress --config-name production@wbck && zzz --wove production@wbck && bun zzz/distribution.mjs finalize __dist/bibi",
     "build@wbck+watch": "zzz --clean --weave production@wbck+watch && webpack --progress --config-name production@wbck --watch",
     "make:dress-template": "zzz --make:dress-template",
     "archive": "zzz --clean tmp --weave archive && webpack --progress --config-name archive && zzz --archive",
@@ -44,18 +44,20 @@
     "serve": "node zzz/serve.mjs --config-name development",
     "demo": "bun run build@wbck && bun run serve",
     "start": "bun run serve",
-    "test": "bun test"
+    "test": "bun test",
+    "test:browser": "node tests/browser/integration.mjs",
+    "verify:dist": "bun zzz/distribution.mjs verify __dist/bibi"
   },
   "devDependencies": {
-    "zzz": "workspace:*",
-    "copy-webpack-plugin": "^14.0.0",
     "chokidar": "^5.0.0",
     "compression": "^1.8.2",
-    "express": "^5.2.1",
+    "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^7.1.5",
     "cssnano": "^9.0.3",
+    "express": "^5.2.1",
     "mini-css-extract-plugin": "^2.9.4",
     "open": "^11.0.0",
+    "playwright": "^1.64.0",
     "postcss": "^8.5.28",
     "postcss-loader": "^8.2.0",
     "postcss-preset-env": "^11.5.1",
@@ -66,7 +68,8 @@
     "webpack": "^5.110.3",
     "webpack-cli": "^7.2.3",
     "webpack-dev-middleware": "^8.3.0",
-    "webpack-remove-empty-scripts": "^1.1.1"
+    "webpack-remove-empty-scripts": "^1.1.1",
+    "zzz": "workspace:*"
   },
   "dependencies": {
     "bibi-zip-loader": "^0.9.0",

@@ -92,11 +92,20 @@ U.at1st = () => {
 
 
 U.initialize = () => {
-         if(typeof U['nav']  == 'number') U['nav'] < 1 ? delete U['nav'] : R.StartOn = { Nav:  U['nav']  }; // to be converted in L.coordinateLinkages
-    else if(typeof U['p']    == 'string')                                  R.StartOn = { P:    U['p']    };
-    else if(typeof U['iipp'] == 'number')                                  R.StartOn = { IIPP: U['iipp'] };
-    else if(typeof U['edge'] == 'string')                                  R.StartOn = { Edge: U['edge'] };
-    else if(typeof U['epubcfi'] == 'string')                               R.StartOn = R.getCFIDestination(U['epubcfi']);
+    const startAt = Location => {
+        const Destination = typeof Location?.cfi === 'string' ? R.getCFIDestination(Location.cfi) || {} : typeof Location?.p === 'string' ? { P: Location.p } : {};
+        R.StartOn = { ...Destination, Location };
+    };
+    if(typeof U['location'] === 'string') {
+        let Location;
+        try { Location = JSON.parse(U['location']); } catch { Location = null; }
+        startAt(Location);
+    } else if(typeof U['nav'] === 'number') U['nav'] < 1 ? delete U['nav'] : R.StartOn = { Nav: U['nav'] };
+    else if(typeof U['p'] === 'string') startAt({ p: U['p'] });
+    else if(typeof U['iipp'] === 'number') R.StartOn = { IIPP: U['iipp'] };
+    else if(typeof U['edge'] === 'string') R.StartOn = { Edge: U['edge'] };
+    else if(typeof U['epubcfi'] === 'string') startAt({ cfi: U['epubcfi'] });
+    else if(typeof U.Query?.p === 'string') startAt({ p: U.Query.p });
     delete U.initialize;
 };
 

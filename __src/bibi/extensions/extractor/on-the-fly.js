@@ -1,7 +1,7 @@
 'use strict';
 
 import BibiZipLoader from './on-the-fly.bibi-zip-loader.js';
-const WorkerURL = new URL('./on-the-fly.bibi-zip-loader.worker.js', document.currentScript.src).href;
+const WorkerURL = new URL('./on-the-fly.worker.js', document.currentScript.src);
 
 Bibi.x({
 
@@ -10,4 +10,7 @@ Bibi.x({
     author: 'Satoru Matsushima (@satorumurmur)',
     version: '1.3.0'
 
-})(() => O.RangeLoader = new BibiZipLoader({ url: S['book'], worker: WorkerURL }));
+})(() => {
+    WorkerURL.searchParams.set('credentials', S['request-with-credentials'] ? 'include' : 'same-origin');
+    O.RangeLoader = new BibiZipLoader({ url: S['book'], worker: WorkerURL.href });
+});

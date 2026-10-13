@@ -56,6 +56,17 @@ jobs:
       - run: bun test
       - run: bun audit
       - run: bun run build
+      - run: bunx playwright install --with-deps chromium
+      - name: Install Japanese vertical fixture font
+        run: sudo apt-get install --yes fonts-noto-cjk
+      - run: bun run test:browser
+      - name: Upload browser failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: browser-failure
+          path: /tmp/bibi-browser-*/failure.png
+          retention-days: 7
       - name: Build release ZIP
         id: archive
         if: steps.release.outputs.tag != ''

@@ -7,6 +7,7 @@
 import zzZ from 'zzz';  export default zzZ;
 
 const { PACKAGE, WEBSITE_ADDRESS, LICENSE_ADDRESS, SRC, SRC_BC, DIST, ARCHIVES, ARCHIVES_TMP, ARCHIVES_TMP_DIST, LOG_CHARM, LOG_HEADER, ARGUMENTS, ENVARS, Composer, Conductor } = zzZ;
+import { createDistributionManifest, verifyArchive, walkFiles } from './distribution.mjs';
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +27,7 @@ Object.assign(Conductor.Baton, {  // ===========================================
                     '**/.DS_Store',
                     '**/Thumbs.db',
                     'bibi/*.html',
+                    'bibi/build-manifest.json',
                     'bibi/and',
                     'bibi/extensions',
                     'bibi/info',
@@ -79,17 +81,26 @@ Object.assign(Conductor.Baton, {  // ===========================================
         const PackageName = PACKAGE.name == 'bibi' ? 'Bibi' : PACKAGE.name;
         const ArchiveName = PackageName + '-v' + PACKAGE.version;
         const BCKPostfix = '+BackCompatKit';
+        const Manifest = createDistributionManifest(ARCHIVES_TMP_DIST + '/bibi');
+        const EntryDate = new Date(Math.max(315532800, Manifest.source.sourceDateEpoch) * 1000);
         const zip = (ArchiveName) => new Promise((resolve, reject) => {
             const PackageZipName = ArchiveName + '.zip';
             const WriteStream = Conductor.createWriteStream(ARCHIVES_TMP + '/' + PackageZipName);
-            const Zip = new ZipArchive({ forceLocalTime: true, zlib: { level: 9 } });
+            const Zip = new ZipArchive({ forceLocalTime: false, zlib: { level: 9 }, statConcurrency: 1 });
             const fail = Err => { Zip.abort(); WriteStream.destroy(); reject(Err); };
             WriteStream.on('error', fail);
-            WriteStream.on('close', () => resolve([PackageZipName, Zip.pointer()]));
+            WriteStream.on('close', () => verifyArchive(ARCHIVES_TMP + '/' + PackageZipName).then(() => resolve([PackageZipName, Zip.pointer()]), reject));
             Zip.on('error', fail);
             Zip.on('warning', fail);
             Zip.pipe(WriteStream);
-            Zip.directory(ARCHIVES_TMP_DIST, ArchiveName);
+            const Directories = new Set(['', 'bibi-bookshelf']);
+            const Files = walkFiles(ARCHIVES_TMP_DIST);
+            for(const File of Files) {
+                const Steps = File.split('/'); Steps.pop();
+                while(Steps.length) { Directories.add(Steps.join('/')); Steps.pop(); }
+            }
+            for(const Directory of [...Directories].sort()) Zip.append('', { name: ArchiveName + '/' + (Directory ? Directory + '/' : ''), type: 'directory', date: EntryDate, mode: 0o755 });
+            for(const File of Files) Zip.append(fs.createReadStream(Path.join(ARCHIVES_TMP_DIST, File)), { name: ArchiveName + '/' + File, date: EntryDate, mode: 0o644 });
             Zip.finalize().catch(fail);
         });
         const formatNum = (Num) => {

@@ -865,6 +865,7 @@ L.postprocessItem = (Item) => {
             if(!Item.PrePaginated) return L.patchItemStyles(Item);
         },
         // () => Item.stamp('Postprocessed'),
+        () => R.registerLocationDocument(Item),
         () => E.dispatch('bibi:postprocessed-item', Item)
     );
 };
