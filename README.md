@@ -22,11 +22,17 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
-### v2.0.0
+### v2.1.1
 
 Stable v2 release with wide-screen portrait/prose pagination, reading-position persistence, dark-mode controls, EPUB content sanitization, and development/build-tooling hardening.
 
-The reader and `zzz` packages are versioned `2.0.0`. The root package version supplies the reader and Jo runtime versions; `bun run archive` generates `Bibi-v2.0.0.zip`.
+This patch preserves the 2.1.0 host integration API and corrects page alignment when the menubar occupies part of the reader viewport:
+
+* Navigation targets use coordinates relative to the scroll frame, preventing clipped page tops and the following page appearing at the bottom.
+* Visible-page detection includes the scroll frame's layout offset, so a fully visible page advances without an extra click.
+* Distribution browser regression checks cover forward/backward page turns and landscape-to-portrait resizing with the menubar above the content.
+
+The reader and `zzz` packages are versioned `2.1.1`. The root package version supplies the reader and Jo runtime versions; `bun run archive` generates `Bibi-v2.1.1.zip`.
 
 
 ### Table of Contents
