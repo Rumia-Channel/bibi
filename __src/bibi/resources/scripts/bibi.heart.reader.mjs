@@ -1000,19 +1000,19 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
     if(Item.Reflowable) {
         if(!R.Paginated && B.WritingMode.split('-')[1] == Item.WritingMode.split('-')[1] && (Dest.Range || (Dest.Element && Dest.Element.ownerDocument !== document))) {
             const Rect = Dest.Range ? Dest.Range.getBoundingClientRect() : Dest.Element.getBoundingClientRect();
-            FocusPoint = O.getElementCoord(Item)[C.L_AXIS_L] + (Item.NoPadding ? 0 : Item.Padding[C.L_OOBL_L]) + Rect[C.L_BASE_b];
+            FocusPoint = O.getElementCoord(Item, R.Main)[C.L_AXIS_L] + (Item.NoPadding ? 0 : Item.Padding[C.L_OOBL_L]) + Rect[C.L_BASE_b];
         } else {
-            FocusPoint = O.getElementCoord(Page)[C.L_AXIS_L];
+            FocusPoint = O.getElementCoord(Page, R.Main)[C.L_AXIS_L];
             if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
             if(S.SLD == 'rtl') FocusPoint += Page.offsetWidth;
         }
         if(S.SLD == 'rtl') FocusPoint -= R.Stage.Width;
     } else {
         if(R.Stage[C.L_SIZE_L] >= Page.Spread['offset' + C.L_SIZE_L]) {
-            FocusPoint = O.getElementCoord(Page.Spread)[C.L_AXIS_L];
+            FocusPoint = O.getElementCoord(Page.Spread, R.Main)[C.L_AXIS_L];
             FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - Page.Spread['offset' + C.L_SIZE_L]) / 2);
         } else {
-            FocusPoint = O.getElementCoord(Page)[C.L_AXIS_L];
+            FocusPoint = O.getElementCoord(Page, R.Main)[C.L_AXIS_L];
             if(R.Stage[C.L_SIZE_L] > Page['offset' + C.L_SIZE_L]) FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - Page['offset' + C.L_SIZE_L]) / 2);
             else if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
         }

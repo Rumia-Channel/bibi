@@ -267,7 +267,7 @@ I.PageObserver = { create: () => {
         getFrame: () => {
             const Frame = {};
             Frame.Length = R.Main['offset' + C.L_SIZE_L];
-            Frame[C.L_OOBL_L                              ] = Math.ceil(R.Main['scroll' + C.L_OOBL_L]); // Android Chrome returns scrollLeft/Top value of an element with slightly less float than actual.
+            Frame[C.L_OOBL_L                              ] = Math.ceil(R.Main['scroll' + C.L_OOBL_L] + O.getElementCoord(R.Main)[C.L_AXIS_L]); // Match sML.getCoord's document origin, including the scroll frame's layout offset.
             Frame[C.L_OOBL_L == 'Top' ? 'Bottom' : 'Right'] = Frame[C.L_OOBL_L] + Frame.Length;
             //if(PageObserver.Current.List.length && Frame[C.L_BASE_B] == PageObserver.Current.Frame.Before && Frame[C.L_BASE_A] == PageObserver.Current.Frame.After) return false;
             return { Before: Frame[C.L_BASE_B], After: Frame[C.L_BASE_A], Length: Frame.Length };
