@@ -257,6 +257,39 @@ try {
         assert.match((await position(Reader)).location.cfi, /^\/6\/4!/);
         await remove(Reader);
     });
+    await scenario('paged vertical text stays inside the reader viewport below the menubar', async () => {
+        const PreviousViewport = Page.viewportSize();
+        await Page.setViewportSize({ width: 1280, height: 900 });
+        Reader = await open({ book: '/epubs/vertical.epub', 'book-key': 'viewport-alignment', 'content-hash': 'vertical-1', 'use-menubar': 'yes', 'use-full-height': 'no', 'keep-settings': 'no', 'resume-from-last-position': 'no' });
+        const Frame = await readerFrame(Reader);
+        const assertAligned = async () => {
+            const Geometry = await Frame.locator('.page.current').first().evaluate(Element => {
+                const Page = Element.getBoundingClientRect(), Main = document.getElementById('bibi-main').getBoundingClientRect();
+                return { page: { top: Page.top, bottom: Page.bottom }, viewport: { top: Main.top, bottom: Main.bottom } };
+            });
+            assert.ok(Math.abs(Geometry.page.top - Geometry.viewport.top) <= 1 && Geometry.page.bottom <= Geometry.viewport.bottom + 1, JSON.stringify(Geometry));
+        };
+        await restore(Reader, { cfi: '/6/2!/4/2/4/1:0' });
+        await assertAligned();
+        await textVisible(Reader, 'long', 0);
+        const Start = (await position(Reader)).layout.pageIndex;
+        await Page.evaluate(Index => window.readers[Index].move(1), Reader);
+        assert.equal((await position(Reader)).layout.pageIndex, Start + 1);
+        await assertAligned();
+        await Page.evaluate(Index => window.readers[Index].move(-1), Reader);
+        assert.equal((await position(Reader)).layout.pageIndex, Start);
+        await assertAligned();
+        const StateCount = await Page.evaluate(() => window.states.length);
+        await Page.setViewportSize({ width: 760, height: 1000 });
+        await Page.waitForFunction(Before => window.states.slice(Before).some(Event => Event.state.operable), StateCount);
+        await restore(Reader, { cfi: '/6/2!/4/2/4/1:0' });
+        await assertAligned();
+        await Page.evaluate(Index => window.readers[Index].move(1), Reader);
+        await assertAligned();
+        await Page.screenshot({ path: path.join(Temp, 'viewport-alignment.png') });
+        await remove(Reader);
+        await Page.setViewportSize(PreviousViewport);
+    });
     await scenario('fixed layout and cookie-authenticated Native delivery', async () => {
         Reader = await open({ book: '/epubs/fixed.epub', 'book-key': 'fixed', 'content-hash': 'fixed-1' });
         const Position = await position(Reader);
