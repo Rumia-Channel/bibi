@@ -80,8 +80,10 @@ const restorePosition = async (Location, ExpectedIdentity) => {
 };
 Bibi.API = Object.freeze({
     schemaVersion: 1, getState, getPosition, restorePosition,
+    getHostNavigationState: () => Bibi.HostNavigation.getState(),
+    refreshHostNavigation: () => Bibi.HostNavigation.refresh(),
     subscribe: (Type, Listener) => {
-        if(!['bibi:state-changed', 'bibi:position-changed'].includes(Type) || typeof Listener !== 'function') throw new TypeError('Use a public state or position event and a listener.');
+        if(!['bibi:state-changed', 'bibi:position-changed', 'bibi:host-navigation-changed'].includes(Type) || typeof Listener !== 'function') throw new TypeError('Use a public reader event and a listener.');
         const Handler = Event => Listener(Event.detail);
         document.addEventListener(Type, Handler);
         return () => document.removeEventListener(Type, Handler);
@@ -98,6 +100,8 @@ M.handleAPIRequest = async Request => {
             case 'getState': Response.result = getState(); break;
             case 'getPosition': Response.result = getPosition(); break;
             case 'restorePosition': Response.result = await restorePosition(Request.params?.location, Request.params?.identity); break;
+            case 'getHostNavigationState': Response.result = Bibi.HostNavigation.getState(); break;
+            case 'refreshHostNavigation': Response.result = await Bibi.HostNavigation.refresh(); break;
             default: throw fail('UNKNOWN_METHOD', 'The API method is not supported.');
         }
         Response.ok = true;
@@ -117,3 +121,4 @@ document.addEventListener('bibi:x_x', Event => {
 for(const Event of ['bibi:focused-on', 'bibi:scrolled-by', 'bibi:moved-by', 'bibi:stopped-scrolling', 'bibi:flipped', 'bibi:changed-intersection']) document.addEventListener(Event, settlePosition);
 document.addEventListener('bibi:is-going-to:lay-out', publishState);
 document.addEventListener('bibi:laid-out', () => { if(Status === 'ready') { publishState(); settlePosition(); } });
+document.addEventListener('bibi:changed-host-navigation', Event => publish({ type: 'bibi:host-navigation-changed', state: Event.detail }));

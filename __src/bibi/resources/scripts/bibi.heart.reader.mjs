@@ -53,15 +53,17 @@ R.createSpine = (SpreadsDocumentFragment) => {
 
 
 R.resetBibiHeight = () => {
-    if(O.TouchOS) O.HTML.style.height = O.Body.style.height = '';
-    const SafeHeight = O.HTML.offsetHeight - O.SafeArea.Bottom;
-    if(O.TouchOS) O.HTML.style.height = O.Body.style.height = SafeHeight + 'px'; // for In-App Browsers
+    O.HTML.style.height = O.Body.style.height = '';
+    const ViewportHeight = window.visualViewport?.scale === 1 ? Math.min(window.innerHeight, window.visualViewport.height) : window.innerHeight;
+    const SafeHeight = Math.max(0, Math.min(O.HTML.offsetHeight, ViewportHeight) - O.SafeArea.Bottom);
+    O.HTML.style.height = O.Body.style.height = SafeHeight + 'px';
     return SafeHeight;
 };
 
 
 R.resetStage = () => {
     const SafeHeight = R.resetBibiHeight();
+    if(S['use-menubar'] && I.Menu.getBoundingClientRect) I.Menu.Height = I.Menu.getBoundingClientRect().height;
     R.Stage = {};
     R.Main.style.padding = R.Main.style.width = R.Main.style.height = '';
     R.Main.Book.style.padding = R.Main.Book.style.width = R.Main.Book.style.height = '';

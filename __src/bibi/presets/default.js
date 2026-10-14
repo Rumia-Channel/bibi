@@ -38,7 +38,7 @@ Bibi.preset({
 "use-full-height"            : "yes", // "yes" | "no" | "desktop" | "mobile" // If "use-menubar" is interpreted as "no", "use-full-height" is always treated as "yes".
 
 "use-arrows"                 : "yes", // "yes" | "no" | "desktop" | "mobile"
-"flipper-width"              : 0.25, // Number of ratio to the viewport (less than 1) | pixels (1 or greater) // Less than 0 is treated as 0.
+"flipper-width"              : 1 / 3, // Ratio to one page (less than 1) | pixels (1 or greater). Two-page view uses one-sixth of the viewport at each outer edge.
 
 "use-keys"                   : "yes", // "yes" | "no" | "desktop" | "mobile"
 
@@ -224,6 +224,9 @@ Bibi.preset({
 
 /* !!!! BE CAREFUL !!!! */ "request-with-credentials" : false,
 
+"use-host-navigation"        : false,
+"host-navigation-api"        : "",
+"host-navigation-paths"      : [],
 
 /*
 

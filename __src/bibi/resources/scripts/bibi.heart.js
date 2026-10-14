@@ -26,4 +26,5 @@ import './bibi.heart.events.mjs';
 import './bibi.heart.messages.mjs';
 import './bibi.heart.extensions.mjs';
 import './bibi.heart.location.mjs';
+import './bibi.heart.host-navigation.mjs';
 import './bibi.heart.api.mjs';

@@ -22,17 +22,16 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
-### v2.1.1
+### v2.2.0
 
-Stable v2 release with wide-screen portrait/prose pagination, reading-position persistence, dark-mode controls, EPUB content sanitization, and development/build-tooling hardening.
+This release preserves the schemaVersion 1 reading-position API and adds host-controlled volume navigation:
 
-This patch preserves the 2.1.0 host integration API and corrects page alignment when the menubar occupies part of the reader viewport:
+* Configured standalone readers show a previous/next-volume boundary page before leaving the book. A separate outward action navigates; an inward action returns to the real page. Wheel momentum and held keys cannot immediately cross volumes.
+* The opt-in **戻る** button appears beside the TOC. Destinations are refreshed and verified against the current book/file identity and the host's same-origin path allowlist.
+* Only a document-pinned or preloaded preset can enable host navigation. URL-selected presets, ordinary readers and iframe readers cannot enable it.
+* The toolbar and reader geometry account for safe-area insets and the visual viewport. Page-sized tap bands use each outer page's third: each viewport sixth in two-pane mode, each third in single-pane mode.
 
-* Navigation targets use coordinates relative to the scroll frame, preventing clipped page tops and the following page appearing at the bottom.
-* Visible-page detection includes the scroll frame's layout offset, so a fully visible page advances without an extra click.
-* Distribution browser regression checks cover forward/backward page turns and landscape-to-portrait resizing with the menubar above the content.
-
-The reader and `zzz` packages are versioned `2.1.1`. The root package version supplies the reader and Jo runtime versions; `bun run archive` generates `Bibi-v2.1.1.zip`.
+The reader and `zzz` packages are versioned `2.2.0`; `bun run archive` generates `Bibi-v2.2.0.zip`. The complete deployment/API contract is [HOST_SERIES_NAVIGATION_ja.md](HOST_SERIES_NAVIGATION_ja.md).
 
 
 ### Table of Contents
@@ -179,7 +178,7 @@ How to Arrange Development Environment
 3. $ `bun install`
 
 
-### Host integration (2.1.0)
+### Host integration (schemaVersion 1)
 
 The reader exposes `Bibi.API` directly and Jo exposes `Bucket.api` for iframe embedding. `schemaVersion` is `1`. Jo methods return promises; direct `getState()` and `getPosition()` are synchronous. Subscribe before embedding, then await `Bucket.api.ready` before navigating.
 
@@ -218,8 +217,10 @@ bucket.Anchor.remove();
 | `getState()` | Identity, `status` (`loading`, `ready`, `error`), `operable`, `error`, and `initialRestore`. A ready reader can temporarily be inoperable during movement or relayout. |
 | `getPosition()` | `{ location: { p, cfi }, progress, progressBasis, atEnd, layout: { iipp, pageIndex, pageCount } }`. Save `location`, not layout diagnostics. |
 | `restorePosition(location, identity?)` | Loads a lazy spine item when necessary, moves to the source point, and returns `{ requestedLocation, position }` with the actual visible position. A page's leading point can precede the requested character. |
-| `subscribe(type, listener)` | Public `bibi:state-changed` and `bibi:position-changed` envelopes; returns an unsubscribe function. Notifications carry schema, session, book, and content identities. |
+| `subscribe(type, listener)` | Public `bibi:state-changed`, `bibi:position-changed` and `bibi:host-navigation-changed` envelopes; returns an unsubscribe function. Notifications carry schema, session, book, and content identities. |
 | `ready` / `dispose()` | Jo readiness promise / release listeners and outstanding requests. Use a new Bucket when replacing a book. |
+| `getHostNavigationState()` | `{ enabled, loading, navigating, visibleBoundary, error }`. Boundary UI does not change the real position or page count. |
+| `refreshHostNavigation()` | Refreshes verified host metadata. Rejects with `HOST_NAVIGATION_DISABLED` outside a configured standalone deployment. |
 
 Locations refer to the original sanitized source DOM before pagination and illustration transfer. Point CFIs use `/6/<even-spine-step>!/4/...` and UTF-16 text offsets; P identifies a source element and cannot distinguish characters in a long paragraph. CFI takes precedence when both are present. Range CFIs, nested indirections, nonlinear spine targets, missing nodes, and out-of-range offsets are rejected rather than silently clamped or replaced with P.
 

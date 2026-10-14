@@ -1,0 +1,34 @@
+html#bibi {
+    --bibi-safe-area-top: env(safe-area-inset-top, 0px);
+    --bibi-safe-area-left: env(safe-area-inset-left, 0px);
+    --bibi-safe-area-right: env(safe-area-inset-right, 0px);
+    --bibi-menu-offset: calc(var(--bibi-menu-base-height, 39px) + var(--bibi-safe-area-top));
+    height: 100dvh;
+    &.without-menubar { --bibi-menu-offset: 0px; }
+    div#bibi-style-checker { padding-top: var(--bibi-safe-area-top); }
+    div#bibi-menu, .bibi-extramenu {
+        box-sizing: border-box;
+        width: 100%;
+        height: var(--bibi-menu-offset);
+        padding-top: var(--bibi-safe-area-top);
+        padding-left: var(--bibi-safe-area-left);
+        padding-right: var(--bibi-safe-area-right);
+    }
+    &.appearance-vertical.slider-opened div#bibi-menu {
+        width: 100%;
+        padding-right: calc(var(--bibi-safe-area-right) + var(--bibi-slider-size, 35px));
+    }
+    &:not(.book-full-height).appearance-horizontal main#bibi-main {
+        top: var(--bibi-menu-offset);
+        height: calc(100% - var(--bibi-menu-offset));
+    }
+    &:not(.book-full-height).appearance-vertical main#bibi-main {
+        padding-top: var(--bibi-menu-offset);
+        height: calc(100% - var(--bibi-menu-offset));
+    }
+    div.bibi-subpanel { top: calc(var(--bibi-menu-offset) + 8px); }
+    div#bibi-panel-bookinfo {
+        margin-top: var(--bibi-menu-offset);
+        max-height: calc(100% - var(--bibi-menu-offset));
+    }
+}

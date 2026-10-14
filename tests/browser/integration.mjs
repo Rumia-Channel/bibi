@@ -6,6 +6,7 @@ import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createReflowFixture, createLazyFixture, LongText, TailText } from './fixtures.mjs';
+import { sendBook } from './book-server.mjs';
 import { verifyDistribution } from '../../zzz/distribution.mjs';
 
 const Repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -22,25 +23,10 @@ window.readers=[];window.positions=[];window.states=[];
 window.openReader=options=>{const url=new URL(options?.deployment||'/vendor/bibi/',location.origin);for(const[k,v]of Object.entries({book:'/epubs/reflow.epub','autostart':'yes','autostart-embedded':'yes','reader-view-mode':'paged','allow-placeholders':'false','book-key':'book-1','content-hash':'revision-1','storage-namespace':'browser-regression','storage-user':'user-1',...options})){if(k!=='deployment')url.searchParams.set(k,String(v));}const bucket=new window['bibi:jo'].Bucket({'bibi-href':url.href});bucket.api.subscribe('bibi:position-changed',event=>window.positions.push(event));bucket.api.subscribe('bibi:state-changed',event=>window.states.push(event));document.body.append(bucket.Anchor);bucket.embed();readers.push(bucket);return readers.length-1;};
 window.closeReader=index=>{const bucket=readers[index];bucket.api.dispose();bucket.Frame.remove();bucket.Anchor.remove();};
 </script></body></html>`;
-const sendBook = (Request, Response, Bytes, Cors = false) => {
-    const Headers = { 'Content-Type': 'application/epub+zip', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
-    if(Cors) Object.assign(Headers, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length' });
-    const Range = Request.headers.range;
-    Requests.push({ url: Request.url, range: Range || null, cors: Cors, cookie: !!Request.headers.cookie });
-    if(Range) {
-        const Match = /^bytes=(\d*)-(\d*)$/.exec(Range);
-        if(!Match) { Response.writeHead(416, Headers); Response.end(); return; }
-        const Start = Match[1] ? Number(Match[1]) : Math.max(0, Bytes.length - Number(Match[2]));
-        const End = Match[1] && Match[2] ? Math.min(Number(Match[2]), Bytes.length - 1) : Bytes.length - 1;
-        if(Start > End || Start >= Bytes.length) { Response.writeHead(416, Headers); Response.end(); return; }
-        Response.writeHead(206, { ...Headers, 'Content-Range': `bytes ${Start}-${End}/${Bytes.length}`, 'Content-Length': End - Start + 1 });
-        Response.end(Bytes.subarray(Start, End + 1));
-    } else { Response.writeHead(200, { ...Headers, 'Content-Length': Bytes.length }); Response.end(Bytes); }
-};
 const SignedServer = http.createServer((Request, Response) => {
     if(Request.method === 'OPTIONS') { Response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Range' }); Response.end(); return; }
     if(new URL(Request.url, 'http://localhost').searchParams.get('signature') !== 'fixture') { Response.writeHead(403, { 'Access-Control-Allow-Origin': HostOrigin }); Response.end(); return; }
-    sendBook(Request, Response, Reflow, true);
+    sendBook(Request, Response, Reflow, true, Requests);
 });
 const Server = http.createServer(async (Request, Response) => {
     try {
@@ -52,7 +38,7 @@ const Server = http.createServer(async (Request, Response) => {
         }
         if(Content.has(URLPath)) {
             if(!Request.headers.cookie?.includes('book-auth=granted')) { Response.writeHead(401); Response.end(); return; }
-            sendBook(Request, Response, Content.get(URLPath)); return;
+            sendBook(Request, Response, Content.get(URLPath), false, Requests); return;
         }
         if(['/vendor/bibi/presets/integration.js', '/alternate/bibi/presets/integration.js'].includes(URLPath)) {
             Response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });

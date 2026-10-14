@@ -53,7 +53,7 @@ export const createBucketAPI = (Bucket) => {
         if(!Session || Session !== Message.sessionId) return false;
         if(Message.bookKey) Identity = { bookKey: Message.bookKey, contentHash: Message.contentHash };
         if(Message.type === 'bibi:state-changed') updateState(Message.state);
-        else if(Message.type !== 'bibi:position-changed') return false;
+        else if(!['bibi:position-changed', 'bibi:host-navigation-changed'].includes(Message.type)) return false;
         Bucket.dispatch(Message.type, Message);
         return true;
     };
@@ -71,9 +71,11 @@ export const createBucketAPI = (Bucket) => {
         getState: () => request('getState'),
         getPosition: () => request('getPosition'),
         restorePosition: (Location, ExpectedIdentity) => request('restorePosition', { location: Location, identity: ExpectedIdentity }),
+        getHostNavigationState: () => request('getHostNavigationState'),
+        refreshHostNavigation: () => request('refreshHostNavigation'),
         subscribe: (Type, Listener) => {
             if(Disposed) throw failure('DISPOSED', 'The reader API has been disposed.');
-            if(!['bibi:state-changed', 'bibi:position-changed'].includes(Type) || typeof Listener !== 'function') throw new TypeError('Use a public state or position event and a listener.');
+            if(!['bibi:state-changed', 'bibi:position-changed', 'bibi:host-navigation-changed'].includes(Type) || typeof Listener !== 'function') throw new TypeError('Use a public reader event and a listener.');
             const Handler = Event => Listener(Event.detail);
             const Unsubscribe = () => { Bucket.Receiver.removeEventListener(Type, Handler); Subscriptions.delete(Unsubscribe); };
             Bucket.Receiver.addEventListener(Type, Handler); Subscriptions.add(Unsubscribe);
