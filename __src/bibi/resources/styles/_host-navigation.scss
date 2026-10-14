@@ -1,0 +1,81 @@
+@use "&globals" as *;
+
+html#bibi .bibi-host-navigation-page {
+    box-sizing: border-box;
+    position: fixed;
+    z-index: $INVARIABLE__Panel_ZIndex - 1;
+    inset: var(--bibi-menu-offset, 39px) 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem max(2rem, var(--bibi-safe-area-right, 0px)) max(2rem, env(safe-area-inset-bottom, 0px)) max(2rem, var(--bibi-safe-area-left, 0px));
+    text-align: center;
+    color: var(--bibi-host-navigation-color, #20242a);
+    background: var(--bibi-host-navigation-background, #fff);
+    h2 { margin: 0; font-size: 1.5rem; }
+    p { margin: 0; overflow-wrap: anywhere; }
+    .bibi-host-navigation-hint { max-width: 36rem; font-size: .875rem; }
+    button {
+        padding: .75rem 1.25rem;
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: 1px solid currentColor;
+        border-radius: .375rem;
+        cursor: pointer;
+        &:disabled { opacity: .5; cursor: wait; }
+        &:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+    }
+    &[hidden] { display: none; }
+}
+
+html#bibi div#bibi-menu-l ul.bibi-host-return-group {
+    margin-left: .5rem;
+    li.bibi-buttonbox { width: auto; }
+    button {
+        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-width: 3.25rem;
+        padding: 0 .5rem;
+        border: 1px solid currentColor;
+        border-radius: .25rem;
+        font: inherit;
+        font-size: 14px;
+        color: var(--bibi-host-return-color, #3d4653);
+        background: transparent;
+        cursor: pointer;
+        white-space: nowrap;
+        &:disabled { opacity: .5; cursor: wait; }
+        &:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    }
+}
+
+html#bibi p#bibi-host-navigation-error {
+    box-sizing: border-box;
+    position: fixed;
+    z-index: $INVARIABLE__Menu_ZIndex - 1;
+    top: var(--bibi-menu-offset, 39px);
+    left: var(--bibi-safe-area-left, 0px);
+    right: var(--bibi-safe-area-right, 0px);
+    margin: 0;
+    padding: .75rem;
+    color: var(--bibi-host-navigation-error-color, #8c1d18);
+    background: var(--bibi-host-navigation-error-background, #fff1ef);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    &[hidden] { display: none; }
+}
+
+@media (prefers-color-scheme: dark) {
+    html#bibi .bibi-host-navigation-page {
+        color: var(--bibi-host-navigation-color, #eef0f4);
+        background: var(--bibi-host-navigation-background, #151820);
+    }
+    html#bibi div#bibi-menu-l ul.bibi-host-return-group button { color: var(--bibi-host-return-color, #eef0f4); }
+}

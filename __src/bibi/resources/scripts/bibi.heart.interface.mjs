@@ -520,6 +520,7 @@ I.ResizeObserver = { create: () => {
         addEventListener: (fn) => {
             screen.orientation?.addEventListener ? screen.orientation.addEventListener('change', fn) : window.addEventListener('orientationchange', fn);
             window.addEventListener('resize', fn);
+            window.visualViewport?.addEventListener('resize', fn);
         }
     };
     E.bind('bibi:opened', () => ResizeObserver.addEventListener(ResizeObserver.onResize));
@@ -922,7 +923,7 @@ I.WheelObserver = { create: () => {
             // Axis != PEve.Axis -> '' (turn)
             // (else) -> '' (keep or slow-down)
             if(!PEve || (Axis == PEve.Axis && Move - PEve.Move > 4)) switch(ToDo) {
-                case 'move':      return WheelObserver.move(C.d2d(Dir, 'Allow Orthogonal Direction'));
+                case 'move':      return WheelObserver.move(C.d2d(Dir, 'Allow Orthogonal Direction'), Eve);
                 case 'utilities': return WheelObserver.toggleUtilities();
                 case 'switch':    return WheelObserver.switchAxis();
             }
@@ -952,9 +953,9 @@ I.WheelObserver = { create: () => {
             case 'X': return R.Main.scrollTop  += Eve.deltaX;
             case 'Y': return R.Main.scrollLeft += Eve.deltaY * (S.ARD == 'rtl' ? -1 : 1);
         } },
-        move: (Distance) => {
+        move: (Distance, InputEvent) => {
             WheelObserver.heat();
-            I.Flipper.flip(Distance, I.isScrollable() && I.draggable() ? { Duration: 333 } : null);
+            I.Flipper.flip(Distance, { Duration: I.isScrollable() && I.draggable() ? 333 : undefined, InputEvent });
         },
         toggleUtilities: () => {
             WheelObserver.heat();
@@ -1136,7 +1137,7 @@ I.KeyObserver = { create: () => { if(!S['use-keys']) return;
             new Promise((resolve, reject) => { switch(typeof KeyParameter) {
                 case 'number': if(I.Flipper.isAbleToFlip(KeyParameter)) {
                     if(I.Arrows) E.dispatch(I.Arrows[KeyParameter], 'bibi:singletapped');
-                    return I.Flipper.flip(KeyParameter, Eve.Staccato > 1 ? { Duration: 0 } : null).then(resolve);
+                    return I.Flipper.flip(KeyParameter, { Duration: Eve.Staccato > 1 ? 0 : undefined, InputEvent: Eve }).then(resolve);
                 } break;
                 case 'string': switch(KeyParameter) {
                     case 'head': case 'foot': return R.focusOn(KeyParameter, { Duration: 0 }).then(resolve);
@@ -1203,10 +1204,8 @@ I.Tracer = { create: () => {
             }
             return false;
         },
-        getDirection: (BibiEvent) => { switch(S.ARA) {
-            case 'horizontal': return BibiEvent.Division.X != 'center' ? BibiEvent.Division.X : BibiEvent.Division.Y;
-            case 'vertical'  : return BibiEvent.Division.Y != 'middle' ? BibiEvent.Division.Y : BibiEvent.Division.X;
-        }}
+        getDirection: BibiEvent => BibiEvent.Division.X !== 'center' ? BibiEvent.Division.X : BibiEvent.Division.Y,
+        getDistance: BibiEvent => C.d2d(Tracer.getDirection(BibiEvent), BibiEvent.Division.X !== 'center' || I.orthogonal('edgetap') === 'move')
     };
     ['bibi:tapped', 'bibi:singletapped', 'bibi:doubletapped', 'bibi:tripletapped'].forEach(EN => {
         E.add(EN, BibiEvent => {
@@ -1224,10 +1223,10 @@ I.Tracer = { create: () => {
                 if(!Tracer.checkSelectionStatus(BibiEvent)) return;
                 if(BibiEvent.Division.X == 'center' && BibiEvent.Division.Y == 'middle') return I.Utilities.toggleGracefuly();
                 if(Tracer.checkFlipperAvailability(BibiEvent)) {
-                    const Dir = Tracer.getDirection(BibiEvent), Ortho = I.orthogonal('edgetap'), Dist = C.d2d(Dir, Ortho == 'move');
+                    const Dir = Tracer.getDirection(BibiEvent), Ortho = I.orthogonal('edgetap'), Dist = Tracer.getDistance(BibiEvent);
                     if(Dist) {
                         if(I.Flipper.isAbleToFlip(Dist)) {
-                            I.Flipper.flip(Dist, BibiEvent.Staccato > 1 ? { Duration: 0 } : null);
+                            I.Flipper.flip(Dist, { Duration: BibiEvent.Staccato > 1 ? 0 : undefined, InputEvent: BibiEvent });
                             if(I.Arrows) E.dispatch(I.Arrows[Dist], 'bibi:singletapped');
                         }
                     } else {
@@ -1302,6 +1301,7 @@ I.Flipper = { create: () => {
         PreviousDistance: 0,
         Back: { Distance: -1 }, Forward: { Distance: 1 },
         isAbleToFlip: (Distance) => {
+            if(Bibi.HostNavigation?.canHandle(Distance)) return true;
             if(L.Opened && !I.OpenedSubpanel && typeof (Distance * 1) == 'number' && Distance) {
                 if(!I.PageObserver.Current.List.length) I.PageObserver.updateCurrent();
                 if(I.PageObserver.Current.List.length) {
@@ -1316,6 +1316,7 @@ I.Flipper = { create: () => {
         },
         flip: (Distance, Opt) => {
             if(typeof (Distance *= 1) != 'number' || !isFinite(Distance) || Distance === 0) return Promise.resolve();
+            if(Bibi.HostNavigation?.advance(Distance, Opt?.InputEvent)) return Promise.resolve();
             I.ScrollObserver.forceStopScrolling();
             if(B.PrePaginated) { // Preventing flicker.
                 const C0 = I.PageObserver.Current.List[0], C1 = I.PageObserver.Current.List.slice(-1)[0];

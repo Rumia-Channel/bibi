@@ -1,6 +1,7 @@
 // Heart of Bibi — Events (split from bibi.heart.js; peers via shared context, no cycles)
 
 import { O, R, I, S, E, X } from './bibi.heart.context.mjs';
+import { getPageTapDivision } from './bibi.heart.hitregions.mjs';
 
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
@@ -81,56 +82,17 @@ E.aBCD = (Eve) => { // add Bibi's Collections of Data (formerly: add Bibi-Coord/
             Coord.X -= O.Body.scrollLeft;
             Coord.Y -= O.Body.scrollTop;
         } else {
-            const Main = R.Main;
-            //const MainTransformation = I.Loupe.CurrentTransformation || { Scale: 1, TranslateX: 0, TranslateY: 0 };
-            const MainTransformation = I.Loupe.CurrentTransformation ? I.Loupe.getActualTransformation() : { Scale: 1, TranslateX: 0, TranslateY: 0 };
-            const MainScale = MainTransformation.Scale;
-            const MainTransformOriginX_InMain = Main.offsetWidth  / 2;
-            const MainTransformOriginY_InMain = Main.offsetHeight / 2;
-            const MainTranslationX = MainTransformation.TranslateX;
-            const MainTranslationY = MainTransformation.TranslateY;
             const Item = Doc.documentElement.Item;
-            const ItemScale = Item.Scale;
-            const ItemCoordInMain = O.getElementCoord(Item, Main);
-            if(!Item.NoPadding && !Item.Outsourcing) ItemCoordInMain.X += Item.Padding.Left, ItemCoordInMain.Y += Item.Padding.Top;
-            Coord.X = Math.floor(Main.offsetLeft + ((MainTransformOriginX_InMain + MainTranslationX) + ((((ItemCoordInMain.X + (Coord.X * ItemScale)) - Main.scrollLeft) - MainTransformOriginX_InMain) * MainScale)));
-            Coord.Y = Math.floor(Main.offsetTop  + ((MainTransformOriginY_InMain + MainTranslationY) + ((((ItemCoordInMain.Y + (Coord.Y * ItemScale)) - Main.scrollTop ) - MainTransformOriginY_InMain) * MainScale)));
-            //                  (MainCoord       + ((MainTransformOrigin_in_Main + MainTranslation ) + ((((ItemCoord_in_Main + Coord_in_Item        ) - ScrolledLength ) - MainTransformOrigin_in_Main) * MainScale)))
-            //                  (MainCoord       + ((MainTransformOrigin_in_Main + MainTranslation ) + (((Coord_in_Main                               - ScrolledLength ) - MainTransformOrigin_in_Main) * MainScale)))
-            //                  (MainCoord       + ((MainTransformOrigin_in_Main + MainTranslation ) + ((Coord_in_Viewport_of_Main                                       - MainTransformOrigin_in_Main) * MainScale)))
-            //                  (MainCoord       + ((MainTransformOrigin_in_Main + MainTranslation ) + (Coord_from_MainTransformOrigin_in_Main                                                          * MainScale)))
-            //                  (MainCoord       + (MainTransformOrigin_in_Translated-Main           + Coord_from_TransformOrigin_in_Scaled-Main                                                                    ))
-            //                  (MainCoord       + Coord_in_Transformed-Main                                                                                                                                         )
-            //                  Coord
+            const Rect = Item.getBoundingClientRect();
+            // Events already use the iframe viewport's CSS pixels, not the original EPUB page size.
+            // The iframe's actual rectangle also includes reader zoom and the scroll frame offset.
+            Coord.X = Rect.left + (Item.clientLeft + Coord.X - Doc.defaultView.scrollX) * Rect.width / Item.offsetWidth;
+            Coord.Y = Rect.top + (Item.clientTop + Coord.Y - Doc.defaultView.scrollY) * Rect.height / Item.offsetHeight;
         }
         return Coord;
     };
 
-    E.aBCD.getDivision = (Coord) => {
-        const FlipperWidth = S['flipper-width'];
-        const Ratio = {
-            X: Coord.X / window.innerWidth,
-            Y: Coord.Y / window.innerHeight
-        };
-        let BorderT, BorderR, BorderB, BorderL;
-        if(FlipperWidth < 1) { // Ratio
-            BorderL = BorderT =     FlipperWidth;
-            BorderR = BorderB = 1 - FlipperWidth;
-        } else { // Pixel to Ratio
-            BorderL = FlipperWidth / window.innerWidth;
-            BorderT = FlipperWidth / window.innerHeight;
-            BorderR = 1 - BorderL;
-            BorderB = 1 - BorderT;
-        }
-        const Division = { /* 9: 5 */ };
-             if(Ratio.X < BorderL          ) Division.X = 'left';//,   Division[9] -= 1;
-        else if(          BorderR < Ratio.X) Division.X = 'right';//,  Division[9] += 1;
-        else                                 Division.X = 'center';
-             if(Ratio.Y < BorderT          ) Division.Y = 'top';//,    Division[9] -= 3;
-        else if(          BorderB < Ratio.Y) Division.Y = 'bottom';//, Division[9] += 3;
-        else                                 Division.Y = 'middle';
-        return Division;
-    };
+    E.aBCD.getDivision = Coord => getPageTapDivision(Coord, window.innerWidth, window.innerHeight, R.Stage?.Width ? R.Stage.Width / (R.TwoPane ? 2 : 1) : window.innerWidth, S['flipper-width']);
 
 
 

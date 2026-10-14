@@ -92,7 +92,8 @@ Bibi.SettingTypes_PresetOnly = {
         'use-textsetter',
         'recognize-repeated-taps-separately',
         'remove-bibi-website-link',
-        'request-with-credentials'
+        'request-with-credentials',
+        'use-host-navigation'
     ],
     'yes-no': [
         'accept-local-file',
@@ -104,7 +105,8 @@ Bibi.SettingTypes_PresetOnly = {
         'default-reader-view-mode',
         'website-name-in-title',
         'website-name-in-menu',
-        'website-href'
+        'website-href',
+        'host-navigation-api'
     ],
     'integer': [
         'max-bookmarks',
@@ -117,7 +119,8 @@ Bibi.SettingTypes_PresetOnly = {
         'extensions',
         'extract-if-necessary',
         'inhibit',
-        'trustworthy-origins'
+        'trustworthy-origins',
+        'host-navigation-paths'
     ]
 };
 
@@ -143,7 +146,8 @@ Bibi.SettingTypes_UserOnly = {
         'storage-user',
         'location',
         'sugar-for-biscuits',
-        'ui-language'
+        'ui-language',
+        'host-return-to'
     ],
     'integer': [
         'log',
@@ -288,6 +292,7 @@ Bibi.ring = () => Promise.resolve().then(() => {
 Bibi.hello = () => {
     D.at1st();
     U.at1st();
+    Bibi.HostNavigationPresetTrusted = !!D['preset'] || !!document.getElementById('bibi-preset');
     const Promises = [];
     if(!document.getElementById('bibi-preset')) {
         const PresetName = D['preset'] || U['preset'] || 'default';
@@ -422,6 +427,8 @@ Bibi.initialize = async () => {
         SC.removeAttribute('style');
         I.Slider.Size = S['use-slider' ] ? parseFloat(SCCS.width)  : 0;
         I.Menu.Height = S['use-menubar'] ? parseFloat(SCCS.height) : 0;
+        O.HTML.style.setProperty('--bibi-menu-base-height', SCCS.height);
+        O.HTML.style.setProperty('--bibi-slider-size', SCCS.width);
         O.getSafeArea = () => O.Embedded ? { Top: 0, Right: 0, Bottom: 0, Left: 0 } : { Top: parseFloat(SCCS.paddingTop), Right: parseFloat(SCCS.paddingRight), Bottom: parseFloat(SCCS.paddingBottom), Left: parseFloat(SCCS.paddingLeft) };
         Object.defineProperty(O, 'SafeArea', { get: O.getSafeArea });
         // delete document.body.removeChild(SC);

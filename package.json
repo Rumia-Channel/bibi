@@ -1,6 +1,6 @@
 {
   "name": "bibi",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "author": {
     "name": "Satoru Matsushima"
   },
@@ -45,7 +45,7 @@
     "demo": "bun run build@wbck && bun run serve",
     "start": "bun run serve",
     "test": "bun test",
-    "test:browser": "node tests/browser/integration.mjs",
+    "test:browser": "node tests/browser/integration.mjs && node tests/browser/host-navigation.mjs",
     "verify:dist": "bun zzz/distribution.mjs verify __dist/bibi"
   },
   "devDependencies": {

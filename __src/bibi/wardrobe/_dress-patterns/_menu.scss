@@ -70,7 +70,7 @@ div#bibi-menu-r, .bibi-extramenu-r {
 div#bibi-menu-l, .bibi-extramenu-l {
 	ul {
 		&:first-child       { padding-left: $Menu-ButtonGroup_Padding; }
-		&:not(:first-child) { padding-left: $Menu-ButtonGroup_Padding$Menu-ButtonGroup_Padding + $Menu-ButtonGroup-Separator_Width; }
+        &:not(:first-child) { padding-left: $Menu-ButtonGroup_Padding + $Menu-ButtonGroup-Separator_Width; }
 		&:not(.bibi-buttongroup-tiled) li {
 			&:not(:first-child) { margin-left: $Menu-ButtonGroup-Button_Margin; }
 		}
