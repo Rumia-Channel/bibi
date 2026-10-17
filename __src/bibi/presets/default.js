@@ -82,7 +82,7 @@ Bibi.preset({
 "item-padding-left"          : 24, // Number of pixels // It affects only for reflowable books.
 "item-padding-right"         : 24, // Number of pixels // It affects only for reflowable books.
 "item-padding-top"           : 48, // Number of pixels // It affects only for reflowable books.
-"item-padding-bottom"        : 24, // Number of pixels // It affects only for reflowable books.
+"item-padding-bottom"        : 48, // Number of pixels // It affects only for reflowable books.
 
 "concatenate-spreads"        : ["auto", "auto"], // ["auto" | "never" | "always", "auto" | "never" | "always"] // It affects only for fixed-layout books in the "horizontal"/"vertical" scroll view modes.
 //                             ^ Each item of the arrays corresponds to the view mode:

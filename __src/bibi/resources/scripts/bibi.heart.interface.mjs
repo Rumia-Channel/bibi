@@ -1489,6 +1489,12 @@ I.Menu = { create: () => {
         Menu.addEventListener('pointerover', console.log);
     }*/
     if(!O.TouchOS) E.add('bibi:opened', () => {
+        const unhoverMenu = () => {
+            clearTimeout(Menu.Timer_close);
+            E.dispatch(Menu, 'bibi:unhovered');
+        };
+        Menu.addEventListener('mouseleave', unhoverMenu);
+        window.addEventListener('blur', unhoverMenu);
         E.add('bibi:moved-pointer', BibiEvent => {
             if(I.isPointerStealth()) return false;
             clearTimeout(Menu.Timer_close);
