@@ -22,6 +22,19 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.2.1
+
+This patch fixes reader layout and menubar visibility without changing the schemaVersion 1 reading-position or host-navigation APIs:
+
+* Fractional-width panes no longer enter orthogonal-flow gutter pagination and push title-page content out of view.
+* Native horizontal-text figures retain publisher-defined sizing, alignment, spacing, and flow; foreign wrapper margins are reset only for adopted illustrations.
+* Fitted single-picture covers use image-page navigation and stay centered in their standalone opening instead of exposing the following page.
+* Moving out of the menubar or switching away from the reader clears hover-only visibility so the controls do not remain stuck on screen.
+* Reflowable books default to 48px of padding at both the top and bottom, for vertical and horizontal text. Left/right padding remains 24px; fixed-layout pages are unchanged.
+
+The reader and `zzz` packages are versioned `2.2.1`; `bun run archive` generates `Bibi-v2.2.1.zip`.
+
+
 ### v2.2.0
 
 This release preserves the schemaVersion 1 reading-position API and adds host-controlled volume navigation:
@@ -31,7 +44,7 @@ This release preserves the schemaVersion 1 reading-position API and adds host-co
 * Only a document-pinned or preloaded preset can enable host navigation. URL-selected presets, ordinary readers and iframe readers cannot enable it.
 * The toolbar and reader geometry account for safe-area insets and the visual viewport. Page-sized tap bands use each outer page's third: each viewport sixth in two-pane mode, each third in single-pane mode.
 
-The reader and `zzz` packages are versioned `2.2.0`; `bun run archive` generates `Bibi-v2.2.0.zip`. The complete deployment/API contract is [HOST_SERIES_NAVIGATION_ja.md](HOST_SERIES_NAVIGATION_ja.md).
+The complete deployment/API contract is [HOST_SERIES_NAVIGATION_ja.md](HOST_SERIES_NAVIGATION_ja.md).
 
 
 ### Table of Contents
@@ -150,6 +163,8 @@ Eligibility uses the rendered prose's occupied width and page bands, not a chara
 Reflowable books may declare individual illustration pages `pre-paginated`, even with `spread-none` and a centered page spread; those standalone portraits remain eligible. An adopted illustration's emptied source page is removed from the physical scroll flow. Pane widths use the current page band, not the auto-sized body's previous image width.
 This is atomic pane placement, not unrestricted floating: landscape illustrations, small inline images, wholly fixed-layout books, covers, explicit multi-page spreads, captioned figures, and headings/navigation without prose do not opt into portrait/prose adoption.
 Landscape illustrations can still use the full opening. Links to an adopted illustration's original EPUB spine entry remain usable.
+Small inline images retain publisher-defined spacing across relayouts; only adopted illustrations have their foreign wrapper margins reset. Fractional-width horizontal-text panes use normal pagination rather than orthogonal-flow gutters.
+Native horizontal-text figures are not converted into picture panes. Fitted single-picture covers remain centered when opened or revisited, even inside a reflowable book.
 
 
 

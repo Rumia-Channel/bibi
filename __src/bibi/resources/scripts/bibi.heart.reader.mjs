@@ -294,7 +294,7 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             let ENatB = 0, ENatL = 0;
             const SvgSize = svgNaturalSize(Ele); // vector first: a % -sized svg reports a transient layout box, not its intrinsic size
             if(SvgSize) { ENatB = (C.L_SIZE_B == 'Width' ? SvgSize[0] : SvgSize[1]); ENatL = (C.L_SIZE_L == 'Width' ? SvgSize[0] : SvgSize[1]); }
-            if(!(ENatB > 0) || !(ENatL > 0)) { ENatB = Ele['offset' + C.L_SIZE_B]; ENatL = Ele['offset' + C.L_SIZE_L]; }
+            if(!(ENatB > 0) || !(ENatL > 0)) { const Rect = Ele.getBoundingClientRect(); ENatB = Rect[C.L_SIZE_b]; ENatL = Rect[C.L_SIZE_l]; } // fractional publisher sizes must not be rounded up into a false overflow
             if(!(ENatB > 0) || !(ENatL > 0)) { const NW = Ele.naturalWidth, NH = Ele.naturalHeight; if(NW > 0 && NH > 0) { ENatB = (C.L_SIZE_B == 'Width' ? NW : NH); ENatL = (C.L_SIZE_L == 'Width' ? NW : NH); } } // unreadable layout size (transient zero during reflow): fit off natural instead of skipping into stale (result stays EMax-bounded either way)
             const EFitRatio = Math.min(EMaxB / ENatB, EMaxL / ENatL);
             if(EFitRatio < 1) sML.style(Ele, { width: 'auto', height: 'auto',
@@ -322,7 +322,8 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
             if(!Tar.BibiDefaultBreaks) { Tar.BibiDefaultBreaks = {}; ZoneProperties.forEach(Pro => Tar.BibiDefaultBreaks[Pro] = Tar.style[Pro] || ''); }
             else Object.keys(Tar.BibiDefaultBreaks).forEach(Pro => Tar.style[Pro] = Tar.BibiDefaultBreaks[Pro]);
             if(Ele !== Tar) { if(!Ele.BibiDefaultBreaks) { Ele.BibiDefaultBreaks = {}; ['display', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight'].forEach(Pro => Ele.BibiDefaultBreaks[Pro] = Ele.style[Pro] || ''); } else Object.keys(Ele.BibiDefaultBreaks).forEach(Pro => Ele.style[Pro] = Ele.BibiDefaultBreaks[Pro]); } // size props (width/max*) deliberately unrestored: fit recomputes them every pass from pristine (its own restore); restoring here would clobber fresh fit values with first-pass ones across resizes
-            for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // adopted solos smuggle converter margins (calibre .calibre2{margin-top:5%;margin-bottom:3%}) into foreign flows: neutralize the wrapper chain so adopted and native pictures share one geometry
+            if(ItemLineAxis == 'horizontal' && !Ele.BibiAdoptedPicture) return; // horizontal publisher layouts keep their native image flow, alignment, and breaks
+            if(Ele.BibiAdoptedPicture) for(let CE = Ele; CE && CE !== Item.Body; CE = CE.parentElement) { CE.style.marginTop = CE.style.marginBottom = CE.style.marginLeft = CE.style.marginRight = '0'; if(CE === Tar) break; } // only adopted pictures need their foreign wrapper margins neutralized; native pictures retain publisher spacing
             if(/^img$/i.test(Ele.tagName) || /^svg$/i.test(Ele.tagName)) { if(R.singleMediaIsBig(Ele) === false) return; } // 384x384 and below stay in flow
             if(/^img$/i.test(Ele.tagName) && R.singleMediaIsBig(Ele) === null && !(Ele.naturalWidth > 0)) Ele.addEventListener('load', () => { if(!R.LayingOut) R.layOutItem(Item).catch(() => {}); else R.requestTwoPaneRegroup(); }, { once: true }); // verdict pending: re-render (and regroup) once real dimensions arrive
             if(!Paged) return;
@@ -374,7 +375,8 @@ R.renderReflowableItem = (Item) => new Promise(resolve => {
         if(Item.OFREs.length) Item.OFREs.forEach(OFRE => sML.style(OFRE, OFRE.BibiOFREOriginalStyleWidthHeight));
     }
     if(!Item.Outsourcing) {
-        if(S.RVM == 'paged' && Item.HTML['offset'+ C.L_SIZE_L] > PageCL && (Item.WritingMode.split('-')[1] == 'tb' || S['pagination-method'] == 'x')) {
+        // Gutter pagination is only for orthogonal flows; CSSOM dimensions round fractional pane widths to integers.
+        if(S.RVM == 'paged' && S.SLA != ItemLineAxis && Item.HTML['offset'+ C.L_SIZE_L] > Math.round(PageCL) && (Item.WritingMode.split('-')[1] == 'tb' || S['pagination-method'] == 'x')) {
             // reader-view-mode: paged, spread-layout-axis: vertical,   Item.WritingMode: **-tb                       ... horizontal-text item in vertical-text book
             // reader-view-mode: paged, spread-layout-axis: horizontal, Item.WritingMode: tb-**, pagination-method: x ... extra layout method for vertical-text book
             Item.HTML.classList.add('bibi-columned');
@@ -627,6 +629,7 @@ R.renderPrePaginatedItem = (Item) => new Promise(resolve => {
         if(!Media) return Vp;
         Doc.body.style.margin = '0';
         for(let El = Media; El && El !== Doc.body; El = El.parentElement) { El.style.marginTop = El.style.marginBottom = El.style.marginLeft = El.style.marginRight = '0'; }
+        Media.style.display = 'block'; // a fitted single picture has no text baseline; inline SVG descent must not enlarge its viewport
         sML.style(Item, { display: 'block', width: Vp.Width + 'px', height: Vp.Height + 'px' }); // pre-size: % margins resolve against this
         const W = Math.ceil(Math.max(Vp.Width, Doc.documentElement.scrollWidth || 0, Doc.body.scrollWidth || 0));
         const H = Math.ceil(Math.max(Vp.Height, Doc.documentElement.scrollHeight || 0, Doc.body.scrollHeight || 0));
@@ -999,7 +1002,7 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
     R.Moving = true;
     let FocusPoint;
     const Page = Dest.Page, Item = Page.Item, Side = Opt.Side != 'after' ? 'before' : 'after';
-    if(Item.Reflowable) {
+    if(Item.Reflowable && !((Item.OnlySingleSVG || Item.OnlySingleImg) && Item.SingleMediaIsBig !== false && !Item.BibiDonationDonor)) {
         if(!R.Paginated && B.WritingMode.split('-')[1] == Item.WritingMode.split('-')[1] && (Dest.Range || (Dest.Element && Dest.Element.ownerDocument !== document))) {
             const Rect = Dest.Range ? Dest.Range.getBoundingClientRect() : Dest.Element.getBoundingClientRect();
             FocusPoint = O.getElementCoord(Item, R.Main)[C.L_AXIS_L] + (Item.NoPadding ? 0 : Item.Padding[C.L_OOBL_L]) + Rect[C.L_BASE_b];
