@@ -333,7 +333,7 @@ html.two-pane {
 	div.spread-box.two-pane-paired {
 		flex: 0 0 var(--bibi-pane-width); // the book can span many viewports horizontally
 		min-width: 0 !important; // beats book-type min-width:100vw (higher specificity, earlier source)
-		min-height: 0 !important; // beats book-type min-height:100vh
+		min-height: var(--bibi-pane-height) !important; // each opening reserves the full stage, even when both fitted pictures are shorter
 	}
 	&.spread-ttb.appearance-rtl div#bibi-main-book {
 		flex-direction: row-reverse;

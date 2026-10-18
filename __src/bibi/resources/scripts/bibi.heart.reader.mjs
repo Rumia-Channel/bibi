@@ -81,6 +81,7 @@ R.resetStage = () => {
     //R.Main.style['background'] = S['book-background'] ? S['book-background'] : '';
     R.TwoPane = S.RVM == 'paged' && S.ARA == 'horizontal' && R.isTwoPaneViewport(R.Stage.Width, R.Stage.Height); // paged 2-up only; scroll modes, vertical advance, and narrow viewports behave exactly as before
     R.Main.Book.style.setProperty('--bibi-pane-width', R.Stage.Width / 2 + 'px'); // half of the viewport, not half of the entire horizontal book strip
+    R.Main.Book.style.setProperty('--bibi-pane-height', R.Stage.Height + 'px');
     O.HTML.classList.toggle('two-pane', !!R.TwoPane);
 };
 
@@ -150,7 +151,7 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
     }
     const IsHead = Spread.Index == 0, IsFoot = Spread.Index == R.Spreads.length - 1;
     let PaddingBefore = 0, PaddingAfter = 0;
-    if(IsHead || IsFoot) {
+    if((IsHead || IsFoot) && !(R.TwoPane && Spread.PaneWidthFactor == 0.5)) { // paired edge pages are centered as an opening, not padded independently to a full stage
         const StageLength = R.Stage[C.L_SIZE_L], SpreadLength = SpreadSize[C.L_SIZE_L];
         let PaddingLength = 0;
         if(StageLength > SpreadLength) {
@@ -730,7 +731,7 @@ R.updateTwoPaneGrouping = () => {
         const Solo = (Sp.Items.length == 1) ? Sp.Items[0] : null;
         const pairable = R.isPairableSpread(Sp) && !R.isBlankPageContent(Solo);
         const Vp = Solo && Solo.Viewport;
-        const Aspect = (Vp && !Vp.IsSubstitute) ? [Vp.Width, Vp.Height] : (Solo ? R.getSingleMediaAspect(Solo) : null);
+        const Aspect = (Solo && Solo.SingleMediaIsBig === true ? R.getSingleMediaAspect(Solo) : null) || ((Vp && !Vp.IsSubstitute) ? [Vp.Width, Vp.Height] : null); // percentage-sized image viewports may only be the iframe's initial 300px width
         const BigEnough = (Vp && !Vp.IsSubstitute) ? true : (Solo ? Solo.SingleMediaIsBig === true : false); // media fallback counts only when resolved big; small stays pairable
         return { pairable: pairable, soloLandscape: !!(pairable && BigEnough && Aspect && R.shouldSoloLandscapeSpread(Aspect[0], Aspect[1], R.Stage.Width, R.Stage.Height)) };
     })) : Spreads.map((_, i) => [i]);
@@ -778,8 +779,10 @@ R.isTwoPanePairAligned = (Pair) => {
     if(!R.TwoPane || !Pair || Pair.length < 2) return true;
     try {
         const MR = R.Main.getBoundingClientRect();
-        const Rs = Pair.map(Sp => Sp.Box.getBoundingClientRect());
-        return Rs[0].left >= MR.left - 1 && Rs[Rs.length - 1].right <= MR.right + 1;
+        return Pair.every(Sp => {
+            const Rect = Sp.Box.getBoundingClientRect();
+            return Rect.left >= MR.left - 1 && Rect.right <= MR.right + 1 && Rect.top >= MR.top - 1 && Rect.bottom <= MR.bottom + 1;
+        });
     } catch(Err) { return true; }
 };
 R.snapTwoPaneView = (Tries = 3) => { // re-aim the current pair only when misaligned; retries converge transient geometry (progressive image loads), then stop
@@ -1022,9 +1025,9 @@ R.focusOn = (Par, Opt) => new Promise((resolve, reject) => { // Par = { Destinat
             else if(Side == 'after') FocusPoint += (Page['offset' + C.L_SIZE_L] - R.Stage[C.L_SIZE_L]) * C.L_AXIS_D;
         }
     }
-    if(R.TwoPane && Page.Spread.TwoPaneGroup && Page.Spread.TwoPaneGroup.length > 1 && !R.isTwoPanePairAligned(Page.Spread.TwoPaneGroup)) { // center the whole pair on box slots, never a half-shifted spread (skip when already aligned: no redundant scrolls, no event storms)
+    if(R.TwoPane && Page.Spread.TwoPaneGroup && Page.Spread.TwoPaneGroup.length > 1) { // either member targets the whole opening, including already visible pairs with unequal page heights
         const Pair = Page.Spread.TwoPaneGroup, PairL = (C.L_AXIS_L == 'X') ? Pair.reduce((L, Sp) => L + Sp.Box['offset' + C.L_SIZE_L], 0) : Math.max(...Pair.map(Sp => Sp.Box['offset' + C.L_SIZE_L]));
-        FocusPoint = O.getElementCoord(Pair[0].Box, R.Main)[C.L_AXIS_L];
+        FocusPoint = Math.min(...Pair.map(Sp => O.getElementCoord(Sp.Box, R.Main)[C.L_AXIS_L]));
         if(R.Stage[C.L_SIZE_L] >= PairL) FocusPoint -= Math.floor((R.Stage[C.L_SIZE_L] - PairL) / 2);
     }
     // if(Number.isInteger(Dest.TextNodeIndex)) R.selectTextLocation(Dest); // Colorize Destination with Selection

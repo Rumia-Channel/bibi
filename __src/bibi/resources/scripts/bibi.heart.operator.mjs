@@ -507,7 +507,7 @@ O.getViewportByViewBox = (Str) => {
 O.getViewportByImage = (Img) => {
     if(Img && /^img$/i.test(Img.tagName)) {
         const ImageStyle = getComputedStyle(Img);
-        return { Width: parseInt(ImageStyle.width), Height: parseInt(ImageStyle.height) };
+        return { Width: Math.ceil(parseFloat(ImageStyle.width)), Height: Math.ceil(parseFloat(ImageStyle.height)) }; // fractional image edges must fit inside the scaled viewport
     }
     return null;
 };

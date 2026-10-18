@@ -31,3 +31,25 @@ export const createLazyFixture = async () => {
     Zip.file('content/package.opf', Package, { date: DateOfFixture });
     return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
 };
+
+export const createOpeningFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    const Pictures = [
+        ['cover', 800, 1200], ['frontispiece', 1353, 1920],
+        ['landscape1', 1920, 1388], ['landscape2', 1920, 1378],
+        ['portrait1', 1000, 1200], ['portrait2', 1000, 1300]
+    ];
+    const Chapters = [...Pictures.map(([Id]) => Id), 'notice', 'prologue', 'prose'];
+    add('mimetype', 'application/epub+zip');
+    add('META-INF/container.xml', '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="content/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    add('content/package.opf', `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">opening-layout-fixture</dc:identifier><dc:title>口絵の順送り</dc:title><dc:language>ja</dc:language><meta name="primary-writing-mode" content="vertical-rl"/><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>${Chapters.map(Id => `<item id="${Id}" href="${Id}.xhtml" media-type="application/xhtml+xml"/>`).join('')}${Pictures.map(([Id]) => `<item id="${Id}-art" href="${Id}.svg" media-type="image/svg+xml"/>`).join('')}</manifest><spine page-progression-direction="rtl">${Chapters.map(Id => `<itemref idref="${Id}"/>`).join('')}</spine></package>`);
+    add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="prose.xhtml#prose">本文</a></li></ol></nav></body></html>');
+    Pictures.forEach(([Id, Width, Height]) => {
+        add(`content/${Id}.xhtml`, `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>${Id}</title><style>body{text-align:center}.page{font-size:0.125em;height:100%;width:100%}img{width:100%}</style></head><body><div class="page"><img src="${Id}.svg" alt="${Id}"/></div></body></html>`);
+        add(`content/${Id}.svg`, `<svg xmlns="http://www.w3.org/2000/svg" width="${Width}" height="${Height}" viewBox="0 0 ${Width} ${Height}"><rect x="4" y="4" width="${Width - 8}" height="${Height - 8}" fill="#dddddd" stroke="#444444" stroke-width="8"/><text x="40" y="100" font-size="60">${Id}</text></svg>`);
+    });
+    add('content/notice.xhtml', xhtml('注意書き', '<p id="notice">本電子書籍は縦書きでレイアウトされています。</p>', true));
+    add('content/prologue.xhtml', xhtml('プロローグ', '<p id="prologue">長い夢を見ていた気がする。</p>', true));
+    add('content/prose.xhtml', xhtml('本文', `<p id="prose">${LongText}</p>`, true));
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
