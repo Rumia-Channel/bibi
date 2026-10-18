@@ -22,6 +22,16 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.2.2
+
+This patch fixes front-matter illustrations and paired-page navigation without changing the schemaVersion 1 reading-position or host-navigation APIs:
+
+* Percentage-width front matter classifies wide illustrations by their intrinsic size, not a transient iframe width; fitted image bounds round outward to prevent clipped edges.
+* Paired pages reserve a full-height opening and focus together, including at the end of a book, keeping unequal-height pictures visible and forward/backward page turns in order.
+
+The reader and `zzz` packages are versioned `2.2.2`; `bun run archive` generates `Bibi-v2.2.2.zip`.
+
+
 ### v2.2.1
 
 This patch fixes reader layout and menubar visibility without changing the schemaVersion 1 reading-position or host-navigation APIs:
@@ -31,8 +41,6 @@ This patch fixes reader layout and menubar visibility without changing the schem
 * Fitted single-picture covers use image-page navigation and stay centered in their standalone opening instead of exposing the following page.
 * Moving out of the menubar or switching away from the reader clears hover-only visibility so the controls do not remain stuck on screen.
 * Reflowable books default to 48px of padding at both the top and bottom, for vertical and horizontal text. Left/right padding remains 24px; fixed-layout pages are unchanged.
-
-The reader and `zzz` packages are versioned `2.2.1`; `bun run archive` generates `Bibi-v2.2.1.zip`.
 
 
 ### v2.2.0
@@ -165,6 +173,7 @@ This is atomic pane placement, not unrestricted floating: landscape illustration
 Landscape illustrations can still use the full opening. Links to an adopted illustration's original EPUB spine entry remain usable.
 Small inline images retain publisher-defined spacing across relayouts; only adopted illustrations have their foreign wrapper margins reset. Fractional-width horizontal-text panes use normal pagination rather than orthogonal-flow gutters.
 Native horizontal-text figures are not converted into picture panes. Fitted single-picture covers remain centered when opened or revisited, even inside a reflowable book.
+Standalone picture classification uses intrinsic media dimensions even when the EPUB sets the image width to `100%`. Paired pages share a stage-height opening; focusing either member keeps both pages in view.
 
 
 

@@ -38,7 +38,7 @@
     },
     "zzz": {
       "name": "zzz",
-      "version": "2.2.1",
+      "version": "2.2.2",
       "bin": "cli.mjs",
       "dependencies": {
         "archiver": "^8.0.0",

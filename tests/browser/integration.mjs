@@ -5,16 +5,16 @@ import os from 'node:os';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { createReflowFixture, createLazyFixture, LongText, TailText } from './fixtures.mjs';
+import { createReflowFixture, createLazyFixture, createOpeningFixture, LongText, TailText } from './fixtures.mjs';
 import { sendBook } from './book-server.mjs';
 import { verifyDistribution } from '../../zzz/distribution.mjs';
 
 const Repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const Distribution = path.join(Repository, '__dist/bibi');
 await verifyDistribution(Distribution);
-const Reflow = await createReflowFixture(), Vertical = await createReflowFixture(true), IllustrationFlow = await createReflowFixture(true, true), Lazy = await createLazyFixture();
+const Reflow = await createReflowFixture(), Vertical = await createReflowFixture(true), IllustrationFlow = await createReflowFixture(true, true), Lazy = await createLazyFixture(), Opening = await createOpeningFixture();
 const Fixed = await fs.readFile(path.join(Repository, '__src/bibi-bookshelf/__samples/Sample_Pre-Paginated_LtR.epub'));
-const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/fixed.epub', Fixed]]);
+const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/opening.epub', Opening], ['/epubs/fixed.epub', Fixed]]);
 const Requests = [], Errors = [], Results = [];
 let HostOrigin, SignedOrigin, Browser, Page;
 const Temp = await fs.mkdtemp(path.join(os.tmpdir(), 'bibi-browser-'));
@@ -273,6 +273,47 @@ try {
         await Page.evaluate(Index => window.readers[Index].move(1), Reader);
         await assertAligned();
         await Page.screenshot({ path: path.join(Temp, 'viewport-alignment.png') });
+        await remove(Reader);
+        await Page.setViewportSize(PreviousViewport);
+    });
+    await scenario('percentage-width front matter stays contained and turns in opening order', async () => {
+        const PreviousViewport = Page.viewportSize();
+        await Page.setViewportSize({ width: 1280, height: 900 });
+        Reader = await open({ book: '/epubs/opening.epub', 'book-key': 'opening', 'content-hash': 'opening-1', 'resume-from-last-position': 'no', 'keep-settings': 'no' });
+        const Frame = await readerFrame(Reader);
+        const assertOpening = async Expected => {
+            await Frame.waitForFunction(Expected => Expected.every(Index => R.Current.Pages.some(Page => Page.Item.Index === Index)) && !R.Moving && !R.TwoPaneRelaying, Expected);
+            const Geometry = await Frame.evaluate(() => {
+                const Main = R.Main.getBoundingClientRect();
+                return {
+                    viewport: { left: Main.left, top: Main.top, right: Main.right, bottom: Main.bottom },
+                    pages: R.Current.Pages.map(Page => Page.Item.Index),
+                    pictures: R.Current.Items.flatMap(Item => [...Item.contentDocument.querySelectorAll('img')].map(Image => {
+                        const Rect = Image.getBoundingClientRect(), Box = Item.getBoundingClientRect();
+                        return { item: Item.Index, left: Box.left + Rect.left * Item.Scale, top: Box.top + Rect.top * Item.Scale, right: Box.left + Rect.right * Item.Scale, bottom: Box.top + Rect.bottom * Item.Scale };
+                    }))
+                };
+            });
+            assert.deepEqual(Geometry.pages, Expected, JSON.stringify(Geometry));
+            assert.deepEqual(Geometry.pictures.map(Picture => Picture.item), Expected.filter(Index => Index < 6), JSON.stringify(Geometry));
+            for(const Picture of Geometry.pictures) assert.ok(Picture.left >= Geometry.viewport.left - 1 && Picture.top >= Geometry.viewport.top - 1 && Picture.right <= Geometry.viewport.right + 1 && Picture.bottom <= Geometry.viewport.bottom + 1, JSON.stringify(Geometry));
+        };
+        const Openings = [[0], [1], [2], [3], [4, 5], [6, 7], [8]];
+        await assertOpening(Openings[0]);
+        for(const Expected of Openings.slice(1)) {
+            await Page.evaluate(Index => window.readers[Index].move(1), Reader);
+            await assertOpening(Expected);
+        }
+        await textVisible(Reader, 'prose', 0);
+        for(const Expected of Openings.slice(0, -1).reverse()) {
+            await Page.evaluate(Index => window.readers[Index].move(-1), Reader);
+            await assertOpening(Expected);
+        }
+        for(const ItemIndex of [4, 5]) {
+            await restore(Reader, { cfi: `/6/${(ItemIndex + 1) * 2}!/4/2/2` });
+            await assertOpening([4, 5]);
+        }
+        await Page.screenshot({ path: path.join(Temp, 'opening-layout.png') });
         await remove(Reader);
         await Page.setViewportSize(PreviousViewport);
     });
