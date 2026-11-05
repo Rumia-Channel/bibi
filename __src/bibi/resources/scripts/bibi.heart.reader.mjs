@@ -176,6 +176,10 @@ R.layOutSpread = (Spread, Opt = {}) => new Promise(resolve => {
     SpreadBox.classList.toggle('spreaded', Spread.Spreaded);
     SpreadBox.style[C.L_SIZE_b] = '', Spread.style[C.L_SIZE_b] = ''; // Math.ceil(SpreadSize[C.L_SIZE_B]) + 'px';
     SpreadBox.style[C.L_SIZE_l] =     Spread.style[C.L_SIZE_l] = Math.ceil(SpreadSize[C.L_SIZE_L]) + 'px';
+    // A paired two-pane spread fills its pane instead of shrinking to its item: the law that brings the two halves of
+    // an opening together at the shared spine (the auto margins of the item box) needs the free space of the whole pane.
+    // Without it the halves stay apart in their own panes and the opening has a hole in its middle.
+    if(R.TwoPane && Spread.PaneWidthFactor == 0.5) Spread.style[C.L_SIZE_l] = '';
     //sML.style(Spread, { 'border-radius': S['spread-border-radius'], 'box-shadow': S['spread-box-shadow'] });
     if(Opt.Makeover) {
         if(!Spread.PrePaginated) R.replacePages(Spread.OldPages, Spread.Pages);
@@ -948,12 +952,17 @@ R.changeView = (Par) => { if(!Par) return false;
         case 'object':
            if(S['fix-reader-view-mode'] || typeof Par.Mode != 'string' || !S['available-reader-view-modes'].includes(Par.Mode)) Par.Mode = S.RVM;
             Par.FullBreadthLayoutInScroll = B.Reflowable ? false : (Par.FullBreadthLayoutInScroll === undefined || !S['available-reader-view-modes'].includes('vertical')) ? S['full-breadth-layout-in-scroll'] : !!(Par.FullBreadthLayoutInScroll);
-            if(S.RVM == Par.Mode && Par.FullBreadthLayoutInScroll == S['full-breadth-layout-in-scroll']) return false;
+            Par.PageProgressionDirection = B.Type == 'PDF' && /^(ltr|rtl)$/.test(Par.PageProgressionDirection) ? Par.PageProgressionDirection : B.PPD;
+            if(S.RVM == Par.Mode && Par.FullBreadthLayoutInScroll == S['full-breadth-layout-in-scroll'] && Par.PageProgressionDirection == B.PPD) return false;
             break;
         default: return false;
     }
     let ToLayOut = false;
     if(S.RVM != Par.Mode) ToLayOut = true;
+    if(Par.PageProgressionDirection != B.PPD) {
+        B.PPD = Par.PageProgressionDirection;
+        ToLayOut = true;
+    }
     if(Par.FullBreadthLayoutInScroll != S['full-breadth-layout-in-scroll']) {
         S.update({ 'full-breadth-layout-in-scroll': Par.FullBreadthLayoutInScroll });
         if(Par.FullBreadthLayoutInScroll) O.HTML.classList.add(   'book-full-breadth');

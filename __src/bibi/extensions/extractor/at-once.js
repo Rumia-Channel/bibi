@@ -93,9 +93,12 @@ Bibi.x({
         };
         O.log(`Extracting Book Data...`, '<g:>');
         const Promises = [];
+        // Only a file whose extension says it carries text is decoded as text: every other file is kept as bytes
+        // and decoded later, if and when its media type says that it is text.
+        const TextExtensionsRE = /\.(xml|opf|ncx|ya?ml|html?|xht(ml?)?|smil|pls|css|js|json|svg|md|txt)$/i;
         FilesToBeExtract.forEach(FileName => {
             if(FolderNameRE) FileName = FileName.replace(FolderNameRE, '');
-            const IsBin = O.isBin({ Path: FileName });
+            const IsBin = O.isBin({ Path: FileName }) || !TextExtensionsRE.test(FileName);
             Promises.push(
                 BookDataArchive.file(FolderName + FileName).async(IsBin ? 'blob' : 'string').then(FileContent => {
                     B.Package.Manifest[FileName] = IsBin ?

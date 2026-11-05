@@ -1,7 +1,7 @@
-export const sendBook = (Request, Response, Bytes, Cors = false, Requests) => {
-    const Headers = { 'Content-Type': 'application/epub+zip', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
-    if(Cors) Object.assign(Headers, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length' });
-    const Range = Request.headers.range;
+export const sendBook = (Request, Response, Bytes, Cors = false, Requests, Type = 'application/epub+zip', NoRange = false) => {
+    const Headers = { 'Content-Type': Type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-store' };
+    if(Cors) Object.assign(Headers, { 'Access-Control-Allow-Origin': Request.headers.origin || '*', 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length' });
+    const Range = NoRange ? null : Request.headers.range;
     Requests?.push({ url: Request.url, range: Range || null, cors: Cors, cookie: !!Request.headers.cookie });
     if(Range) {
         const Match = /^bytes=(\d*)-(\d*)$/.exec(Range);

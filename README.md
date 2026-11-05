@@ -22,6 +22,23 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.0
+
+This release adds PDF support without changing the schemaVersion 1 reading-position or host-navigation APIs:
+
+* A PDF given by the `book` query opens as a book: every page of the document becomes a page of the reader.
+* A PDF chosen from a local file opens as a book in the same way: it is read by pdf.js from its bytes in the device, and it is never uploaded.
+* A PDF in an EPUB becomes pages of that book. Its item reference is replaced, in place, by one item reference per page, so the reading order of the book is kept. A PDF that is only linked from the content is appended at the end of the book, and an inline embedded PDF object becomes a link to its pages.
+* The pages are rasterized on demand with pdf.js: only the pages around the current position are rendered, and a rendered page is freed when the reader leaves it. A document with hundreds of pages is never rasterized all at once.
+* The text of a page is a text layer: it can be selected, it can be searched (the pages that have not been rendered yet are searched through their extracted text), and it can be used as the reading position.
+* A PDF that cannot be read never keeps the book it belongs to from opening.
+* Standalone PDFs infer their reading direction from sampled text coordinates: vertical text opens right-to-left, horizontal text left-to-right, and undecidable documents retain the configured default. PDFs inside EPUBs retain the EPUB's direction.
+* Portrait PDF pairs use the existing EPUB shared-spine alignment rather than centering each page separately in its half of the opening.
+* A standalone PDF's View Mode menu ends with a left-to-right / right-to-left toggle, so automatic detection can be corrected without changing the current page.
+
+The reader and `zzz` packages are versioned `2.3.0`; `bun run archive` generates `Bibi-v2.3.0.zip`.
+
+
 ### v2.2.2
 
 This patch fixes front-matter illustrations and paired-page navigation without changing the schemaVersion 1 reading-position or host-navigation APIs:
@@ -175,8 +192,35 @@ Small inline images retain publisher-defined spacing across relayouts; only adop
 Native horizontal-text figures are not converted into picture panes. Fitted single-picture covers remain centered when opened or revisited, even inside a reflowable book.
 Standalone picture classification uses intrinsic media dimensions even when the EPUB sets the image width to `100%`. Paired pages share a stage-height opening; focusing either member keeps both pages in view.
 
+### PDF documents
 
+Bibi reads PDF documents with [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0). Its files are shipped beside the reader (`bibi/resources/pdf/`, with its LICENSE) and are loaded only when a PDF is actually opened.
 
+A PDF given by the `book` query opens as a book: every page of the document becomes a page of the reader.
+
+A PDF chosen from a local file (the file picker of the reader's start screen, or a drop on it) opens as a book in the same way. It is read by pdf.js from its bytes in the device, so it is never uploaded.
+
+A PDF in an EPUB becomes pages of that book. Its item reference is replaced, in place, by one item reference per page, so the reading order of the book is kept. A PDF that is only linked from the content is appended at the end of the book, and an inline embedded PDF object (`object`, `embed` or `iframe`) becomes a link to its pages. A PDF that cannot be read (broken, encrypted or missing) never keeps the book it belongs to from opening.
+
+The pages are rasterized on demand: only the pages around the current position are rendered, and a rendered page is freed when the reader leaves it. A document with hundreds of pages is therefore never rasterized all at once.
+
+The text of a page is a text layer: it can be selected and it can be searched. The search covers the pages that have not been rendered yet as well: their text is read without rendering them, and a matching page is rendered when its result is selected. The text of a PDF is not markup and is never shown as such.
+
+A PDF is fetched like any other book, so the `request-with-credentials` option applies to it. The `accept-pdf` option of a preset says whether a PDF may be opened; it is `yes` by default.
+
+For standalone PDFs, the last item of **View Mode** switches **Left-to-right reading** / **Right-to-left reading** (Japanese: **左読み（左 → 右）** / **右読み（右 → 左）**). It starts from the detected/default direction and overrides page order and navigation for the current reading session, including documents without text. The current page and the selected view mode are retained. Enter or Space also activates the focused toggle. Reopening the PDF uses automatic detection again; this override is not saved and does not affect EPUB writing-mode settings.
+
+#### PDF writing-mode analysis
+
+The reader's `PDF` module provides asynchronous `getPageWritingMode(Source, PageNo, Options?)` (one-based page numbers) and `getDocumentWritingMode(Source, Options?)`. `Source` is the existing manifest source, for example a PDF item's `Source`. Both return `{ mode, confidence, evidence: { verticalScore, horizontalScore, analyzedCharacters } }`, with mode `vertical`, `horizontal` or `unknown` and confidence in `[0, 1]`. Confidence is a heuristic score margin, not a calibrated probability.
+
+Analysis combines vertical-font/direction metadata with font-size-relative coordinate alignment, contiguous rows/columns, content order and placement regularity. Character quantity, rather than text-object count, weights the result; small ruby/annotations are downweighted. Page rotation and text transforms are applied before comparing coordinates. Sparse, image-only and closely balanced mixed pages stay `unknown`; unknown pages do not count as horizontal in document aggregation. Sparse covers are likewise unknown; cover semantics cannot be recognized from coordinates alone.
+
+Options include `minCharacters` (10), `minAlignedCharacters` (8), `decisionMargin` (0.15), `toleranceFactor` (0.5), `maxLineGap` (1.4), `smallGlyphSizeRatio` (0.6), `smallGlyphWeight` (0.25), and `minDocumentCharacters` (50). Document analysis samples at most 12 evenly distributed pages by default (`samplePages` overrides the limit), weights decided pages by their character quantity, and yields to the UI between pages. Default analysis results and in-flight requests are cached until the book changes. Custom thresholds reuse extracted text but do not reuse default decisions. Search, analysis and the positioned text layer share pdf.js text extraction.
+
+This does not reconstruct paragraphs, reflow PDF text, perform OCR or add image recognition. Glyph positions within a multi-character text run are approximated from its advance; complex tables, unusual font metrics, rotated decorative text or an unrepresentative page sample can remain unknown or be misclassified. Scanned documents without a text layer remain unknown. The original page raster and selectable text positions are preserved.
+
+To check external PDF files locally, pass them to `node tests/browser/pdf-real-check.mjs <PDF file> [PDF file ...]`. The checker accepts paths at runtime and reports only anonymous numeric diagnostics, not titles or extracted text. Do not add personal paths or private PDF files to the repository.
 
 How to Arrange Development Environment
 --------------------------------------------------------------------------------------------------------------------------------
@@ -288,6 +332,8 @@ Serve the complete `bibi/` tree unchanged, preferably on the host's origin. Exte
 The server listens only on `127.0.0.1`, rejects foreign Host/Origin headers, and sends `Cache-Control: no-store`. Use `bun run serve --no-open` to avoid opening a browser, or `bun run serve --port 62223` to choose a different port.
 Always run `bun run build` to generate production files in `__dist` before publishing; do not publish the development server's bundles.
 
+To open a PDF on the development server, put it in `__dist/` (the directory the server serves statically) and open `http://localhost:62222/bibi/?book=/name.pdf`; or choose it with the file picker of `http://localhost:62222/bibi/`, which reads it in the device. A PDF is never uploaded, and `bun run build` clears `__dist/` again.
+
 | Distribution                            | Source                                                                                                |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `__dist/bibi/*.html`                    | `__src/bibi/*.html`                                                                                   |
@@ -384,6 +430,7 @@ License
     - [DOMPurify](https://github.com/cure53/DOMPurify) : © Mario Heiderich / Dual licensed under [the Apache License Version 2.0 or the Mozilla Public License Version 2.0](https://github.com/cure53/DOMPurify/blob/master/LICENSE)
     - [JSZip](http://stuk.github.io/jszip) : © Stuart Knightley / Dual licensed under [the MIT License or the GPLv3](https://github.com/Stuk/jszip/blob/HEAD/LICENSE.markdown)
     - [JS-YAML](http://nodeca.github.io/js-yaml/) : © Vitaly Puzrin / Licensed under [the MIT License](https://github.com/nodeca/js-yaml/blob/master/LICENSE)
+    - [pdf.js](https://mozilla.github.io/pdf.js/) : © Mozilla and contributors / Licensed under [the Apache License 2.0](https://github.com/mozilla/pdf.js/blob/master/LICENSE) (shipped in `bibi/resources/pdf/`)
  *  - [NoSleep.js](https://github.com/richtr/NoSleep.js) : © Rich Tibbett / Licensed under [the MIT License](https://github.com/richtr/NoSleep.js/blob/master/LICENSE)
 
 

@@ -8,6 +8,7 @@ import JSZip from 'jszip';
 export const RequiredAssets = [
     'index.html', 'and/jo.js', 'presets/default.js',
     'resources/scripts/bibi.js', 'resources/scripts/bibi.wand.js', 'resources/styles/bibi.css',
+    'resources/pdf/pdf.mjs', 'resources/pdf/pdf.worker.mjs', 'resources/pdf/LICENSE',
     'wardrobe/everyday/bibi.dress.css', 'extensions/sanitizer.js',
     'extensions/extractor/at-once.js', 'extensions/extractor/on-the-fly.js',
     'extensions/extractor/on-the-fly.worker.js', 'extensions/extractor/on-the-fly.bibi-zip-loader.worker.js'

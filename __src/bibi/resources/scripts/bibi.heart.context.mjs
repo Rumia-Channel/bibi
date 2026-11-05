@@ -9,7 +9,8 @@ export const L = { // Bibi.Loader
 export const R = { // Bibi.Reader
     Spreads: [], Items: [], Pages: [],
     NonLinearItems: [],
-    IntersectingPages: [], Current: {}
+    IntersectingPages: [], Current: {},
+    HasPDFItems: false, PDFEvicted: false
 };
 
 export const I = {}; // Bibi.UserInterfaces
