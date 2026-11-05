@@ -35,6 +35,7 @@ This release adds PDF support without changing the schemaVersion 1 reading-posit
 * Standalone PDFs infer their reading direction from sampled text coordinates: vertical text opens right-to-left, horizontal text left-to-right, and undecidable documents retain the configured default. PDFs inside EPUBs retain the EPUB's direction.
 * Portrait PDF pairs use the existing EPUB shared-spine alignment rather than centering each page separately in its half of the opening.
 * A standalone PDF's View Mode menu ends with a left-to-right / right-to-left toggle, so automatic detection can be corrected without changing the current page.
+* The archive toolchain overrides `minimatch` to the patched 11.x line to address [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
 
 The reader and `zzz` packages are versioned `2.3.0`; `bun run archive` generates `Bibi-v2.3.0.zip`.
 
