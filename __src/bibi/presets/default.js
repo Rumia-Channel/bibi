@@ -183,6 +183,7 @@ Bibi.preset({
 "default-page-progression-direction" : "ltr", // "ltr" | "rtl" // Most of EPUBs have right property in itself, but....
 
 "accept-local-file"                  : "yes", // "yes" | "no" | "desktop" | "mobile" // If it is enabled, Bibi prepares UI for loading files. Conditions for acceptance are <03> at the bottom.
+"accept-pdf"                         : "yes", // "yes" | "no" | "desktop" | "mobile" // If it is enabled, Bibi opens a PDF document given by the "book" query, or chosen from a local file, as a book. Its pages are rasterized on demand.
 "accept-bibizine"                    : true, // true | false // If true, Bibi accepts EPUB-like BibiZine formated book. (If you are interested in it, please contact the author.)
 "accept-blob-converted-data"         : true, // true | false // If true, Bibi accepts BLOB object converted from a EPUB File. (If you are interested in it, please contact the author.)
 "accept-base64-encoded-data"         : true, // true | false // If true, Bibi accepts Base64 string encoded from a EPUB File. (If you are interested in it, please contact the author.)
@@ -267,10 +268,14 @@ Bibi.preset({
         - [AND] The extension of the file is ".zip".
         - [AND] The "extract-if-necessary" includes ".zip" or "*".
         - [AND] The MIME-Type sent from the browser is empty, "application/zip", "application/x-zip", or "application/x-zip-compressed".
+    * [OR] The file is a PDF.
+        - [AND] The extension of the file is ".pdf" or the MIME-Type sent from the browser is "application/pdf".
+        - [AND] The "accept-pdf" option is enabled.
 
     ### Note:
     * Extension of the file is required even if "extract-if-necessary" is "" (or includes "*").
     * An empty MIME-Type is accepted because browsers may not know the file association. The ZIP contents must still form a valid EPUB or BibiZine.
+    * A PDF is not extracted: it is read by pdf.js, so its pages become the pages of the book.
 
 
 ## <04> Setting "x" for "pagination-method" option

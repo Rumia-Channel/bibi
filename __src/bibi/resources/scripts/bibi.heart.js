@@ -12,6 +12,7 @@
 export { Bibi, L, R, I, P, U, D, S, C, O, E, M, X } from './bibi.heart.context.mjs';
 export { B } from './bibi.heart.book.mjs';
 export { W } from './bibi.heart.wand.mjs';
+export { PDF } from './bibi.heart.pdf.mjs';
 import './bibi.heart.lifecycle.mjs';
 import './bibi.heart.loader.mjs';
 import './bibi.heart.reader.mjs';

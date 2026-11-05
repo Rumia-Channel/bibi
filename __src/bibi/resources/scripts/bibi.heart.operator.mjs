@@ -243,6 +243,12 @@ O.file = (Source, Opt = {}) => new Promise((resolve, reject) => {
             case 'at-once':    return Promise.reject(`File Not Included: "${ Source.Path }"`);
         }
     }).then(() =>
+        // A file that was kept as bytes because its name said nothing about its content is decoded once its media type is known.
+        // This must happen before the initialization: the initialization reads the content as text.
+        Source.DataType == 'Blob' && Source.Content instanceof Blob && O.isTextMediaType(Source['media-type'])
+            ? Source.Content.text().then(Text => { Source.Content = Text; Source.DataType = 'Text'; })
+            : undefined
+    ).then(() =>
         typeof Opt.initialize == 'function' ? Opt.initialize(Source) : Opt.initialize
     ).then(() =>
         Opt.Preprocess && !Source.Preprocessed ? O.preprocess(Source) : Source
@@ -261,7 +267,13 @@ O.file = (Source, Opt = {}) => new Promise((resolve, reject) => {
 });
 
 
-O.isBin = (Source) => /\.(aac|gif|jpe?g|m4[av]|mp([34]|e?g)|ogg|[ot]tf|pdf|png|web[mp]|woff2?)$/i.test(Source.Path.split('?')[0]);
+// A resource is binary when its name says so, or when its declared media type says so (an EPUB may name a PDF without an extension).
+O.isBin = (Source) => /\.(aac|gif|jpe?g|m4[av]|mp([34]|e?g)|ogg|[ot]tf|pdf|png|web[mp]|woff2?)$/i.test(Source.Path.split('?')[0])
+    || /^(application\/(pdf|zip|octet-stream|font-woff2?)|font\/)/i.test(Source['media-type'] || '');
+
+// A media type that carries text (and can therefore be decoded from bytes).
+O.isTextMediaType = MediaType => /^(text\/|application\/(xhtml\+xml|xml|javascript|ecmascript|json)|image\/svg\+xml)/i.test(MediaType || '')
+    || /\+xml$/i.test(MediaType || '');
 
 O.createDataURL = (DT, CB, MT) => new Promise((o, x) => DT == 'Text' ? o(`data:` + MT + `;base64,` + btoa(String.fromCharCode.apply(null, new TextEncoder().encode(CB)))) : (_ => { _.onload = () => o(_.result); _.onerror = x; _.readAsDataURL(CB); })(new FileReader()));
 O.createBlobURL = (DT, CB, MT) => Promise.resolve(URL.createObjectURL(DT == 'Text' ? new Blob([CB], { type: MT }) : CB));
@@ -311,7 +323,21 @@ O.getItemType = (MediaType) => { switch(MediaType?.replace?.(/^([^\/]+\/)?([^\+]
     case 'html': case 'xhtml': case 'xml':            return 'MarkupDocument';
     case 'svg':                                       return 'SVG';
     case 'gif': case 'jpeg': case 'png': case 'webp': return 'BitmapImage';
+    case 'pdf':                                       return 'PDF';
 } return ''; };
+
+O.isPDFPath = (Path) => typeof Path == 'string' && /\.pdf$/i.test(Path.split(/[?#]/)[0]);
+
+// How a chosen local file is classified as a PDF: "PDF" when its name or its media type says so, "mismatch" when the name and the
+// media type contradict each other, "" when it is not a PDF. An empty media type never contradicts a name: a browser may not know the
+// file association.
+O.getPDFType = (Name, MIMEType) => {
+    const ByName = O.isPDFPath(String(Name || ''));
+    const ByType = MIMEType == 'application/pdf';
+    if(!ByName) return ByType ? 'PDF' : '';
+    if(!MIMEType || ByType) return 'PDF';
+    return 'mismatch';
+};
 
 
 O.preprocess = (Source) => {

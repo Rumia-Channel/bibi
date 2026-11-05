@@ -79,6 +79,17 @@ FileBranches.push(
             'presets/**'
         ]
     } },
+    { Method: 'Copy', Origin: 'node_modules/pdfjs-dist/build', Graft: 'bibi/resources/pdf', Paths: [
+        'pdf.mjs',
+        'pdf.worker.mjs'
+    ] },
+    { Method: 'Copy', Origin: 'node_modules/pdfjs-dist', Graft: 'bibi/resources/pdf', Paths: [
+        'LICENSE',
+        'cmaps/**',
+        'standard_fonts/**',
+        'wasm/**',
+        'iccs/**'
+    ] },
     { Method: 'Copy', Origin: '.', Graft: 'bibi/info', Paths : [
         'LICENSE',
         'README.md'
@@ -115,7 +126,8 @@ if(Composer.WBCK) FileBranches.push(
 // -----------------------------------------------------------------------------------------------------------------------------
 
 const TerserIgnore = [
-    /^bibi\/presets\//
+    /^bibi\/presets\//,
+    /^bibi\/resources\/pdf\// // pdf.js is copied verbatim: minifying it breaks its private fields
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

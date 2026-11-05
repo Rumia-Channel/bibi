@@ -5,7 +5,7 @@ import os from 'node:os';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { createReflowFixture, createLazyFixture, createOpeningFixture, LongText, TailText } from './fixtures.mjs';
+import { createReflowFixture, createLazyFixture, createOpeningFixture, createPDFFixture, createPDFEmbeddedFixture, createPDFBrokenFixture, createPDFExtensionlessFixture, createExtensionlessMarkupFixture, LongText, TailText } from './fixtures.mjs';
 import { sendBook } from './book-server.mjs';
 import { verifyDistribution } from '../../zzz/distribution.mjs';
 
@@ -14,8 +14,15 @@ const Distribution = path.join(Repository, '__dist/bibi');
 await verifyDistribution(Distribution);
 const Reflow = await createReflowFixture(), Vertical = await createReflowFixture(true), IllustrationFlow = await createReflowFixture(true, true), Lazy = await createLazyFixture(), Opening = await createOpeningFixture();
 const Fixed = await fs.readFile(path.join(Repository, '__src/bibi-bookshelf/__samples/Sample_Pre-Paginated_LtR.epub'));
-const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/opening.epub', Opening], ['/epubs/fixed.epub', Fixed]]);
+const PDFDocument = createPDFFixture(40);
+const EmbeddedPDF = await createPDFEmbeddedFixture(true), LinkedPDF = await createPDFEmbeddedFixture(false), BrokenPDF = await createPDFBrokenFixture(), ExtensionlessPDF = await createPDFExtensionlessFixture(3, 'attachment'), SuffixlessPDF = await createPDFExtensionlessFixture(3, 'attachment.bin'), ExtensionlessMarkup = await createExtensionlessMarkupFixture(), LargePage = createPDFFixture(1, 20000, 20000), MaliciousPDF = createPDFFixture(2, 300, 200, PageNo => PageNo == 1 ? ['needle', '<img src=x onerror=y=1>'] : 'second page'), WideTextPDF = createPDFFixture(20, 300, 200, PageNo => PageNo == 20 ? 'PDF7' : 'other page'), MultiLinePDF = createPDFFixture(3, 300, 200, PageNo => [`first line of page ${ PageNo }`, `second line of page ${ PageNo }`]);
+const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/opening.epub', Opening], ['/epubs/fixed.epub', Fixed], ['/epubs/document.pdf', PDFDocument], ['/epubs/embedded.epub', EmbeddedPDF], ['/epubs/linked.epub', LinkedPDF], ['/epubs/broken.epub', BrokenPDF], ['/epubs/extensionless.epub', ExtensionlessPDF], ['/epubs/suffixless.epub', SuffixlessPDF], ['/epubs/extensionless-markup.epub', ExtensionlessMarkup], ['/epubs/large.pdf', LargePage], ['/epubs/malicious.pdf', MaliciousPDF], ['/epubs/widetext.pdf', WideTextPDF], ['/epubs/multiline.pdf', MultiLinePDF], ['/epubs/atonce-extensionless.epub', ExtensionlessPDF], ['/epubs/atonce-suffixless.epub', SuffixlessPDF], ['/epubs/atonce-markup.epub', ExtensionlessMarkup]]);
 const Requests = [], Errors = [], Results = [];
+const VerticalPDF = createPDFFixture(6, 300, 520, () => [240, 170, 100].flatMap(x =>
+    Array.from({ length: 12 }, (_, i) => ({ text: 'A', x, y: 470 - i * 30 }))));
+Content.set('/epubs/vertical.pdf', VerticalPDF);
+Content.set('/epubs/portrait.pdf', createPDFFixture(6, 300, 520, () => 'A horizontal body line with enough characters to establish direction.'));
+Content.set('/epubs/no-text.pdf', createPDFFixture(6, 300, 520, () => []));
 let HostOrigin, SignedOrigin, Browser, Page;
 const Temp = await fs.mkdtemp(path.join(os.tmpdir(), 'bibi-browser-'));
 const HostPage = `<!doctype html><html><head><meta charset="utf-8"><title>Bibi public API smoke</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe.bibi-frame{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><script src="/vendor/bibi/and/jo.js"></script><script>
@@ -26,6 +33,11 @@ window.closeReader=index=>{const bucket=readers[index];bucket.api.dispose();buck
 const SignedServer = http.createServer((Request, Response) => {
     if(Request.method === 'OPTIONS') { Response.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Range' }); Response.end(); return; }
     if(new URL(Request.url, 'http://localhost').searchParams.get('signature') !== 'fixture') { Response.writeHead(403, { 'Access-Control-Allow-Origin': HostOrigin }); Response.end(); return; }
+    if(new URL(Request.url, 'http://localhost').pathname === '/book.pdf') {
+        // A cross-origin PDF that requires the credential: only a credentialed request can read it.
+        if(!Request.headers.cookie?.includes('book-auth=granted')) { Response.writeHead(403, { 'Access-Control-Allow-Origin': Request.headers.origin || HostOrigin, 'Access-Control-Allow-Credentials': 'true' }); Response.end(); return; }
+        sendBook(Request, Response, PDFDocument, true, Requests, 'application/pdf'); return;
+    }
     sendBook(Request, Response, Reflow, true, Requests);
 });
 const Server = http.createServer(async (Request, Response) => {
@@ -36,13 +48,27 @@ const Server = http.createServer(async (Request, Response) => {
             if(!Request.headers.cookie?.includes('book-auth=granted')) { Response.writeHead(401); Response.end(); return; }
             Response.writeHead(302, { Location: SignedOrigin + '/book.epub?signature=fixture' }); Response.end(); return;
         }
+        if(URLPath === '/epubs/redirect.pdf') {
+            Response.writeHead(302, { Location: SignedOrigin + '/book.pdf?signature=fixture' }); Response.end(); return;
+        }
         if(Content.has(URLPath)) {
             if(!Request.headers.cookie?.includes('book-auth=granted')) { Response.writeHead(401); Response.end(); return; }
-            sendBook(Request, Response, Content.get(URLPath), false, Requests); return;
+            // A book served without range support is extracted at once: the reader falls back from the range-capable extractor.
+            const NoRange = URLPath.startsWith('/epubs/atonce-');
+            sendBook(Request, Response, Content.get(URLPath), false, Requests, URLPath.endsWith('.pdf') ? 'application/pdf' : 'application/epub+zip', NoRange); return;
         }
         if(['/vendor/bibi/presets/integration.js', '/alternate/bibi/presets/integration.js'].includes(URLPath)) {
             Response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
-            Response.end('Bibi.preset({"extract-if-necessary":[".epub",".zip",""],"resume-from-last-position":"yes","keep-settings":"yes","allow-scripts-in-content":false,"request-with-credentials":false});'); return;
+            Response.end('Bibi.preset({"extract-if-necessary":[".epub",".zip",""],"resume-from-last-position":"yes","keep-settings":"yes","allow-scripts-in-content":false,"request-with-credentials":false,"accept-pdf":"yes"});'); return;
+        }
+        if(['/vendor/bibi/presets/credentialed.js'].includes(URLPath)) {
+            Response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+            Response.end('Bibi.preset({"extract-if-necessary":[".epub",".zip",""],"resume-from-last-position":"yes","keep-settings":"yes","allow-scripts-in-content":false,"request-with-credentials":true,"accept-pdf":"yes"});'); return;
+        }
+        if(URLPath === '/vendor/bibi/presets/no-pdf.js') {
+            // A preset that forbids PDFs: neither a PDF of the "book" query nor a local PDF may be opened.
+            Response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+            Response.end('Bibi.preset({"extract-if-necessary":[".epub",".zip",""],"accept-local-file":"yes","resume-from-last-position":"yes","keep-settings":"yes","allow-scripts-in-content":false,"request-with-credentials":false,"accept-pdf":"no"});'); return;
         }
         const Prefix = ['/vendor/bibi/', '/alternate/bibi/'].find(Prefix => URLPath.startsWith(Prefix));
         if(Prefix) {
@@ -50,7 +76,7 @@ const Server = http.createServer(async (Request, Response) => {
             const File = path.resolve(Distribution, Relative);
             if(!File.startsWith(Distribution + path.sep)) { Response.writeHead(403); Response.end(); return; }
             const Bytes = await fs.readFile(File);
-            const Type = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[path.extname(File)] || 'application/octet-stream';
+            const Type = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[path.extname(File)] || 'application/octet-stream';
             Response.writeHead(200, { 'Content-Type': Type, 'Cache-Control': 'no-store' }); Response.end(Bytes); return;
         }
         Response.writeHead(404); Response.end();
@@ -74,9 +100,52 @@ try {
     const position = Index => Page.evaluate(Index => window.readers[Index].api.getPosition(), Index);
     const restore = (Index, Location) => Page.evaluate(({ Index, Location }) => window.readers[Index].api.restorePosition(Location), { Index, Location });
     const remove = Index => Page.evaluate(Index => window.closeReader(Index), Index);
+    // A reader that is moving is momentarily inoperable (NOT_READY): the wait must tolerate that.
+    const waitForPageIndex = async (Index, Expected) => {
+        await Page.waitForFunction(async ({ Index, Expected }) => {
+            try { return (await window.readers[Index].api.getPosition()).layout.pageIndex === Expected; }
+            catch(Error) { return false; }
+        }, { Index, Expected });
+    };
     const readerFrame = async Index => {
         const Handle = await Page.evaluateHandle(Index => window.readers[Index].Frame, Index);
         return Handle.asElement().contentFrame();
+    };
+    // The rasterized image of the page the reader currently shows (not merely the first loaded one).
+    const pdfPage = async (Index, Timeout = 10000) => {
+        const ReaderFrame = await readerFrame(Index);
+        const Deadline = Date.now() + Timeout;
+        for(;;) {
+            const Found = await ReaderFrame.evaluate(async () => {
+                const Page = R.getPage();
+                if(!Page || !Page.Item) return null;
+                const Doc = Page.Item.contentDocument;
+                const Img = Doc && Doc.querySelector('img.bibi-pdf-page');
+                if(!Img || !Img.getAttribute('src')) return null;
+                if(!Img.complete) await new Promise(Resolve => { Img.addEventListener('load', Resolve, { once: true }); setTimeout(Resolve, 3000); });
+                if(!Img.naturalWidth) return null;
+                const Bytes = new Uint8Array(await (await fetch(Img.src)).arrayBuffer());
+                let Hash = 7;
+                for(let i = 0; i < Bytes.length; i++) Hash = (Hash * 31 + Bytes[i]) % 2147483647;
+                return { width: Img.naturalWidth, height: Img.naturalHeight, bytes: Bytes.length, hash: Hash, itemIndex: Page.Item.Index };
+            });
+            if(Found) return Found;
+            if(Date.now() > Deadline) return null;
+            await new Promise(Resolve => setTimeout(Resolve, 100));
+        }
+    };
+    const pdfPageCount = async Index => {
+        const ReaderFrame = await readerFrame(Index);
+        return ReaderFrame.evaluate(() => R.Items.filter(Item => Item.PDFRasterized).length);
+    };
+    const clickInReader = async (Index, Selector) => {
+        const ReaderFrame = await readerFrame(Index);
+        for(const Frame of ReaderFrame.childFrames()) {
+            if(!await Frame.locator(Selector).count()) continue;
+            await Frame.locator(Selector).first().click();
+            return true;
+        }
+        return false;
     };
     const textVisible = async (Index, Id, Offset) => {
         const ReaderFrame = await readerFrame(Index);
@@ -324,6 +393,339 @@ try {
         assert.ok(Requests.some(Request => Request.url.startsWith('/epubs/fixed.epub') && Request.cookie));
         await remove(Reader);
     });
+    await scenario('a standalone PDF opens as a book, one spine item per page', async () => {
+        Reader = await open({ book: '/epubs/document.pdf', 'book-key': 'pdf', 'content-hash': 'pdf-1' });
+        const State = await Page.evaluate(Index => window.readers[Index].api.getState(), Reader);
+        assert.equal(State.status, 'ready');
+        const Position = await position(Reader);
+        assert.equal(Position.layout.pageIndex, 0);
+        assert.equal(Position.layout.pageCount, 40, 'The PDF must produce one page per document page.');
+        const First = await pdfPage(Reader);
+        assert.ok(First && First.width > 0 && First.height > 0, 'The first PDF page must be rasterized.');
+        assert.ok(First.width > First.height, 'The fixture pages are landscape: the rasterized page must keep its orientation.');
+        // The pages are rasterized on demand: a document with many pages must not be rasterized all at once.
+        const Rasterized = await pdfPageCount(Reader);
+        assert.ok(Rasterized < 12, `Only a few pages may be rasterized at once, not the whole document (${Rasterized} of 40).`);
+        await Page.evaluate(Index => window.readers[Index].move(1), Reader);
+        await waitForPageIndex(Reader, 1);
+        const Second = await pdfPage(Reader);
+        assert.ok(Second && Second.width > 0, 'The second PDF page must be rasterized.');
+        assert.notEqual(Second.hash, First.hash, 'Each PDF page must be its own image.');
+        await Page.evaluate(Index => window.readers[Index].move(-1), Reader);
+        await waitForPageIndex(Reader, 0);
+        const Back = await pdfPage(Reader);
+        assert.ok(Back && Back.width > 0, 'A page revisited after being turned down must be rasterized again.');
+        assert.equal(Back.hash, First.hash, 'A revisited page must show the same image again.');
+        await remove(Reader);
+    });
+    await scenario('portrait PDF openings share the spine in both detected reading directions', async () => {
+        const PreviousViewport = Page.viewportSize();
+        await Page.setViewportSize({ width: 1600, height: 900 });
+        for(const [Book, Mode, Direction] of [['portrait', 'horizontal', 'ltr'], ['vertical', 'vertical', 'rtl']]) {
+            Reader = await open({ book: `/epubs/${Book}.pdf`, 'book-key': `direction-${Book}` });
+            const Frame = await readerFrame(Reader);
+            const Writing = await Frame.evaluate(async () => ({
+                page: await PDF.getPageWritingMode(R.Items[0].Source, 1),
+                document: await PDF.getDocumentWritingMode(R.Items[0].Source),
+                direction: B.PPD
+            }));
+            assert.equal(Writing.page.mode, Mode);
+            assert.equal(Writing.document.mode, Mode);
+            assert.equal(Writing.direction, Direction);
+            await Frame.evaluate(() => Bibi.API.restorePosition({ cfi: '/6/4!/4' }));
+            await Frame.waitForFunction(() => !R.Moving && Bibi.API.getState().operable &&
+                R.Items.slice(1, 3).every(Item => Item.Loaded && Item.PDFRasterized &&
+                    Math.abs(Item.Box.offsetWidth / Item.Box.offsetHeight - 300 / 520) < 0.01));
+            const Bounds = await Frame.evaluate(() => R.Items.slice(1, 3).map(Item => {
+                const Rect = Item.Box.getBoundingClientRect();
+                return { left: Rect.left, right: Rect.right };
+            }).sort((A, B) => A.left - B.left));
+            assert.ok(Math.abs(Bounds[0].right - Bounds[1].left) <= 1, 'Portrait pages must meet at the shared spine.');
+            assert.ok(Math.abs((Bounds[0].left + Bounds[1].right) / 2 - 800) <= 1, `The opening must be centered as a whole: ${Book} ${JSON.stringify(Bounds)}`);
+            await Page.screenshot({ path: path.join(Temp, `pdf-${Mode}-opening.png`) });
+            await remove(Reader);
+        }
+        await Page.setViewportSize(PreviousViewport);
+    });
+    await scenario('PDF reading direction can be overridden without losing the page, including unknown documents', async () => {
+        const PreviousViewport = Page.viewportSize();
+        await Page.setViewportSize({ width: 1600, height: 900 });
+        for(const Book of ['vertical', 'portrait', 'no-text']) {
+            Reader = await open({ book: `/epubs/${Book}.pdf`, 'book-key': `manual-${Book}` });
+            const Frame = await readerFrame(Reader);
+            await restore(Reader, { cfi: '/6/4!/4' });
+            await Frame.waitForFunction(() => !R.Moving && !R.LayingOut &&
+                R.Items.slice(1, 3).every(Item => Item.Loaded && Item.PDFRasterized));
+            const Initial = await Frame.evaluate(() => S.PPD);
+            for(const Input of ['pointer', 'keyboard']) {
+                const Expected = (await Frame.evaluate(() => S.PPD)) == 'rtl' ? 'ltr' : 'rtl';
+                const Before = (await position(Reader)).layout.pageIndex;
+                await Frame.locator('#bibi-menu .bibi-icon-config').click();
+                const Toggle = Frame.locator('#bibi-button-pdf-reading-direction');
+                await Toggle.waitFor({ state: 'visible' });
+                if(Input == 'pointer') {
+                    await Page.screenshot({ path: path.join(Temp, `pdf-${Book}-direction-menu.png`) });
+                    await Toggle.click();
+                } else {
+                    await Toggle.focus();
+                    await Toggle.press('Enter');
+                }
+                await Frame.waitForFunction(Direction => S.PPD == Direction && !R.LayingOut && !O.Busy, Expected);
+                assert.equal((await position(Reader)).layout.pageIndex, Before, 'Changing direction must retain the current source page.');
+                assert.equal(await Toggle.getAttribute('aria-checked'), String(Expected == 'rtl'));
+                const LeftToRight = await Frame.evaluate(() => R.Items[1].Box.getBoundingClientRect().left < R.Items[2].Box.getBoundingClientRect().left);
+                assert.equal(LeftToRight, Expected == 'ltr', 'The paired PDF pages must swap physical reading order.');
+                await Frame.locator('body').press(Expected == 'rtl' ? 'ArrowLeft' : 'ArrowRight');
+                await waitForPageIndex(Reader, 3);
+                await Frame.waitForFunction(() => Bibi.API.getState().operable);
+                await restore(Reader, { cfi: '/6/4!/4' });
+            }
+            assert.equal(await Frame.evaluate(() => S.PPD), Initial);
+            if(Book == 'no-text') for(const Mode of ['horizontal', 'vertical']) {
+                await Frame.locator('#bibi-menu .bibi-icon-config').click();
+                await Frame.locator(`.bibi-button:has(.bibi-icon-view-${Mode})`).click();
+                await Frame.waitForFunction(Mode => S.RVM == Mode && Bibi.API.getState().operable, Mode);
+                await restore(Reader, { cfi: '/6/4!/4' });
+                const Before = (await position(Reader)).layout.pageIndex;
+                const PreviousDirection = await Frame.evaluate(() => S.PPD);
+                await Frame.locator('#bibi-menu .bibi-icon-config').click();
+                await Frame.locator('#bibi-button-pdf-reading-direction').press('Space');
+                await Frame.waitForFunction(Direction => S.PPD != Direction && Bibi.API.getState().operable, PreviousDirection);
+                assert.equal(await Frame.evaluate(() => S.RVM), Mode, 'Direction overrides must not change the chosen scroll mode.');
+                assert.equal((await position(Reader)).layout.pageIndex, Before, 'A scrolled PDF must retain its current page.');
+            }
+            await remove(Reader);
+        }
+        await Page.setViewportSize(PreviousViewport);
+    });
+    await scenario('a PDF chosen from a local file opens as a book', async () => {
+        const LocalPage = await Browser.newPage({ viewport: { width: 1280, height: 900 } });
+        LocalPage.on('pageerror', Error => Errors.push(Error.message));
+        try {
+            await LocalPage.goto(HostOrigin + '/vendor/bibi/index.html');
+            await LocalPage.setInputFiles('#bibi-catcher input', { name: 'local.pdf', mimeType: 'application/pdf', buffer: PDFDocument });
+            await LocalPage.waitForFunction(() => { try { return Bibi.API.getState().operable; } catch(Error) { return false; } }, null, { timeout: 60000 });
+            const State = await LocalPage.evaluate(() => Bibi.API.getState());
+            assert.equal(State.status, 'ready');
+            const Position = await LocalPage.evaluate(() => Bibi.API.getPosition());
+            assert.equal(Position.layout.pageCount, 40, 'The local PDF must produce one page per document page.');
+            const Deadline = Date.now() + 20000;
+            let Raster = null;
+            for(;;) {
+                Raster = await LocalPage.evaluate(async () => {
+                    const Page = R.getPage();
+                    if(!Page || !Page.Item) return null;
+                    const Doc = Page.Item.contentDocument;
+                    const Img = Doc && Doc.querySelector('img.bibi-pdf-page');
+                    if(!Img || !Img.getAttribute('src')) return null;
+                    if(!Img.complete) await new Promise(Resolve => { Img.addEventListener('load', Resolve, { once: true }); setTimeout(Resolve, 3000); });
+                    if(!Img.naturalWidth) return null;
+                    const Layer = Doc.querySelector('span.bibi-pdf-text-layer');
+                    return { width: Img.naturalWidth, height: Img.naturalHeight, text: Layer ? Layer.innerText.trim() : '' };
+                });
+                if(Raster) break;
+                if(Date.now() > Deadline) break;
+                await new Promise(Resolve => setTimeout(Resolve, 100));
+            }
+            assert.ok(Raster && Raster.width > 0, 'The page of the local PDF must be rasterized.');
+            assert.equal(Raster.text, 'PDF page 1', 'The text layer of the local PDF page must carry the text of the page.');
+            // The file picker covers the book: it must be gone once the book is open.
+            const Catcher = await LocalPage.evaluate(() => { const Element = document.querySelector('#bibi-catcher'); return Element ? getComputedStyle(Element).opacity : null; });
+            assert.equal(Catcher, '0', 'The file picker must not stay on top of the opened book.');
+        } finally { await LocalPage.close(); }
+    });
+    await scenario('a local file whose name and media type contradict each other is not opened as a PDF', async () => {
+        const MismatchPage = await Browser.newPage({ viewport: { width: 1280, height: 900 } });
+        MismatchPage.on('pageerror', Error => Errors.push(Error.message));
+        try {
+            await MismatchPage.goto(HostOrigin + '/vendor/bibi/index.html');
+            await MismatchPage.setInputFiles('#bibi-catcher input', { name: 'local.pdf', mimeType: 'text/plain', buffer: PDFDocument });
+            await MismatchPage.waitForFunction(() => { try { return Bibi.API.getState().status === 'error'; } catch(Error) { return false; } }, null, { timeout: 60000 });
+            const Failure = await MismatchPage.evaluate(() => Bibi.API.getState());
+            assert.equal(Failure.error.code, 'LOAD_FAILED');
+            assert.equal(Failure.error.message, 'File of this type is unacceptable');
+        } finally { await MismatchPage.close(); }
+    });
+    await scenario('a local PDF is not opened when the preset forbids PDFs', async () => {
+        const ForbiddenPage = await Browser.newPage({ viewport: { width: 1280, height: 900 } });
+        ForbiddenPage.on('pageerror', Error => Errors.push(Error.message));
+        try {
+            await ForbiddenPage.goto(HostOrigin + '/vendor/bibi/index.html?preset=no-pdf');
+            // The file picker must not offer a PDF when the preset forbids them.
+            await ForbiddenPage.waitForSelector('#bibi-catcher input', { state: 'attached' });
+            const Accept = await ForbiddenPage.evaluate(() => { const Input = document.querySelector('#bibi-catcher input'); return Input ? Input.getAttribute('accept') : null; });
+            assert.ok(Accept && !Accept.includes('application/pdf'), `The file picker must not offer a PDF (${ Accept }).`);
+            await ForbiddenPage.setInputFiles('#bibi-catcher input', { name: 'local.pdf', mimeType: 'application/pdf', buffer: PDFDocument });
+            await ForbiddenPage.waitForFunction(() => { try { return Bibi.API.getState().status === 'error'; } catch(Error) { return false; } }, null, { timeout: 60000 });
+            const Failure = await ForbiddenPage.evaluate(() => Bibi.API.getState());
+            assert.equal(Failure.error.code, 'LOAD_FAILED');
+            assert.equal(Failure.error.message, 'Failed to open the book (PDF is set to unacceptable)');
+        } finally { await ForbiddenPage.close(); }
+    });
+    await scenario('an EPUB with an embedded PDF shows the PDF pages', async () => {
+        for(const Book of ['/epubs/embedded.epub', '/epubs/linked.epub']) {
+            Reader = await open({ book: Book, 'book-key': 'embedded', 'content-hash': 'embedded-1' });
+            const Anchor = await Page.evaluate(Index => {
+                const ReaderFrame = window.readers[Index].Frame.contentWindow;
+                const Item = ReaderFrame.R.Items.find(Item => /embedded\.pdf$/.test(Item.AnchorPath));
+                return Item ? { index: Item.Index, indexInSpine: Item.IndexInSpine, path: Item.AnchorPath, linear: Item.IsLinearItem } : null;
+            }, Reader);
+            assert.ok(Anchor, 'The embedded PDF must become spine items.');
+            assert.equal(Anchor.linear, true, 'A linear PDF must stay in the reading order.');
+            const Pages = await Page.evaluate(Index => window.readers[Index].Frame.contentWindow.R.Items.filter(Item => /embedded\.pdf$/.test(Item.AnchorPath)).length, Reader);
+            assert.equal(Pages, 3, 'The embedded PDF must contribute one item per page.');
+            // An inline embedded PDF object becomes a link to the PDF's pages (the secure configuration strips the element itself).
+            assert.equal(await clickInReader(Reader, 'a.bibi-pdf-embedded'), true, 'The inline PDF object must become a link.');
+            const Linked = await pdfPage(Reader);
+            assert.ok(Linked && Linked.width > 0, 'The linked PDF page must be rasterized.');
+            await restore(Reader, { cfi: `/6/${(Anchor.indexInSpine + 1) * 2}!/4` });
+            const Rasterized = await pdfPage(Reader);
+            assert.ok(Rasterized && Rasterized.width > 0, 'The embedded PDF page must be rasterized.');
+            await remove(Reader);
+        }
+    });
+    await scenario('an EPUB with a PDF resource without an extension shows its pages', async () => {
+        for(const Book of ['/epubs/extensionless.epub', '/epubs/suffixless.epub']) {
+            Reader = await open({ book: Book, 'book-key': 'extensionless', 'content-hash': 'extensionless-1' });
+            const Anchor = await Page.evaluate(Index => {
+                const ReaderFrame = window.readers[Index].Frame.contentWindow;
+                const Item = ReaderFrame.R.Items.find(Item => /attachment/.test(Item.AnchorPath));
+                return Item ? { indexInSpine: Item.IndexInSpine } : null;
+            }, Reader);
+            assert.ok(Anchor, 'The PDF resource must become spine items.');
+            await restore(Reader, { cfi: `/6/${(Anchor.indexInSpine + 1) * 2}!/4` });
+            const Rasterized = await pdfPage(Reader);
+            assert.ok(Rasterized && Rasterized.width > 0, 'The PDF page must be rasterized.');
+            await remove(Reader);
+        }
+        Reader = await open({ book: '/epubs/extensionless-markup.epub', 'book-key': 'extensionless-markup', 'content-hash': 'extensionless-markup-1' });
+        await textVisible(Reader, 'chapter', 0);
+        await remove(Reader);
+    });
+    await scenario('an EPUB extracted at once keeps its ambiguous resources readable', async () => {
+        for(const Book of ['/epubs/atonce-extensionless.epub', '/epubs/atonce-suffixless.epub']) {
+            Reader = await open({ book: Book, 'book-key': 'atonce', 'content-hash': 'atonce-1' });
+            assert.equal(await Page.evaluate(Index => window.readers[Index].Frame.contentWindow.B.ExtractionPolicy, Reader), 'at-once', 'The book must be extracted at once.');
+            const Anchor = await Page.evaluate(Index => {
+                const ReaderFrame = window.readers[Index].Frame.contentWindow;
+                const Item = ReaderFrame.R.Items.find(Item => /attachment/.test(Item.AnchorPath));
+                return Item ? { indexInSpine: Item.IndexInSpine } : null;
+            }, Reader);
+            assert.ok(Anchor, 'The PDF resource must become spine items.');
+            await restore(Reader, { cfi: `/6/${(Anchor.indexInSpine + 1) * 2}!/4` });
+            const Rasterized = await pdfPage(Reader);
+            assert.ok(Rasterized && Rasterized.width > 0, 'The PDF page must be rasterized.');
+            await remove(Reader);
+        }
+        Reader = await open({ book: '/epubs/atonce-markup.epub', 'book-key': 'atonce-markup', 'content-hash': 'atonce-markup-1' });
+        assert.equal(await Page.evaluate(Index => window.readers[Index].Frame.contentWindow.B.ExtractionPolicy, Reader), 'at-once', 'The book must be extracted at once.');
+        await textVisible(Reader, 'chapter', 0);
+        await remove(Reader);
+    });
+    await scenario('a PDF page with several lines keeps its document well-formed', async () => {
+        Reader = await open({ book: '/epubs/multiline.pdf', 'book-key': 'multiline', 'content-hash': 'multiline-1' });
+        const Raster = await pdfPage(Reader);
+        assert.ok(Raster && Raster.width > 0, 'The page must be rasterized.');
+        // The text layer of a page with several lines holds a line break element: the item document is XHTML, so it must stay well-formed.
+        const Item = await (await readerFrame(Reader)).evaluate(() => {
+            const Page = R.getPage();
+            const Doc = Page && Page.Item ? Page.Item.contentDocument : null;
+            if(!Doc) return null;
+            const Layer = Doc.querySelector('span.bibi-pdf-text-layer');
+            const Error = Doc.querySelector('parsererror');
+            return {
+                contentType: Doc.contentType,
+                parserError: Error ? Error.textContent.replace(/\s+/g, ' ').trim().slice(0, 120) : null,
+                text: Layer ? Layer.textContent.replace(/\s+/g, ' ').trim() : null,
+                breaks: Layer ? Layer.querySelectorAll('br').length : 0
+            };
+        });
+        assert.ok(Item, 'The item document must exist.');
+        assert.equal(Item.contentType, 'application/xhtml+xml');
+        assert.equal(Item.parserError, null, 'The item document must be well-formed XML.');
+        assert.ok(Item.breaks > 0, 'The text layer must hold the line breaks of the page.');
+        assert.ok(Item.text && Item.text.includes('first line'), 'The text layer must carry the first line of the page.');
+        assert.ok(Item.text && Item.text.includes('second line'), 'The text layer must carry the second line of the page.');
+        await remove(Reader);
+    });
+    await scenario('a large-format PDF page is rasterized within the limits', async () => {
+        Reader = await open({ book: '/epubs/large.pdf', 'book-key': 'large', 'content-hash': 'large-1' });
+        const Rasterized = await pdfPage(Reader);
+        assert.ok(Rasterized && Rasterized.width > 0, 'The large page must be rasterized.');
+        assert.ok(Rasterized.width <= 4096 && Rasterized.height <= 4096, `The raster must fit the canvas limits (${Rasterized.width}x${Rasterized.height}).`);
+        assert.ok(Rasterized.width * Rasterized.height <= 16 * 1024 * 1024, `The raster must fit the pixel budget (${Rasterized.width * Rasterized.height} pixels).`);
+        await remove(Reader);
+    });
+    await scenario('a term is found on a PDF page that has not been rendered yet', async () => {
+        Reader = await open({ book: '/epubs/document.pdf', 'book-key': 'search', 'content-hash': 'search-1' });
+        const Results = await Page.evaluate(async Index => {
+            const ReaderFrame = window.readers[Index].Frame.contentWindow;
+            const Search = await ReaderFrame.I.RangeFinder.search(['PDF page 7'], { Focus: false });
+            return Search.Results.map(Result => ({ itemIndex: Result.Item.Index, pageNo: Result.PDFPageNo, hasRange: !!Result.Range }));
+        }, Reader);
+        assert.ok(Results.length >= 1, 'The term must be found in the PDF.');
+        assert.equal(Results[0].pageNo, 7, 'The match must be on the page that holds the term.');
+        assert.equal(Results[0].hasRange, false, 'A page that has not been rendered has no range yet.');
+        const Focused = await Page.evaluate(async Index => {
+            const ReaderFrame = window.readers[Index].Frame.contentWindow;
+            await ReaderFrame.I.RangeFinder.setSearchResultFocusTo(0);
+            return { loaded: ReaderFrame.R.Items[6].Loaded };
+        }, Reader);
+        assert.equal(Focused.loaded, true, 'The matched page must be rendered.');
+        await Page.waitForFunction(async Index => {
+            try { return window.readers[Index].Frame.contentWindow.I.PageObserver.Current.Pages.some(Page => Page.Item.Index === 6); }
+            catch(Error) { return false; }
+        }, Reader, { timeout: 8000 });
+        await remove(Reader);
+        // The search of a page that has not been rendered must match like the search of a rendered one.
+        Reader = await open({ book: '/epubs/document.pdf', 'book-key': 'search-case', 'content-hash': 'search-case-1' });
+        const Lower = await Page.evaluate(async Index => {
+            const ReaderFrame = window.readers[Index].Frame.contentWindow;
+            const Search = await ReaderFrame.I.RangeFinder.search(['pdf page 7'], { Focus: false });
+            return Search.Results.map(Result => Result.PDFPageNo);
+        }, Reader);
+        assert.ok(Lower.includes(7), 'The search must not depend on the case.');
+        await remove(Reader);
+        Reader = await open({ book: '/epubs/widetext.pdf', 'book-key': 'search-wide', 'content-hash': 'search-wide-1' });
+        const Wide = await Page.evaluate(async Index => {
+            const ReaderFrame = window.readers[Index].Frame.contentWindow;
+            const Search = await ReaderFrame.I.RangeFinder.search(['ＰＤＦ７'], { Focus: false });
+            return Search.Results.map(Result => Result.PDFPageNo);
+        }, Reader);
+        assert.ok(Wide.includes(20), 'The search must not depend on the width of the characters.');
+        await remove(Reader);
+    });
+    await scenario('the text of a PDF is never shown as markup', async () => {
+        Reader = await open({ book: '/epubs/malicious.pdf', 'book-key': 'malicious', 'content-hash': 'malicious-1' });
+        const Injected = await Page.evaluate(async Index => {
+            const ReaderFrame = window.readers[Index].Frame.contentWindow;
+            const Search = await ReaderFrame.I.RangeFinder.search(['needle'], { Focus: false });
+            await new Promise(Resolve => setTimeout(Resolve, 500));
+            return { results: Search.Results.length, flag: ReaderFrame.y, images: ReaderFrame.document.querySelectorAll('img[src="x"]').length };
+        }, Reader);
+        assert.ok(Injected.results >= 1, 'The term must be found in the PDF.');
+        assert.equal(Injected.flag, undefined, 'The text of a PDF must not be executed.');
+        assert.equal(Injected.images, 0, 'The text of a PDF must not become an element.');
+        await remove(Reader);
+    });
+    await scenario('an EPUB with an unreadable PDF still opens', async () => {
+        Reader = await open({ book: '/epubs/broken.epub', 'book-key': 'broken', 'content-hash': 'broken-1' });
+        const State = await Page.evaluate(Index => window.readers[Index].api.getState(), Reader);
+        assert.equal(State.status, 'ready', 'A PDF that cannot be read must not keep the book from opening.');
+        await textVisible(Reader, 'chapter', 0);
+        await remove(Reader);
+    });
+    await scenario('a cross-origin PDF is fetched with the credential setting applied', async () => {
+        const Without = await Page.evaluate(() => window.openReader({ book: '/epubs/redirect.pdf', preset: 'integration', 'book-key': 'pdf-x', 'content-hash': 'pdf-x-1' }));
+        const WithoutError = await Page.evaluate(async Index => { try { await window.readers[Index].api.ready; } catch(Error) { return Error.code; } }, Without);
+        assert.equal(WithoutError, 'LOAD_FAILED', 'A cross-origin PDF must not be read without the credential.');
+        await remove(Without);
+        Reader = await open({ book: '/epubs/redirect.pdf', preset: 'credentialed', 'book-key': 'pdf-y', 'content-hash': 'pdf-y-1' });
+        const Rasterized = await pdfPage(Reader);
+        assert.ok(Rasterized && Rasterized.width > 0, 'The cross-origin PDF page must be rasterized.');
+        assert.ok(Requests.some(Request => Request.url.includes('/book.pdf') && Request.cors && Request.cookie), 'The cross-origin PDF must be requested with the credential.');
+        await remove(Reader);
+    });
     await scenario('vertical text and signed-style CORS/Range redirect delivery', async () => {
         Reader = await open({ book: '/epubs/vertical.epub', 'book-key': 'vertical', 'content-hash': 'vertical-1', 'reader-view-mode': 'horizontal' });
         await restore(Reader, { cfi: '/6/2!/4/2/4/1:6000' });
@@ -333,7 +735,7 @@ try {
         Reader = await open({ book: '/epubs/redirect.epub', 'book-key': 'redirect', 'content-hash': 'redirect-1' });
         assert.equal((await Page.evaluate(Index => window.readers[Index].api.getState(), Reader)).status, 'ready');
         assert.ok(Requests.some(Request => Request.cors && Request.range));
-        assert.equal(Requests.filter(Request => Request.cors).some(Request => Request.cookie), false);
+        assert.equal(Requests.filter(Request => Request.cors && Request.url.includes('/book.epub')).some(Request => Request.cookie), false);
     });
     await scenario('end state and load failure are distinct', async () => {
         await restore(Reader, { cfi: '/6/6!/4/2/4/1:' + (TailText.length - 1) });

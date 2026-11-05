@@ -2,6 +2,7 @@
 
 import { Bibi, O, L, R, I, P, S, C, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
+import { PDF } from './bibi.heart.pdf.mjs';
 import { getHostBookStorageLabel } from './bibi.heart.storage.mjs';
 
 //==============================================================================================================================================
@@ -424,7 +425,8 @@ I.Turner = { create: () => {
         filterOrders: (Orders) => Orders.filter(Items => Items && (Items = Items.filter(Item => Item?.Turned != 'Up')).length),
         stringifyOrders: (Orders) => Orders.map(Items => Items ? Items.map(Item => Item ? Item.Index : '').join('+') : '').join('-'),
         turnItems: (Opt = {}) => {
-            if(R.DoNotTurn || !S['allow-placeholders']) return;
+            if(R.DoNotTurn || (!S['allow-placeholders'] && !R.HasPDFItems)) return;
+            if(R.PDFEvicted) { R.PDFEvicted = false, Turner.PastTurningOrdersString = ''; } // a rasterized page was freed: its item must be turned up again
             const Dir = (I.ScrollObserver.History.length > 1) && (I.ScrollObserver.History[1] * C.L_AXIS_D > I.ScrollObserver.History[0] * C.L_AXIS_D) ? -1 : 1;
             const OItem = Opt.Origin || Turner.getTurningOriginItem(Dir); if(!OItem) return;
             let NewOrders = [];
@@ -453,7 +455,7 @@ I.Turner = { create: () => {
             })();
         },
         turnItem: async (Item, Up) => {
-            if(R.DoNotTurn || !S['allow-placeholders'] || !Item || Item.TurningUp === (Up = !!Up)) return;
+            if(R.DoNotTurn || (!S['allow-placeholders'] && Item.Type != 'PDF') || !Item || Item.TurningUp === (Up = !!Up)) return;
             Item.TurningUp = Up;
             const ProcessID = Item.TurningProcessID = O.id();
             await Promise.resolve(Item.Turning);
@@ -1409,19 +1411,20 @@ I.Veil = { create: () => {
 
 I.Catcher = { create: () => { if(S['book-data'] || S['book'] || !S['accept-local-file']) return;
     const Catcher = I.Catcher = O.Body.appendChild(sML.create('div', { id: 'bibi-catcher' }));
+    const PDF = S['accept-pdf']; // a PDF may be opened from a local file too
     Catcher.insertAdjacentHTML('afterbegin', I.distillLabels.distillLanguage({
         default: [
             `<div class="pgroup" lang="en">`,
-                `<p><strong>Pass Me Your EPUB File!</strong></p>`,
-                `<p><em>You Can Open Your Own EPUB.</em></p>`,
+                `<p><strong>Pass Me Your EPUB${ PDF ? ' or PDF' : '' } File!</strong></p>`,
+                `<p><em>You Can Open Your Own EPUB${ PDF ? ' or PDF' : '' }.</em></p>`,
                 `<p><span>Please ${ O.TouchOS ? 'Tap Screen' : 'Drag & Drop It Here. <br />Or Click Screen' } and Choose It.</span></p>`,
                 `<p><small>(Open in Your Device without Uploading)</small></p>`,
             `</div>`
         ].join(''),
         ja: [
             `<div class="pgroup" lang="ja">`,
-                `<p><strong>EPUBファイルをここにください！</strong></p>`,
-                `<p><em>お持ちの EPUB ファイルを<br />開くことができます。</em></p>`,
+                `<p><strong>EPUB${ PDF ? ' / PDF' : '' }ファイルをここにください！</strong></p>`,
+                `<p><em>お持ちの EPUB${ PDF ? ' / PDF' : '' } ファイルを<br />開くことができます。</em></p>`,
                 `<p><span>${ O.TouchOS ? '画面をタップ' : 'ここにドラッグ＆ドロップするか、<br />画面をクリック' }して選択してください。</span></p>`,
                 `<p><small>（外部に送信されず、この端末の中で開きます）</small></p>`,
             `</div>`
@@ -1439,6 +1442,7 @@ I.Catcher = { create: () => { if(S['book-data'] || S['book'] || !S['accept-local
             Accept.push('application/x-zip');
             Accept.push('application/x-zip-compressed');
         }
+        if(PDF) Accept.push('application/pdf');
         if(Accept.length) Catcher.Input.setAttribute('accept', Accept.join(','));
     }
     Catcher.Input.addEventListener('change', Eve => {
@@ -1530,7 +1534,7 @@ I.Menu = { create: () => {
     I.Menu.Config = { create: () => {
         const Menu = I.Menu;
         const Components = [];
-        if(!S['fix-reader-view-mode'] && S['available-reader-view-modes'].length > 1)                      Components.push('ViewModeSection');
+        if((!S['fix-reader-view-mode'] && S['available-reader-view-modes'].length > 1) || S['accept-pdf']) Components.push('ViewModeSection');
         if(O.Embedded)                                                                                     Components.push('WindowSection'), Components.push('WindowSection_NewWindowButton');
         if(O.FullscreenTarget && !O.TouchOS)                                                               Components.push('WindowSection'), Components.push('WindowSection_FullscreenButton');
         if(S['website-href'] && /^https?:\/\/[^\/]+/.test(S['website-href']) && S['website-name-in-menu']) Components.push('LinkageSection'), Components.push('LinkageSection_WebsiteLink');
@@ -1597,6 +1601,40 @@ I.Menu = { create: () => {
                         return I.setUIState(Button, S['full-breadth-layout-in-scroll'] ? 'active' : 'default');
                 } });
             } }));
+            const DirectionGroup = Section.addButtonGroup({
+                Buttons: [{
+                    id: 'bibi-button-pdf-reading-direction',
+                    Type: 'toggle',
+                    Labels: {
+                        default: { default: `Left-to-right reading`, ja: `左読み（左 → 右）` },
+                        active: { default: `Right-to-left reading`, ja: `右読み（右 → 左）` }
+                    },
+                    action: function() {
+                        if(!L.Opened || O.Busy || R.LayingOut || R.Moving) return UpdateDirection();
+                        R.changeView({ PageProgressionDirection: this.UIState == 'active' ? 'rtl' : 'ltr', NoNotification: true });
+                    }
+                }]
+            });
+            const DirectionButton = DirectionGroup.Buttons[0];
+            DirectionButton.setAttribute('role', 'switch');
+            DirectionButton.setAttribute('tabindex', '0');
+            DirectionButton.addEventListener('keydown', Event => {
+                if(Event.key != 'Enter' && Event.key != ' ') return;
+                Event.preventDefault();
+                Event.stopPropagation();
+                if(!Event.repeat) E.dispatch(DirectionButton, 'bibi:singletapped');
+            });
+            const UpdateDirection = () => {
+                const PDFBook = B.Type == 'PDF';
+                const ViewModes = !S['fix-reader-view-mode'] && S['available-reader-view-modes'].length > 1;
+                Section.ButtonGroups[0].style.display = ViewModes ? '' : 'none';
+                Section.style.display = ViewModes || PDFBook ? '' : 'none';
+                DirectionGroup.style.display = PDFBook ? '' : 'none';
+                I.setUIState(DirectionButton, B.PPD == 'rtl' ? 'active' : 'default');
+                DirectionButton.setAttribute('aria-checked', String(B.PPD == 'rtl'));
+            };
+            E.add(['bibi:initialized-book', 'bibi:updated-settings'], UpdateDirection);
+            UpdateDirection();
         }};
 
         I.Menu.Config.WindowSection = { create: (Components) => {
@@ -3367,6 +3405,11 @@ I.Footnotes = { create: () => { if(!S['use-popup-footnotes']) return I.Footnotes
 }};
 
 
+// The text of a search result is shown as markup: it is escaped, except for the line-break markers of the reader.
+const escapeHTML = Text => String(Text).replace(/[&<>"]/g, Ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[Ch]));
+const escapeResultText = Text => String(Text).split(/(<span class="break"> <\/span>)/g).map(Part => Part == '<span class="break"> </span>' ? Part : escapeHTML(Part)).join('');
+
+
 I.RangeFinder = { create: () => {
     const RangeFinder = I.RangeFinder = {
         _str: (Str) => typeof Str == 'string' ? Str : Number.isFinite(Str) ? String(Str) : '',
@@ -3500,8 +3543,55 @@ I.RangeFinder = { create: () => {
             SearchStrings = SearchStrings.Formatted || SearchStrings;
             const SearchResults = [];
             return Promise.all(
-                R.Items.map((Item, i) => Item.Loaded ? this.searchFromDocument(Item.contentDocument, SearchStrings, SearchOptions).then(ItemSearchResults => SearchResults[i] = ItemSearchResults) : null)
-            )   .then(() => SearchResults.flat().map((SRes, i) => (SRes.Item = SRes.Document.body.Item, SRes.IndexInItem = SRes.Index, SRes.Index = i, SRes)));
+                R.Items.map((Item, i) => Item.Loaded
+                    ? this.searchFromDocument(Item.contentDocument, SearchStrings, SearchOptions).then(ItemSearchResults => SearchResults[i] = ItemSearchResults)
+                    : this.searchFromUnrenderedItem(Item, SearchStrings, SearchOptions).then(ItemSearchResults => SearchResults[i] = ItemSearchResults)
+                )
+            )   .then(() => SearchResults.flat().filter(SRes => !!SRes).map((SRes, i) => (SRes.Item = SRes.Item || SRes.Document.body.Item, SRes.IndexInItem = SRes.Index, SRes.Index = i, SRes)));
+        },
+        // A PDF page that has not been rendered yet is searched through its extracted text: the page is not rasterized for it.
+        // The result becomes focusable when it is selected: then the page is rendered and the text is found in it.
+        // The text of a PDF is not sanitized (it is not markup): the snippets are escaped before they are shown.
+        searchFromUnrenderedItem: async function(Item, SearchStrings, SearchOptions) {
+            if(Item.Type != 'PDF') return null;
+            const PageNo = Item['bibi:pdf-page'] || 1;
+            const Text = await PDF.getPageText(Item.Source, PageNo);
+            if(!Text) return null;
+            const Opt = this._opt(SearchOptions);
+            const FlatText = this._flatten(Text, Opt); // the same normalization as the search of a rendered page
+            const Results = [];
+            let Index = 0;
+            for(const Str of [SearchStrings].flat().filter(Str => typeof Str == 'string' && Str)) {
+                const FlatStr = this._flatten(Str, Opt);
+                if(!FlatStr) continue;
+                let From = 0, Occurrence = 0;
+                for(;;) {
+                    const At = FlatText.indexOf(FlatStr, From);
+                    if(At < 0) break;
+                    Results.push({
+                        Item, Index: Index++, PDFStrings: SearchStrings, PDFOptions: SearchOptions, PDFPageNo: PageNo, PDFOccurrence: Occurrence++, PDFTerm: Str,
+                        TextAround: [
+                            At > 30 ? '...' : '',
+                            Text.substring(Math.max(0, At - 30), At),
+                            Text.substring(At, At + FlatStr.length),
+                            Text.substring(At + FlatStr.length, At + FlatStr.length + 30) + (At + FlatStr.length + 30 < Text.length ? '...' : '')
+                        ],
+                        Range: null
+                    });
+                    From = At + FlatStr.length;
+                }
+            }
+            return Results.length ? Results : null;
+        },
+        // A PDF search result becomes a real range when its page is rendered and the text is found in it.
+        resolvePDFSearchResult: async function(SearchResult) {
+            const Item = SearchResult.Item;
+            if(!Item) return null;
+            await I.Turner.turnItem(Item, true);
+            if(!Item.Loaded) return null;
+            const Results = await this.searchFromDocument(Item.contentDocument, [SearchResult.PDFTerm], SearchResult.PDFOptions || {});
+            const Match = Results[SearchResult.PDFOccurrence];
+            return Match ? Match.Range : null;
         },
         search: function(SearchStrings, SearchOptions_BehaviorOptions) {
             this.searching(false);
@@ -3556,7 +3646,7 @@ I.RangeFinder = { create: () => {
                 if(k == 'Results') {
                     this.removeAllPaints();
                     const SearchResults = this.Search.Results;
-                    if(SearchResults.length) SearchResults.forEach(SearchResult => this.paint(SearchResult.Range));
+                    if(SearchResults.length) SearchResults.forEach(SearchResult => SearchResult.Range && this.paint(SearchResult.Range));
                     SearchResults.Focused       = null;
                 }
             });
@@ -3605,6 +3695,18 @@ I.RangeFinder = { create: () => {
                 SearchResults.Focused = SearchResult;
                 this.updateSearch();
             }
+            return this.focusOnSearchResult(SearchResult);
+        },
+        // A PDF result has no range until its page is rendered: the page is rendered when the result is selected.
+        // A range of a page that has been rendered again belongs to a document that is gone: it is resolved again.
+        focusOnSearchResult: async function(SearchResult) {
+            const Item = SearchResult.Item;
+            const Stale = !SearchResult.Range || (Item && Item.Loaded && SearchResult.Range.startContainer && SearchResult.Range.startContainer.ownerDocument !== Item.contentDocument);
+            if(Stale && SearchResult.PDFPageNo) {
+                const Range = await this.resolvePDFSearchResult(SearchResult);
+                if(!Range) return Promise.resolve();
+                SearchResult.Range = Range;
+            }
             return this.focusOn(SearchResult.Range);
         },
         changeSearchResultFocusBy: function(Dist) {      /**/ if(!Number.isInteger(Dist) || !Dist) return Promise.resolve();
@@ -3639,6 +3741,7 @@ I.RangeFinder = { create: () => {
             } return iStart;
         },
         paint: function(RoP /* Range-or-Paint */, Spec) {
+            if(!RoP) return; // a PDF result has no range until its page is rendered
             let IsNew, Paint, Ran, Doc, Item;
             if(RoP.nodeType === 1) {
                 Paint = RoP;
@@ -3794,7 +3897,7 @@ I.RangeFinder = { create: () => {
                     if(SearchResults) SearchResults.forEach((SearchResult, i) => {
                         const Button = ListButtonGroup.addButton({
                             Icon: `<span>` + (SearchResult.Index + 1) + `</span>`,
-                            Labels: { default: { default: SearchResult.TextAround.map((Txt, i) => sML.create(i == 2 ? 'strong' : i % 2 == 1 ? 'em' : 'span', { innerHTML: Txt.replace(/(<span class="break"> <\/span>)/g, '$1\n') }).outerHTML).join('') } },
+                            Labels: { default: { default: SearchResult.TextAround.map((Txt, i) => sML.create(i == 2 ? 'strong' : i % 2 == 1 ? 'em' : 'span', { innerHTML: escapeResultText(Txt).replace(/(<span class="break"> <\/span>)/g, '$1\n') }).outerHTML).join('') } },
                             action: () => List.close() && this.setSearchResultFocusTo(SearchResult.Index)
                         });
                         if(SearchResult.IndexInItem == 0)                                           Button.classList.add('first-in-item');
@@ -3909,7 +4012,7 @@ I.RangeFinder = { create: () => {
                 }, E.CPO_100);
             });
             E.add('bibi:opened', () => {
-                if(S['use-search-ui'] && B.Package.Metadata['rendition:layout'] == 'reflowable') this.createSearchUI();
+                if(S['use-search-ui'] && (B.Package.Metadata['rendition:layout'] == 'reflowable' || R.HasPDFItems)) this.createSearchUI();
                 E.add('bibi:changed-intersection', () => {
                     this.reserveRepainting(999);
                 });

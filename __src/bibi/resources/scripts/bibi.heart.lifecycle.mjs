@@ -97,6 +97,7 @@ Bibi.SettingTypes_PresetOnly = {
     ],
     'yes-no': [
         'accept-local-file',
+        'accept-pdf',
         'keep-settings',
         'resume-from-last-position'
     ],
@@ -606,7 +607,7 @@ Bibi.loadBook = (BookInfo) => Promise.resolve().then(() => {
     // Bibi.StartOption.addResetter();
     O.HTML.classList.add('loading-items');
     let LoadedItems = 0;
-    return Promise.all(R.Spreads.map(Spread => new Promise(resolve => L.loadSpread(Spread, { AllowPlaceholderItems: S['allow-placeholders'] && Spread.Index != Bibi.StartOption.TargetSpreadIndex }).then(() => {
+    return Promise.all(R.Spreads.map(Spread => new Promise(resolve => L.loadSpread(Spread, { AllowPlaceholderItems: Spread.Index != Bibi.StartOption.TargetSpreadIndex }).then(() => {
         I.notify(`Loading Items... <span class="sotto">${ LoadedItems += Spread.Items.length }/${ R.Items.length }</span>`);
         setTimeout(() => resolve(), 69);
         // !Bibi.StartOption.Reset ? R.layOutSpreadAndItsItems(Spread).then(resolve) : resolve();

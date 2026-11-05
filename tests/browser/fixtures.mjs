@@ -53,3 +53,86 @@ export const createOpeningFixture = async () => {
     add('content/prose.xhtml', xhtml('本文', `<p id="prose">${LongText}</p>`, true));
     return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
 };
+
+// A minimal but valid PDF: one page per entry, each page carrying its own text so the pages are distinguishable.
+const PDFString = Text => String(Text).replace(/([\\()])/g, '\\$1');
+// A text with characters outside Latin-1 is written as a UTF-16BE hexadecimal string.
+const PDFText = Text => /[^\x00-\x7F]/.test(Text) ? '<' + 'FEFF' + Buffer.from(Text, 'utf16le').toString('hex').toUpperCase().replace(/(..)(..)/g, (Pair, Low, High) => High + Low) + '>' : '(' + PDFString(Text) + ')';
+export const createPDFFixture = (PageCount = 3, PageWidth = 300, PageHeight = 200, TextOfPage) => {
+    const Encoder = new TextEncoder(), Chunks = [];
+    let Length = 0;
+    const Push = Text => { const Bytes = Encoder.encode(Text); Chunks.push(Bytes); Length += Bytes.length; };
+    const Offsets = [];
+    const Obj = (Num, Body) => { Offsets[Num] = Length; Push(`${Num} 0 obj\n${Body}\nendobj\n`); };
+    const PageNum = Index => 4 + Index * 2, ContentNum = Index => 5 + Index * 2;
+    Push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    const Kids = [];
+    for(let Index = 0; Index < PageCount; Index++) Kids.push(`${PageNum(Index)} 0 R`);
+    Obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    Obj(2, `<< /Type /Pages /Kids [${Kids.join(' ')}] /Count ${PageCount} >>`);
+    Obj(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+    for(let Index = 0; Index < PageCount; Index++) {
+        const Texts = TextOfPage ? [TextOfPage(Index + 1)].flat() : [`PDF page ${Index + 1}`];
+        const Stream = 'BT /F1 28 Tf ' + Texts.map((Text, i) => typeof Text == 'object'
+            ? `1 0 0 1 ${Text.x} ${Text.y} Tm ${PDFText(Text.text)} Tj`
+            : `20 ${Math.floor(PageHeight / 2) - 30 * i} Td ${PDFText(Text)} Tj`).join(' ') + ' ET';
+        Obj(PageNum(Index), `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PageWidth} ${PageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${ContentNum(Index)} 0 R >>`);
+        Obj(ContentNum(Index), `<< /Length ${Stream.length} >>\nstream\n${Stream}\nendstream`);
+    }
+    const MaxObj = ContentNum(PageCount - 1), XRefOffset = Length;
+    let XRef = `xref\n0 ${MaxObj + 1}\n0000000000 65535 f \n`;
+    for(let Num = 1; Num <= MaxObj; Num++) XRef += `${String(Offsets[Num]).padStart(10, '0')} 00000 n \n`;
+    Push(XRef);
+    Push(`trailer\n<< /Size ${MaxObj + 1} /Root 1 0 R >>\nstartxref\n${XRefOffset}\n%%EOF\n`);
+    const Bytes = new Uint8Array(Length);
+    let Offset = 0;
+    for(const Chunk of Chunks) { Bytes.set(Chunk, Offset); Offset += Chunk.length; }
+    return Buffer.from(Bytes);
+};
+
+// An EPUB that carries a PDF: "InSpine" puts the PDF into the spine, otherwise it is only linked from the content.
+export const createPDFEmbeddedFixture = async (InSpine = true, PDFPageCount = 3) => {
+    const Zip = new JSZip(), add = (Name, Content, Extra = {}) => Zip.file(Name, Content, { date: DateOfFixture, ...Extra });
+    add('mimetype', 'application/epub+zip', { compression: 'STORE' });
+    add('META-INF/container.xml', '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="content/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    add('content/package.opf', `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">pdf-embedded-fixture</dc:identifier><dc:title>添付 PDF 確認</dc:title><dc:language>ja</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/><item id="embedded" href="embedded.pdf" media-type="application/pdf"/></manifest><spine>${InSpine ? '<itemref idref="chapter"/><itemref idref="embedded"/>' : '<itemref idref="chapter"/>'}</spine></package>`);
+    add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#chapter">章</a></li></ol></nav></body></html>');
+    add('content/chapter.xhtml', xhtml('章', '<p id="chapter">この章から添付の PDF へ移動できます。</p><p><a id="to-pdf" href="embedded.pdf">添付の PDF</a></p><p><object id="inline-pdf" data="embedded.pdf" type="application/pdf">埋め込み PDF</object></p>', false));
+    add('content/embedded.pdf', createPDFFixture(PDFPageCount), { binary: true });
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
+
+// An EPUB that carries a PDF which cannot be read: the book must still open.
+export const createPDFBrokenFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content, Extra = {}) => Zip.file(Name, Content, { date: DateOfFixture, ...Extra });
+    add('mimetype', 'application/epub+zip', { compression: 'STORE' });
+    add('META-INF/container.xml', '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="content/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    add('content/package.opf', '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">pdf-broken-fixture</dc:identifier><dc:title>壊れた PDF 確認</dc:title><dc:language>ja</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/><item id="broken" href="broken.pdf" media-type="application/pdf"/></manifest><spine><itemref idref="chapter"/></spine></package>');
+    add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#chapter">章</a></li></ol></nav></body></html>');
+    add('content/chapter.xhtml', xhtml('章', '<p id="chapter">壊れた PDF があっても本は開けます。</p>', false));
+    add('content/broken.pdf', Buffer.from('%PDF-1.4\nthis is not a readable pdf\n%%EOF\n'), { binary: true });
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
+
+// An EPUB whose PDF resource has no file extension: its declared media type is the only hint that it is binary.
+export const createPDFExtensionlessFixture = async (PDFPageCount = 3, AttachmentName = 'attachment') => {
+    const Zip = new JSZip(), add = (Name, Content, Extra = {}) => Zip.file(Name, Content, { date: DateOfFixture, ...Extra });
+    add('mimetype', 'application/epub+zip', { compression: 'STORE' });
+    add('META-INF/container.xml', '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="content/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    add('content/package.opf', `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">pdf-extensionless-fixture</dc:identifier><dc:title>拡張子なし PDF 確認</dc:title><dc:language>ja</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/><item id="attachment" href="${ AttachmentName }" media-type="application/pdf"/></manifest><spine><itemref idref="chapter"/><itemref idref="attachment"/></spine></package>`);
+    add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml#chapter">章</a></li></ol></nav></body></html>');
+    add('content/chapter.xhtml', xhtml('章', '<p id="chapter">拡張子のない添付ファイルです。</p>', false));
+    add('content/' + AttachmentName, createPDFFixture(PDFPageCount), { binary: true });
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
+
+// An EPUB whose XHTML item has no file extension: only its media type says that it is text.
+export const createExtensionlessMarkupFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content, Extra = {}) => Zip.file(Name, Content, { date: DateOfFixture, ...Extra });
+    add('mimetype', 'application/epub+zip', { compression: 'STORE' });
+    add('META-INF/container.xml', '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="content/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+    add('content/package.opf', '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">extensionless-markup-fixture</dc:identifier><dc:title>拡張子なし XHTML 確認</dc:title><dc:language>ja</dc:language><meta property="dcterms:modified">2000-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="chapter" href="chapter" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>');
+    add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="chapter#chapter">章</a></li></ol></nav></body></html>');
+    add('content/chapter', xhtml('章', '<p id="chapter">拡張子のない XHTML を含む本です。</p>', false));
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};

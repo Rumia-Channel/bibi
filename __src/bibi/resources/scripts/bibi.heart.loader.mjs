@@ -2,6 +2,7 @@
 
 import { Bibi, O, L, R, I, U, D, S, E, X } from './bibi.heart.context.mjs';
 import { B } from './bibi.heart.book.mjs';
+import { PDF } from './bibi.heart.pdf.mjs';
 import { Conc } from './bibi.instruments/Conc.mjs';
 
 //==============================================================================================================================================
@@ -40,10 +41,11 @@ L.openNewWindow = (HRef) => {
 
 
 L.play = () => {
-    if(S['start-in-new-window']) return L.openNewWindow(location.href + (U['jo'] ? (/#/.test(location.href) ? '&' : '#') + `jo(` + Object.entries(U['jo']).map(([K, V]) => K + `=` + encodeURIComponent(V)).join('&') + `)` : ''));
+    if(S['start-in-new-window']) return L.openNewWindow(location.href + (U['jo'] ? (/#/.test(location.href) ? '&' : '#') + `jo(` + Object.entries(U['jo']).map(([K, V]) => K + '=' + encodeURIComponent(V)).join('&') + `)` : ''));
     L.Played = true;
     R.resetStage();
-    L.wait.resolve();
+    // The play button can be pressed before the reader begins to wait (a PDF is not extracted, so nothing waits for it until then).
+    if(L.wait.resolve) L.wait.resolve();
     E.dispatch('bibi:played');
 };
 
@@ -56,12 +58,20 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
         typeof BookInfo.BookData == 'string' ? 'Base64' :
         typeof BookInfo.BookData == 'object' && BookInfo.BookData.size && (BookInfo.BookData.name || BookInfo.BookData.type) ? (BookInfo.BookData.name ? 'File' : 'Blob') : '';
     if(!BookDataFormat) return reject_failedToOpenTheBook(Bibi.ErrorMessages.DataInvalid);
-    B.Type = !S['book'] ? '' : S['zine'] ? 'Zine' : 'EPUB';
-    if(B.Type != 'EPUB') B.ZineData = { Source: { Path: 'zine.yaml' } };
+    // A local file is a PDF when its name or its media type says so: a PDF is not a ZIP, so it is not extracted but read by pdf.js.
+    const PDFType = BookDataFormat == 'File' ? O.getPDFType(BookInfo.BookData.name, BookInfo.BookData.type) : '';
+    B.Type = !S['book'] ? (PDFType == 'PDF' ? 'PDF' : '') : S['zine'] ? 'Zine' : (BookDataFormat == 'URI' && O.isPDFPath(BookInfo.Book) ? 'PDF' : 'EPUB');
+    if(B.Type != 'EPUB' && B.Type != 'PDF') B.ZineData = { Source: { Path: 'zine.yaml' } };
+    PDF.reset(); // another book is opened: nothing of the previous one may be reused (a local PDF is known by its file name only)
     if(BookDataFormat == 'URI') {
         // Online
         if(O.Local) return reject(`Bibi can't open books via ${ D['book'] ? 'data-bibi-book' : 'URL' } on local mode`);
         B.Path = BookInfo.Book;
+        if(B.Type == 'PDF') {
+            if(!S['accept-pdf']) return reject_failedToOpenTheBook('PDF is set to unacceptable');
+            const Source = { 'id': 'BibiPDFItem', 'href': O.rrr(B.Path), 'media-type': 'application/pdf', 'Path': O.rrr(B.Path), 'URI': B.Path };
+            return L.loadPDFBook(Source).then(() => resolve('PDF file')).catch(Err => reject_failedToOpenTheBook(String(Err && Err.message || Err)));
+        }
         const RootSource = (B.Type == 'Zine' ? B.ZineData : B.Container).Source;
         const InitErrors = [], initialize_as = (FileOrFolder) => ({
             Promised: (
@@ -95,6 +105,24 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
             if(!S['accept-local-file'])                      return reject(`Local file is set to unacceptable`);
             if(!BookData.name)                               return reject(`File without a name is unacceptable`);
             if(!/\.[\w\d]+$/.test(BookData.name))            return reject(`Local file without extension is set to unacceptable`);
+            if(PDFType == 'mismatch')                        return reject(MIMETypeErrorMessage);
+            if(PDFType == 'PDF') {
+                // A local PDF file: its bytes are read by pdf.js, so it is not extracted as a ZIP.
+                if(!S['accept-pdf']) return reject_failedToOpenTheBook('PDF is set to unacceptable');
+                FileOrData = 'file';
+                B.Path = '[Local File] ' + BookData.name;
+                if(I.Catcher && I.Catcher.Input) I.Catcher.style.opacity = 0; // the catcher is hidden by the ZIP extractor for a zipped book
+                return L.loadPDFBook({
+                    'id'        : 'BibiPDFItem',
+                    'href'      : BookData.name,
+                    'media-type': 'application/pdf',
+                    'Path'      : O.rrr('/' + BookData.name),
+                    'Content'   : BookData,
+                    'DataType'  : 'Blob'
+                }, { FileName: BookData.name })
+                    .then(() => resolve(`PDF ${ FileOrData }`))
+                    .catch(Err => reject_failedToOpenTheBook(String(Err && Err.message || Err)));
+            }
             if(!O.isToBeExtractedIfNecessary(BookData.name)) return reject(`File with this extension is set to unacceptable`);
             if(BookData.type) {
                 if(/\.epub$/i.test(BookData.name) ? !MIMETypeREs['EPUB'].test(BookData.type) :
@@ -137,18 +165,66 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
 }).then(InitializedAs => {
     delete S['book-data'];
     delete S['book-data-mimetype'];
-    return (B.Type == 'Zine' ? X.Zine.loadZineData() : L.loadContainer().then(L.loadPackage)).then(() => E.dispatch('bibi:initialized-book')).then(() => InitializedAs);
+    return (B.Type == 'Zine' ? X.Zine.loadZineData() :
+            B.Type == 'PDF'  ? Promise.resolve() : // the package of a PDF book is already built by L.loadPDFBook
+                               L.loadContainer().then(L.loadPackage)).then(() => E.dispatch('bibi:initialized-book')).then(() => InitializedAs);
 });
 
 
-L.loadContainer = () => O.openDocument(B.Container.Source).then(L.loadContainer.process);
+// A PDF opened as a book: the document becomes a synthetic package whose spine holds one item per page.
+// The items are ordinary spine items, so the ordinary machinery (lazy loading, fitting, page turns, position) applies.
+L.loadPDFBook = async (Source, Opt = {}) => {
+    const Path = Source.Path, FileName = Opt.FileName || Path.split('/').pop() || 'book.pdf';
+    B.Package.Manifest[Path] = Source;
+    B.Package.Source.Path = Path;
+    const Doc = await PDF.getDocument(Source);
+    const NumPages = Doc.numPages;
+    if(!NumPages) throw new Error('The PDF has no page.');
+    let Title = FileName.replace(/\.pdf$/i, ''), Language = 'en';
+    // A PDF may carry a garbled title (a document written by a word processor with a broken encoding) and the control characters
+    // of such a title are not allowed in XML: the package document must stay valid, and a title that had to be cleaned is not worth showing.
+    const XMLText = Text => String(Text).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '').replace(/[\uD800-\uDFFF]/g, '');
+    try {
+        const Meta = await Doc.getMetadata();
+        if(Meta && Meta.info) {
+            const InfoTitle = Meta.info.Title ? Meta.info.Title.trim() : '';
+            if(InfoTitle && XMLText(InfoTitle) == InfoTitle) Title = InfoTitle;
+            if(Meta.info.Language) Language = XMLText(Meta.info.Language);
+        }
+    } catch(Err) { /* the metadata is optional */ }
+    const Escape = Text => String(XMLText(Text)).replace(/[&<>"']/g, Ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[Ch]));
+    const Writing = await PDF.getDocumentWritingMode(Source).catch(() => ({ mode: 'unknown' }));
+    const Progression = Writing.mode == 'vertical' ? ' page-progression-direction="rtl"' :
+        Writing.mode == 'horizontal' ? ' page-progression-direction="ltr"' : '';
+    const ItemRefs = [];
+    for(let PageNo = 1; PageNo <= NumPages; PageNo++) ItemRefs.push(`<itemref idref="BibiPDFItem" properties="${ PDF.pageProperty(PageNo) }" />`);
+    const OPF = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BibiPDFIdentifier">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="BibiPDFIdentifier">${ Escape(Path) }</dc:identifier>
+<dc:language>${ Escape(Language) }</dc:language>
+<dc:title>${ Escape(Title) }</dc:title>
+<meta property="rendition:layout">pre-paginated</meta>
+<meta property="rendition:spread">none</meta>
+</metadata>
+<manifest>
+<item id="BibiPDFItem" href="${ Escape(FileName) }" media-type="application/pdf" />
+</manifest>
+<spine${ Progression }>
+${ ItemRefs.join('\n') }
+</spine>
+</package>`;
+    return L.loadPackage.process(O.parseDOM(OPF, 'text/xml'));
+};
 
+
+L.loadContainer = () => O.openDocument(B.Container.Source).then(L.loadContainer.process);
     L.loadContainer.process = (Doc) => B.Package.Source.Path = Doc.getElementsByTagName('rootfile')[0].getAttribute('full-path');
 
 
 L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.process);
 
-    L.loadPackage.process = (Doc) => { // This is Used also from the Zine Extention.
+    L.loadPackage.process = async (Doc) => { // This is Used also from the Zine Extention.
         Doc.Promises = []; E.dispatch('bibi:is-going-to:process-package', Doc);
         // ================================================================================
         // NAMESPACES
@@ -260,6 +336,50 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
         // --------------------------------------------------------------------------------
         E.dispatch('bibi:is-going-to:process-package-spine', _Spine);
         // --------------------------------------------------------------------------------
+        // A PDF in the spine becomes its pages: its item reference is replaced, in place, by one item reference per page,
+        // so that the reading order of the book is kept. A PDF that is only linked from the content is appended at the end
+        // of the spine, so that the link can reach it.
+        const SpineItemRefs = getOPFElementsByTagNameIn(_Spine, 'itemref');
+        const ItemRefList = [];
+        if(B.Type != 'PDF' && Object.values(Manifest).some(Source => Source['media-type'] == 'application/pdf')) {
+            const PDFPageItemRefs = async (IDRef, Source, ItemRef) => {
+                let NumPages = 0;
+                try {
+                    const Doc = await PDF.getDocument(Source);
+                    NumPages = Doc.numPages;
+                } catch(Err) {
+                    // A PDF that cannot be read (broken, encrypted or missing) must not keep the whole book from opening.
+                    O.log(`The PDF "${ Source.Path }" could not be read.`, Err && Err.message ? Err.message : Err, '<e/>');
+                    return [];
+                }
+                const ItemRefs = [];
+                for(let PageNo = 1; PageNo <= NumPages; PageNo++) {
+                    const Page = ItemRef ? ItemRef.cloneNode(false) : _Spine.ownerDocument.createElement('itemref');
+                    Page.removeAttribute('id');
+                    Page.setAttribute('idref', IDRef);
+                    const Properties = (ItemRef ? ItemRef.getAttribute('properties') || '' : '').split(' ').filter(Boolean)
+                        .filter(Pro => !/^(rendition:)?(layout|page-spread)-/.test(Pro)); // the pages carry their own layout
+                    Properties.push(...PDF.pageProperty(PageNo).split(' '));
+                    Page.setAttribute('properties', Properties.join(' '));
+                    ItemRefs.push(Page);
+                }
+                return ItemRefs;
+            };
+            const InSpinePDFs = new Set();
+            for(const ItemRef of SpineItemRefs) {
+                const IDRef = ItemRef.getAttribute('idref');
+                const Source = Manifest[SourcePaths[IDRef]];
+                if(!Source || Source['media-type'] != 'application/pdf') { ItemRefList.push(ItemRef); continue; }
+                InSpinePDFs.add(Source.id);
+                const Pages = await PDFPageItemRefs(IDRef, Source, ItemRef);
+                if(!Pages.length) ItemRefList.push(ItemRef); else ItemRefList.push(...Pages);
+            }
+            for(const Source of Object.values(Manifest)) {
+                if(Source['media-type'] != 'application/pdf' || InSpinePDFs.has(Source.id)) continue;
+                ItemRefList.push(...await PDFPageItemRefs(Source.id, Source, null));
+            }
+        } else ItemRefList.push(...SpineItemRefs);
+        // --------------------------------------------------------------------------------
         if(!B.Nav.Source) {
             const Source = Manifest[SourcePaths[_Spine.getAttribute('toc')]];
             if(Source) B.Nav.Source = Source, B.Nav.Type = 'TOC-NCX';
@@ -276,7 +396,7 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
         if(B.PPD == 'rtl') SpreadBefore = 'right', SpreadAfter = 'left';
         else               SpreadBefore = 'left',  SpreadAfter = 'right';
         const SpreadsDocumentFragment = document.createDocumentFragment();
-        sML.forEach(getOPFElementsByTagNameIn(_Spine, 'itemref'))(ItemRef => {
+        sML.forEach(ItemRefList)(ItemRef => {
             const IDRef = ItemRef.getAttribute('idref'); if(!IDRef) return false;
             const Source = Manifest[SourcePaths[IDRef]]; if(!Source) return false;
             const Item = sML.create('iframe', { className: 'item', scrolling: 'no', allowtransparency: 'true', style: { width: '100vw', height: '100vh' },/*TimeCard: {}, stamp: function(What) { O.stamp(What, this.TimeCard); },*/
@@ -301,6 +421,7 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
                 Properties.forEach(Pro => {
                     if(RenditionPropertyRE.test(Pro)) ItemRef[Pro.replace(RenditionPropertyRE, '$1')] = Pro.replace(RenditionPropertyRE, '$4');
                     if(     BibiPropertyRE.test(Pro)) ItemRef[Pro.replace(     BibiPropertyRE, '$1')] = true;
+                    if(PDF.pageOf(Pro)) Item['bibi:pdf-page'] = PDF.pageOf(Pro);
                 });
             }
             Item['rendition:layout']       = ItemRef['rendition:layout']       || Metadata['rendition:layout']; if(Item['rendition:layout'] != 'pre-paginated') Item['rendition:layout'] = 'reflowable';
@@ -310,14 +431,15 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
             Item['bibi:allow-placeholder'] = ItemRef['bibi:allow-placeholder'] || undefined;
             Item['bibi:no-adjustment']     = ItemRef['bibi:no-adjustment']     || undefined;
             Item['bibi:no-padding']        = ItemRef['bibi:no-padding']        || undefined;
+            if(Item.Type == 'PDF') R.HasPDFItems = true; // PDF pages are rasterized on demand: see L.loadItem
             Object.assign(Item, Item['rendition:layout'] == 'reflowable' ? {
                 Reflowable: true, PrePaginated: false,
-                AllowPlaceholder: B.ExtractionPolicy != 'at-once' && Item['bibi:allow-placeholder'],
+                AllowPlaceholder: Item.Type == 'PDF' ? true : B.ExtractionPolicy != 'at-once' && Item['bibi:allow-placeholder'],
                 NoAdjustment: Item['bibi:no-adjustment'] ? true : false,
                 NoPadding: Item['bibi:no-padding'] ? true : false
             } : {
                 Reflowable: false, PrePaginated: true,
-                AllowPlaceholder: B.ExtractionPolicy != 'at-once' && (Item['bibi:allow-placeholder'] || Metadata['rendition:layout'] == 'pre-paginated'),
+                AllowPlaceholder: Item.Type == 'PDF' ? true : B.ExtractionPolicy != 'at-once' && (Item['bibi:allow-placeholder'] || Metadata['rendition:layout'] == 'pre-paginated'),
                 NoAdjustment: true,
                 NoPadding: true
             });
@@ -598,7 +720,10 @@ L.preprocessResources = () => {
 
 
 L.loadSpread = (Spread, Opt = {}) => new Promise((resolve, reject) => {
-    Spread.AllowPlaceholderItems = (S['allow-placeholders'] && Opt.AllowPlaceholderItems);
+    // A PDF page is rasterized on demand: a document with hundreds of pages must not be rasterized all at once.
+    // The deferral is independent of the extraction policy and of "allow-placeholders": it is a memory guard, not a feature.
+    const HasPDF = Spread.Items.some(Item => Item.Type == 'PDF');
+    Spread.AllowPlaceholderItems = HasPDF ? Opt.AllowPlaceholderItems : (S['allow-placeholders'] && Opt.AllowPlaceholderItems);
     let LoadedItemsInSpread = 0, SkippedItemsInSpread = 0;
     Spread.Items.forEach(Item => {
         L.loadItem(Item, { AllowPlaceholder: Opt.AllowPlaceholderItems })
@@ -614,7 +739,7 @@ L.loadSpread = (Spread, Opt = {}) => new Promise((resolve, reject) => {
 L.loadItem = async (Item, Opt = {}) => {
     const ProcessID = Item.LoadingProcessID = O.id();
     await Promise.resolve(Item.Loading);
-    const IsPlaceholder = (S['allow-placeholders'] && Item.AllowPlaceholder && Opt.AllowPlaceholder) ? true : false;
+    const IsPlaceholder = Opt.AllowPlaceholder ? (Item.Type == 'PDF' ? true : (S['allow-placeholders'] && Item.AllowPlaceholder)) : false;
     const ItemBox = Item.Box;
     const classify = (ClassName, TF) => [Item, ItemBox].forEach(TF ? Ele => Ele.classList.add(ClassName) : Ele => Ele.classList.remove(ClassName));
     let ContentURL;
@@ -643,6 +768,7 @@ L.loadItem = async (Item, Opt = {}) => {
         O.log(`Item#${ String(Item.Index).padStart(3, 0) } is turned DOWN:`, Reason);
         classify('loaded', false);
         classify('placeholder', true);
+        if(Item.Type == 'PDF') PDF.release(Item); // the rasterized page is freed with the item
         if(Item.contentWindow) Item.contentWindow.stop() || O.log(`Item#${ String(Item.Index).padStart(3, 0) } STOPPED its window.`);
         if(Item.contentDocument) Item.contentDocument.querySelectorAll('[src], [*|href]').forEach(Ele => ['src','href','xlink:href'].forEach(Att => Ele.removeAttribute(Att)) || Ele.remove()) || O.log(`Item#${ String(Item.Index).padStart(3, 0) } REMOVED its elements.`);
         if(Item.parentElement) Item.parentElement.removeChild(Item);
@@ -659,7 +785,7 @@ L.loadItem = async (Item, Opt = {}) => {
         URL.revokeObjectURL(ContentURL);
         Item.removeEventListener('load', Item.onLoaded);
         delete Item.onLoaded;
-        delete Item.Source.Content;
+        if(Item.Type != 'PDF') delete Item.Source.Content; // a PDF's bytes are shared by every page of it: they are released once the document is parsed
         delete Item.Source.Preprocessed;
         delete Item.Source.Retlieved;
         delete Item.SourceText;
@@ -675,18 +801,31 @@ L.fetchAndBuildItemSourceText = async (Item) => {
     let Declarations, AdditionalHeader;
     return O.chain({ assure: () => ProcessID == Item.LoadingProcessID, Label: 'L.fetchAndBuildItemSourceText' },
         () => E.dispatch('bibi:is-going-to:build-item-source-text', Item),
-        () => (Opt => !Opt ? Promise.reject('Item.Type Unknown') : O.file(Item.Source, {
-            Preprocess: Opt.Preprocess,
-            URI: Opt.URI,
-            initialize: () => O.chain({ assure: () => ProcessID == Item.LoadingProcessID, Label: 'L.fetchAndBuildItemSourceText > O.file > initialize' },
+        () => (Opt => {
+            if(!Opt) return Promise.reject('Item.Type Unknown');
+            // A PDF page is rasterized from the parsed document: the file is read once and shared by every page of it.
+            // The per-item fetch is bypassed here: it would download the file again for every page, or fail for the pages after the first.
+            if(Item.Type == 'PDF') return O.chain({ assure: () => ProcessID == Item.LoadingProcessID, Label: 'L.fetchAndBuildItemSourceText > PDF' },
                 Opt.initialize_before,
                 () => E.dispatch('bibi:is-going-to:initialize-item-source', Item),
                 Opt.initialize_main,
                 () => E.dispatch('bibi:initialized-item-source', Item),
-                Opt.initialize_after
-            ),
-            finalize: Opt.finalize
-        }))(
+                Opt.initialize_after,
+                Opt.finalize
+            );
+            return O.file(Item.Source, {
+                Preprocess: Opt.Preprocess,
+                URI: Opt.URI,
+                initialize: () => O.chain({ assure: () => ProcessID == Item.LoadingProcessID, Label: 'L.fetchAndBuildItemSourceText > O.file > initialize' },
+                    Opt.initialize_before,
+                    () => E.dispatch('bibi:is-going-to:initialize-item-source', Item),
+                    Opt.initialize_main,
+                    () => E.dispatch('bibi:initialized-item-source', Item),
+                    Opt.initialize_after
+                ),
+                finalize: Opt.finalize
+            });
+        })(
             Item.Type == 'MarkupDocument' ? {
                 Preprocess: true, // (B.ExtractionPolicy || sML.UA.Gecko), // Preprocess if archived (or Gecko. For such books as styled only with -webkit/epub- prefixed properties. It's NOT Gecko's fault but requires preprocessing.)
                 initialize_before: () => Item.SourceText = Item.Source.Content.trim(),
@@ -709,6 +848,28 @@ L.fetchAndBuildItemSourceText = async (Item) => {
                         }));
                         Item.SourceText = ItemDOM.documentElement.outerHTML;
                     }
+                    // An inline embedded PDF (object/embed/iframe) is not rendered in the text flow: it becomes a link to the PDF's pages.
+                    // The conversion runs before the sanitization, so that it also works in the secure configuration, where those elements are removed.
+                    if(/<(object|embed|iframe)[\s>]/i.test(Item.SourceText)) try {
+                        const BaseDir = Item.Source.Path.replace(/\/?[^\/]+$/, '');
+                        const ItemDOM = O.parseDOM(Item.SourceText, Item.Source['media-type']);
+                        const NSTag = ItemDOM.documentElement.namespaceURI || 'http://www.w3.org/1999/xhtml';
+                        let Replaced = 0;
+                        for(const Ele of [...ItemDOM.querySelectorAll('object[data], embed[src], iframe[src]')]) {
+                            const HRef = Ele.getAttribute('data') || Ele.getAttribute('src');
+                            if(!HRef) continue;
+                            const HRefPath = O.rrr(BaseDir + '/' + HRef.split('#')[0]);
+                            const Source = B.Package.Manifest[HRefPath];
+                            if(!Source || Source['media-type'] != 'application/pdf') continue;
+                            const Link = ItemDOM.createElementNS(NSTag, 'a');
+                            Link.setAttribute('class', 'bibi-pdf-embedded');
+                            Link.setAttribute('href', HRef);
+                            Link.textContent = HRef.split(/[?#]/)[0].split('/').pop() || 'PDF';
+                            if(Ele.parentNode) Ele.parentNode.replaceChild(Link, Ele);
+                            Replaced++;
+                        }
+                        if(Replaced) Item.SourceText = ItemDOM.documentElement.outerHTML;
+                    } catch(Err) { /* the document is not parseable: the elements are left untouched */ }
                     if(!S['allow-scripts-in-content']) {
                         Item.SourceText = O.sanitizeItemSourceText(Item.SourceText, { As: 'XHTML' });
                     }
@@ -755,6 +916,20 @@ L.fetchAndBuildItemSourceText = async (Item) => {
                 finalize: () => {
                     Item.SourceText = Item.SourceText.replace('bibi:/' + Item.Source.Path, Item.Source.URI); // URI is BlobURL or URI
                 }
+            } :
+            Item.Type == 'PDF' ? {
+                initialize_before: async () => {
+                    const PageNo = Item['bibi:pdf-page'] || 1;
+                    const Doc = await PDF.getDocument(Item.Source);
+                    const Size = await PDF.getPageSize(Doc, PageNo);
+                    Item.Viewport = { Width: Size.Width, Height: Size.Height }; // the PDF page box: the item is fitted to the stage from it
+                    const Rendered = await PDF.renderInto(Item, Doc, PageNo, new Set((I.PageObserver.IntersectingPages || []).map(Page => Page.Item)));
+                    Item.SourceText = `<span class="bibi-pdf-frame">`
+                        + `<img class="bibi-spine-item-image bibi-pdf-page" alt="" src="${ Rendered.URL }" style="width:${ Size.Width }px;height:${ Size.Height }px" />`
+                        + (Rendered.TextLayer ? `<span class="bibi-pdf-text-layer" style="--total-scale-factor:1;--min-font-size:${ Rendered.TextLayer.MinFontSize || 1 };width:${ Size.Width }px;height:${ Size.Height }px">${ Rendered.TextLayer.HTML }</span>` : '')
+                        + `</span>`;
+                },
+                finalize: () => {}
             } :
             null
         ),
