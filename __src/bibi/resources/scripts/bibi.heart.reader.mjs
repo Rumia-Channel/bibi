@@ -772,6 +772,7 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
                 R.layOutStage();
                 try { I.PageObserver.updateCurrent(); } catch(Err) {}
                 R.snapTwoPaneView();
+                I.Turner.turnItems(); // image dimensions can change the opening that must be preloaded
             }
         } finally {
             R.TwoPaneRelaying = false;
