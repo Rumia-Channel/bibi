@@ -29,7 +29,7 @@ This patch opens image-only ZIP archives as books, without EPUB conversion:
 * ZIP entries identify EPUB, BibiZine, or image-book content, in that order. Invalid archives and archives without supported content fail explicitly.
 * PNG, JPEG, GIF, WebP, AVIF and BMP pages use the existing fixed-layout renderer, natural filename order and subfolder support. Directories, non-images, hidden paths and OS auxiliary files are excluded.
 * Range delivery lists the archive first and fetches images on demand, even with UI placeholders disabled. Servers without Range support and local ZIP files use full extraction.
-* Image ZIPs share the PDF left-to-right / right-to-left toggle. Direction changes preserve the current page and view mode; the configured default applies when reopened.
+* Image ZIPs share the PDF left-to-right / right-to-left toggle. Direction changes pin the current source page in both paged and scrolled modes and retain the view mode; the configured default applies when reopened.
 * The fixed reader shell no longer becomes a horizontal scroll container during direction changes; paired pages stay within the viewport.
 * The schemaVersion 1 position/host APIs, revision identity and credential policy are unchanged. Filenames remain literal ZIP entry names and are never inserted as unescaped markup.
 

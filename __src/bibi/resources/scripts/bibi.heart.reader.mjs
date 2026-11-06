@@ -957,6 +957,8 @@ R.changeView = (Par) => { if(!Par) return false;
             break;
         default: return false;
     }
+    // Direction changes must retain the API's current page, not the viewport's midpoint element.
+    const DirectionPage = L.Opened && Par.PageProgressionDirection != B.PPD ? R.getPage() : null;
     let ToLayOut = false;
     if(S.RVM != Par.Mode) ToLayOut = true;
     if(Par.PageProgressionDirection != B.PPD) {
@@ -979,6 +981,7 @@ R.changeView = (Par) => { if(!Par) return false;
         O.HTML.classList.add('busy');
         O.HTML.classList.add('changing-view');
         R.layOutBook({
+            Destination: DirectionPage ? { Page: DirectionPage } : undefined,
             before: () => new Promise(resolve => setTimeout(() => resolve(E.dispatch('bibi:closes-utilities')), 0)),
             Reset: true,
             NoNotification: Par.NoNotification,
