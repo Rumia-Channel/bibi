@@ -5,7 +5,7 @@ import os from 'node:os';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { createReflowFixture, createLazyFixture, createOpeningFixture, createPDFFixture, createPDFEmbeddedFixture, createPDFBrokenFixture, createPDFExtensionlessFixture, createExtensionlessMarkupFixture, LongText, TailText } from './fixtures.mjs';
+import { createReflowFixture, createLazyFixture, createOpeningFixture, createPDFFixture, createPDFEmbeddedFixture, createPDFBrokenFixture, createPDFExtensionlessFixture, createExtensionlessMarkupFixture, createImageZipFixture, createNestedImageZipFixture, createEscapedNameImageZipFixture, createLargeImageZipFixture, createUnsupportedImageZipFixture, createCorruptImageZipFixture, createZineImageZipFixture, createZipFixture, ImageZipFixturePaths, ImageZipFixtureSizes, LongText, TailText } from './fixtures.mjs';
 import { sendBook } from './book-server.mjs';
 import { verifyDistribution } from '../../zzz/distribution.mjs';
 
@@ -16,7 +16,29 @@ const Reflow = await createReflowFixture(), Vertical = await createReflowFixture
 const Fixed = await fs.readFile(path.join(Repository, '__src/bibi-bookshelf/__samples/Sample_Pre-Paginated_LtR.epub'));
 const PDFDocument = createPDFFixture(40);
 const EmbeddedPDF = await createPDFEmbeddedFixture(true), LinkedPDF = await createPDFEmbeddedFixture(false), BrokenPDF = await createPDFBrokenFixture(), ExtensionlessPDF = await createPDFExtensionlessFixture(3, 'attachment'), SuffixlessPDF = await createPDFExtensionlessFixture(3, 'attachment.bin'), ExtensionlessMarkup = await createExtensionlessMarkupFixture(), LargePage = createPDFFixture(1, 20000, 20000), MaliciousPDF = createPDFFixture(2, 300, 200, PageNo => PageNo == 1 ? ['needle', '<img src=x onerror=y=1>'] : 'second page'), WideTextPDF = createPDFFixture(20, 300, 200, PageNo => PageNo == 20 ? 'PDF7' : 'other page'), MultiLinePDF = createPDFFixture(3, 300, 200, PageNo => [`first line of page ${ PageNo }`, `second line of page ${ PageNo }`]);
+const [ImageZip, NestedImageZip, EscapedNameImageZip, LargeImageZip, UnsupportedImageZip, ZineImageZip] = await Promise.all([
+    createImageZipFixture(), createNestedImageZipFixture(), createEscapedNameImageZipFixture(),
+    createLargeImageZipFixture(ImageZipFixturePaths.Large), createUnsupportedImageZipFixture(), createZineImageZipFixture()
+]);
 const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/opening.epub', Opening], ['/epubs/fixed.epub', Fixed], ['/epubs/document.pdf', PDFDocument], ['/epubs/embedded.epub', EmbeddedPDF], ['/epubs/linked.epub', LinkedPDF], ['/epubs/broken.epub', BrokenPDF], ['/epubs/extensionless.epub', ExtensionlessPDF], ['/epubs/suffixless.epub', SuffixlessPDF], ['/epubs/extensionless-markup.epub', ExtensionlessMarkup], ['/epubs/large.pdf', LargePage], ['/epubs/malicious.pdf', MaliciousPDF], ['/epubs/widetext.pdf', WideTextPDF], ['/epubs/multiline.pdf', MultiLinePDF], ['/epubs/atonce-extensionless.epub', ExtensionlessPDF], ['/epubs/atonce-suffixless.epub', SuffixlessPDF], ['/epubs/atonce-markup.epub', ExtensionlessMarkup]]);
+// The image ZIP fixtures: they are served as "application/zip", so the reader must classify them by their content, not by their name.
+Content.set('/epubs/images.zip', ImageZip);
+Content.set('/epubs/atonce-images.zip', ImageZip);
+Content.set('/epubs/images-nested.zip', NestedImageZip);
+Content.set('/epubs/images-escaped.zip', EscapedNameImageZip);
+Content.set('/epubs/images-large.zip', LargeImageZip);
+Content.set('/epubs/images-unsupported.zip', UnsupportedImageZip);
+Content.set('/epubs/zine.zip', ZineImageZip);
+Content.set('/epubs/images-broken.zip', Buffer.from('this is not a ZIP archive at all'));
+Content.set('/epubs/images-corrupt.zip', await createCorruptImageZipFixture());
+Content.set('/epubs/atonce-images-escaped.zip', EscapedNameImageZip);
+Content.set('/epubs/images-<&>.zip', EscapedNameImageZip);
+Content.set('/epubs/atonce-images-unsupported.zip', UnsupportedImageZip);
+Content.set('/epubs/atonce-images-corrupt.zip', await createCorruptImageZipFixture());
+Content.set('/epubs/epub.zip', Reflow);
+Content.set('/epubs/atonce-zine.zip', ZineImageZip);
+const UnsafeImageName = 'page & " <img src=x onerror=parent.__zipInjected=1>.png';
+Content.set('/epubs/images-invalid-name.zip', await createZipFixture([[UnsafeImageName, Buffer.from('not an image')]]));
 const Requests = [], Errors = [], Results = [];
 const VerticalPDF = createPDFFixture(6, 300, 520, () => [240, 170, 100].flatMap(x =>
     Array.from({ length: 12 }, (_, i) => ({ text: 'A', x, y: 470 - i * 30 }))));
@@ -55,7 +77,7 @@ const Server = http.createServer(async (Request, Response) => {
             if(!Request.headers.cookie?.includes('book-auth=granted')) { Response.writeHead(401); Response.end(); return; }
             // A book served without range support is extracted at once: the reader falls back from the range-capable extractor.
             const NoRange = URLPath.startsWith('/epubs/atonce-');
-            sendBook(Request, Response, Content.get(URLPath), false, Requests, URLPath.endsWith('.pdf') ? 'application/pdf' : 'application/epub+zip', NoRange); return;
+            sendBook(Request, Response, Content.get(URLPath), false, Requests, URLPath.endsWith('.pdf') ? 'application/pdf' : URLPath.endsWith('.zip') ? 'application/zip' : 'application/epub+zip', NoRange); return;
         }
         if(['/vendor/bibi/presets/integration.js', '/alternate/bibi/presets/integration.js'].includes(URLPath)) {
             Response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
@@ -461,7 +483,7 @@ try {
                 const Expected = (await Frame.evaluate(() => S.PPD)) == 'rtl' ? 'ltr' : 'rtl';
                 const Before = (await position(Reader)).layout.pageIndex;
                 await Frame.locator('#bibi-menu .bibi-icon-config').click();
-                const Toggle = Frame.locator('#bibi-button-pdf-reading-direction');
+                const Toggle = Frame.locator('#bibi-button-reading-direction');
                 await Toggle.waitFor({ state: 'visible' });
                 if(Input == 'pointer') {
                     await Page.screenshot({ path: path.join(Temp, `pdf-${Book}-direction-menu.png`) });
@@ -489,7 +511,7 @@ try {
                 const Before = (await position(Reader)).layout.pageIndex;
                 const PreviousDirection = await Frame.evaluate(() => S.PPD);
                 await Frame.locator('#bibi-menu .bibi-icon-config').click();
-                await Frame.locator('#bibi-button-pdf-reading-direction').press('Space');
+                await Frame.locator('#bibi-button-reading-direction').press('Space');
                 await Frame.waitForFunction(Direction => S.PPD != Direction && Bibi.API.getState().operable, PreviousDirection);
                 assert.equal(await Frame.evaluate(() => S.RVM), Mode, 'Direction overrides must not change the chosen scroll mode.');
                 assert.equal((await position(Reader)).layout.pageIndex, Before, 'A scrolled PDF must retain its current page.');
@@ -621,6 +643,182 @@ try {
         assert.equal(await Page.evaluate(Index => window.readers[Index].Frame.contentWindow.B.ExtractionPolicy, Reader), 'at-once', 'The book must be extracted at once.');
         await textVisible(Reader, 'chapter', 0);
         await remove(Reader);
+    });
+    const ImageViewport = Page.viewportSize();
+    await Page.setViewportSize({ width: 900, height: 1200 });
+    const visibleImage = async (Frame, Path) => {
+        await Frame.waitForFunction(Path => {
+            const Item = R.Items.find(Item => Item.Source.Path == Path), Image = Item?.contentDocument?.querySelector('img.bibi-spine-item-image');
+            const Bounds = Item?.Box.getBoundingClientRect();
+            return Bibi.API.getState().operable && Item?.Loaded && Image?.complete && Image.naturalWidth > 0
+                && Bounds.right > 0 && Bounds.left < innerWidth && Bounds.bottom > 0 && Bounds.top < innerHeight;
+        }, Path);
+        const Image = await Frame.evaluate(Path => {
+            const Item = R.Items.find(Item => Item.Source.Path == Path), Image = Item.contentDocument.querySelector('img.bibi-spine-item-image');
+            const Bounds = Item.Box.getBoundingClientRect(), Picture = Image.getBoundingClientRect();
+            return {
+                natural: [Image.naturalWidth, Image.naturalHeight], ratio: Picture.width / Picture.height,
+                visible: Bounds.right > 0 && Bounds.left < innerWidth && Bounds.bottom > 0 && Bounds.top < innerHeight,
+                xmlError: !!Item.contentDocument.querySelector('parsererror')
+            };
+        }, Path);
+        assert.ok(Image.visible, `The decoded page must be visible: ${Path}`);
+        assert.equal(Image.xmlError, false);
+        assert.ok(Math.abs(Image.ratio - Image.natural[0] / Image.natural[1]) < 0.01, 'Image aspect ratio must be preserved.');
+        return Image;
+    };
+    await scenario('PNG image ZIPs render and turn in natural order with Range and full downloads', async () => {
+        for(const Policy of ['range', 'atonce']) {
+            Reader = await open({ book: `/epubs/${Policy == 'range' ? 'images' : 'atonce-images'}.zip`, 'book-key': `image-turns-${Policy}` });
+            const Frame = await readerFrame(Reader);
+            assert.equal(await Frame.evaluate(() => B.ExtractionPolicy), Policy == 'range' ? 'on-the-fly' : 'at-once');
+            assert.deepEqual(await Frame.evaluate(() => R.Items.map(Item => Item.Source.Path)), ImageZipFixturePaths.Flat);
+            for(const [Index, Path] of ImageZipFixturePaths.Flat.entries()) {
+                if(Index) await Page.evaluate(Index => window.readers[Index].move(1), Reader);
+                await waitForPageIndex(Reader, Index);
+                assert.deepEqual((await visibleImage(Frame, Path)).natural, ImageZipFixtureSizes[Path]);
+            }
+            await Page.evaluate(Index => window.readers[Index].move(-1), Reader);
+            await waitForPageIndex(Reader, 1);
+            await visibleImage(Frame, '2.png');
+            await Page.screenshot({ path: path.join(Temp, `image-zip-${Policy}.png`) });
+            await remove(Reader);
+        }
+    });
+    await scenario('image ZIP position restore keeps schemaVersion 1 and revision identity', async () => {
+        const Identity = { 'book-key': 'image-position', 'content-hash': 'image-revision' };
+        Reader = await open({ book: '/epubs/images.zip', ...Identity });
+        const State = await Page.evaluate(Index => window.readers[Index].api.getState(), Reader);
+        assert.equal(State.schemaVersion, 1);
+        assert.equal(State.bookKey, Identity['book-key']);
+        assert.equal(State.contentHash, Identity['content-hash']);
+        await restore(Reader, { cfi: '/6/4!/4' });
+        const Saved = await position(Reader);
+        assert.equal(Saved.progressBasis, 'spine-items');
+        await restore(Reader, { cfi: '/6/2!/4' });
+        assert.equal((await restore(Reader, Saved.location)).position.layout.pageIndex, 1);
+        await remove(Reader);
+        Reader = await open({ book: '/epubs/images.zip', ...Identity, location: JSON.stringify(Saved.location) });
+        assert.equal((await position(Reader)).layout.pageIndex, 1);
+        await visibleImage(await readerFrame(Reader), '2.png');
+        const Error = await Page.evaluate(async Index => {
+            try { await window.readers[Index].api.restorePosition({ cfi: '/6/2!/4' }, { bookKey: 'image-position', contentHash: 'other' }); }
+            catch(Error) { return Error.code; }
+        }, Reader);
+        assert.equal(Error, 'IDENTITY_MISMATCH');
+        await remove(Reader);
+    });
+    await scenario('nested and escaped image names render literally without creating markup', async () => {
+        for(const [Book, Paths] of [
+            ['images-nested', ImageZipFixturePaths.Nested], ['images-escaped', ImageZipFixturePaths.Escaped],
+            ['atonce-images-escaped', ImageZipFixturePaths.Escaped], ['images-%3C%26%3E', ImageZipFixturePaths.Escaped]
+        ]) {
+            Reader = await open({ book: `/epubs/${Book}.zip`, 'book-key': `names-${Book}` });
+            const Frame = await readerFrame(Reader);
+            const Actual = await Frame.evaluate(() => R.Items.map(Item => Item.Source.Path));
+            assert.deepEqual([...Actual].sort(), [...Paths].sort());
+            for(const [Index, Path] of Actual.entries()) {
+                await restore(Reader, { cfi: `/6/${(Index + 1) * 2}!/4` });
+                await visibleImage(Frame, Path);
+            }
+            assert.equal(await Frame.evaluate(() => R.Items.some(Item => Item.contentDocument?.querySelector('script'))), false);
+            await remove(Reader);
+        }
+    });
+    await scenario('JPEG and WebP entries use the same image book renderer', async () => {
+        const Pictures = await Page.evaluate(() => {
+            const Canvas = document.createElement('canvas'); Canvas.width = 160; Canvas.height = 240;
+            const Context = Canvas.getContext('2d'); Context.fillStyle = '#b42'; Context.fillRect(0, 0, 160, 240);
+            return ['image/jpeg', 'image/webp'].map(Type => Canvas.toDataURL(Type).split(',')[1]);
+        });
+        Content.set('/epubs/formats.zip', await createZipFixture([
+            ['1.JPG', Buffer.from(Pictures[0], 'base64')], ['2.webp', Buffer.from(Pictures[1], 'base64')]
+        ]));
+        Reader = await open({ book: '/epubs/formats.zip', 'book-key': 'image-formats' });
+        const Frame = await readerFrame(Reader);
+        assert.deepEqual((await visibleImage(Frame, '1.JPG')).natural, [160, 240]);
+        await restore(Reader, { cfi: '/6/4!/4' });
+        assert.deepEqual((await visibleImage(Frame, '2.webp')).natural, [160, 240]);
+        await remove(Reader);
+    });
+    await scenario('large image ZIPs defer both fetching and decoding even without UI placeholders', async () => {
+        const Before = Requests.length;
+        Reader = await open({ book: '/epubs/images-large.zip', 'book-key': 'image-large', 'allow-placeholders': 'false' });
+        const Frame = await readerFrame(Reader);
+        await visibleImage(Frame, '001.png');
+        assert.equal(await Frame.evaluate(() => R.Items.length), ImageZipFixturePaths.Large);
+        assert.ok(await Frame.evaluate(() => R.Items.filter(Item => Item.Source.URI || Item.Loaded).length) < 10, 'Off-screen images must not all be extracted or decoded.');
+        const Range = Requests.slice(Before).filter(Request => Request.url == '/epubs/images-large.zip');
+        assert.ok(Range.length > 0);
+        assert.ok(Range.every(Request => Request.range), 'Never download the whole archive when Range works.');
+        const Bytes = Range.reduce((Total, Request) => {
+            const [, Start, End] = /^bytes=(\d*)-(\d*)$/.exec(Request.range);
+            return Total + (!Start ? Number(End) : (End ? Number(End) : LargeImageZip.length - 1) - Number(Start) + 1);
+        }, 0);
+        assert.ok(Bytes < LargeImageZip.length / 2, `Initial requests must cover only part of the ZIP: ${Bytes}/${LargeImageZip.length}`);
+        await restore(Reader, { cfi: `/6/${ImageZipFixturePaths.Large * 2}!/4` });
+        await visibleImage(Frame, '020.png');
+        await remove(Reader);
+    });
+    await scenario('image ZIP reading direction toggles preserve the current page and view mode', async () => {
+        await Page.setViewportSize({ width: 1600, height: 900 });
+        Reader = await open({ book: '/epubs/images-large.zip', 'book-key': 'image-direction' });
+        const Frame = await readerFrame(Reader), Toggle = Frame.locator('#bibi-button-reading-direction');
+        await restore(Reader, { cfi: '/6/4!/4' });
+        for(const Mode of ['paged', 'horizontal', 'vertical']) {
+            if(await Frame.evaluate(() => S.RVM) != Mode) {
+                await Frame.evaluate(Mode => R.changeView({ Mode }), Mode);
+                await Frame.waitForFunction(Mode => S.RVM == Mode && Bibi.API.getState().operable, Mode);
+            }
+            await restore(Reader, { cfi: '/6/4!/4' });
+            const Before = (await position(Reader)).layout.pageIndex;
+            const Expected = await Frame.evaluate(() => S.PPD == 'rtl' ? 'ltr' : 'rtl');
+            await Frame.locator('#bibi-menu .bibi-icon-config').click();
+            await Toggle.waitFor({ state: 'visible' });
+            if(Mode == 'paged') await Toggle.click(); else await Toggle.press(Mode == 'horizontal' ? 'Enter' : 'Space');
+            await Frame.waitForFunction(Direction => S.PPD == Direction && !I.OpenedSubpanel && Bibi.API.getState().operable, Expected);
+            assert.equal(await Toggle.getAttribute('aria-checked'), String(Expected == 'rtl'));
+            assert.equal(await Frame.evaluate(() => S.RVM), Mode);
+            assert.equal((await position(Reader)).layout.pageIndex, Before);
+            await visibleImage(Frame, '002.png');
+            if(Mode == 'paged') await visibleImage(Frame, '003.png');
+            if(Mode == 'paged') {
+                await Frame.locator('body').press(Expected == 'rtl' ? 'ArrowLeft' : 'ArrowRight');
+                await waitForPageIndex(Reader, 3);
+                await visibleImage(Frame, '004.png');
+            }
+        }
+        await remove(Reader);
+        await Page.setViewportSize(ImageViewport);
+    });
+    await scenario('unsupported, malformed and corrupt image ZIPs fail instead of becoming inoperable ready books', async () => {
+        for(const Book of ['images-unsupported', 'atonce-images-unsupported', 'images-broken', 'images-corrupt', 'atonce-images-corrupt', 'images-invalid-name']) {
+            const Bad = await Page.evaluate(Book => window.openReader({ book: `/epubs/${Book}.zip`, 'book-key': Book }), Book);
+            await Page.waitForFunction(Index => window.readers[Index].Frame.contentWindow.Bibi?.API?.getState().status == 'error', Bad);
+            const Error = await Page.evaluate(async Index => {
+                try { await window.readers[Index].api.ready; } catch(Error) { return { code: Error.code, message: Error.message }; }
+            }, Bad);
+            assert.equal(Error?.code, 'LOAD_FAILED', Book);
+            if(Book.includes('unsupported')) assert.match(Error.message, /Unsupported Book Format/);
+            assert.equal((await Page.evaluate(Index => window.readers[Index].api.getState(), Bad)).operable, false);
+            if(Book == 'images-invalid-name') {
+                const Frame = await readerFrame(Bad);
+                assert.ok((await Frame.locator('#bibi-notifier').textContent()).includes(UnsafeImageName));
+                assert.equal(await Frame.locator('#bibi-notifier img').count(), 0, 'A filename in an error must remain text, not markup.');
+                assert.equal(await Frame.evaluate(() => window.__zipInjected), undefined);
+            }
+            await remove(Bad);
+        }
+    });
+    await scenario('EPUB and Zine ZIP contents retain their existing readers without explicit format hints', async () => {
+        Reader = await open({ book: '/epubs/epub.zip', 'book-key': 'epub-zip' });
+        await textVisible(Reader, 'long', 0);
+        await remove(Reader);
+        for(const Book of ['zine', 'atonce-zine']) {
+            Reader = await open({ book: `/epubs/${Book}.zip`, 'book-key': Book });
+            await textVisible(Reader, 'zine-page-1', 0);
+            await remove(Reader);
+        }
     });
     await scenario('a PDF page with several lines keeps its document well-formed', async () => {
         Reader = await open({ book: '/epubs/multiline.pdf', 'book-key': 'multiline', 'content-hash': 'multiline-1' });

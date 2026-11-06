@@ -952,7 +952,7 @@ R.changeView = (Par) => { if(!Par) return false;
         case 'object':
            if(S['fix-reader-view-mode'] || typeof Par.Mode != 'string' || !S['available-reader-view-modes'].includes(Par.Mode)) Par.Mode = S.RVM;
             Par.FullBreadthLayoutInScroll = B.Reflowable ? false : (Par.FullBreadthLayoutInScroll === undefined || !S['available-reader-view-modes'].includes('vertical')) ? S['full-breadth-layout-in-scroll'] : !!(Par.FullBreadthLayoutInScroll);
-            Par.PageProgressionDirection = B.Type == 'PDF' && /^(ltr|rtl)$/.test(Par.PageProgressionDirection) ? Par.PageProgressionDirection : B.PPD;
+            Par.PageProgressionDirection = (B.Type == 'PDF' || B.Type == 'ImageZIP') && /^(ltr|rtl)$/.test(Par.PageProgressionDirection) ? Par.PageProgressionDirection : B.PPD;
             if(S.RVM == Par.Mode && Par.FullBreadthLayoutInScroll == S['full-breadth-layout-in-scroll'] && Par.PageProgressionDirection == B.PPD) return false;
             break;
         default: return false;

@@ -80,7 +80,9 @@ body {
 	}
 	position: absolute; @include offset(0, 0, auto);
 	&.InternetExplorer { position: static; }
+	// Scrolling belongs to main and panels, not to the fixed reader shell during direction relayout.
 	overflow: hidden;
+	overflow: clip;
 	@include size(100%);
 	transition: opacity .25s ease;
 	// @____Bibi:Dress__('-') background: $Body_Background;

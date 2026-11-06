@@ -16,7 +16,7 @@ X.list = () => {
     const extension = XP => ({ 'src': O.versionedURL(new URL('../../extensions/' + XP, Bibi.Script.src).href) });
     let ReadyForExtraction = false, ReadyForBibiZine = false;
     if(S['book']) {
-        if(O.isToBeExtractedIfNecessary(S['book'])) ReadyForExtraction = true;
+        if(O.isToBeExtractedIfNecessary(S['book'])) ReadyForExtraction = ReadyForBibiZine = true;
         if(S['zine'])                               ReadyForBibiZine   = true;
     } else {
         if(S['accept-local-file'] || S['accept-blob-converted-data']) ReadyForExtraction = ReadyForBibiZine = true;
