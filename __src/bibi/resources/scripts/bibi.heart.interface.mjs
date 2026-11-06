@@ -1352,7 +1352,8 @@ I.Notifier = { create: () => {
             if(typeof Opt.className == 'string' && (Opt.className = Opt.className.trim())) ClassNames.push(Opt.className);
             ClassNames.length ? (Paragraph.className = ClassNames.join(' ')) : Paragraph.removeAttribute('class');
             (typeof Opt.id == 'string' && (Opt.id = Opt.id.trim())) ? (Paragraph.id = Opt.id) : Paragraph.removeAttribute('id');
-            Paragraph.innerHTML = Msg;
+            if(Opt.Type == 'Error') Paragraph.textContent = String(Msg);
+            else Paragraph.innerHTML = Msg;
             O.HTML.classList.add('notifier-shown');
             if(L.Opened && Opt.Type != 'Error') Notifier.addEventListener(O.TouchOS || Opt.Hoverable ? E['pointerdown'] : E['pointerover'], Notifier.hide);
         },

@@ -37,6 +37,8 @@ Content.set('/epubs/atonce-images-unsupported.zip', UnsupportedImageZip);
 Content.set('/epubs/atonce-images-corrupt.zip', await createCorruptImageZipFixture());
 Content.set('/epubs/epub.zip', Reflow);
 Content.set('/epubs/atonce-zine.zip', ZineImageZip);
+const UnsafeImageName = 'page & " <img src=x onerror=parent.__zipInjected=1>.png';
+Content.set('/epubs/images-invalid-name.zip', await createZipFixture([[UnsafeImageName, Buffer.from('not an image')]]));
 const Requests = [], Errors = [], Results = [];
 const VerticalPDF = createPDFFixture(6, 300, 520, () => [240, 170, 100].flatMap(x =>
     Array.from({ length: 12 }, (_, i) => ({ text: 'A', x, y: 470 - i * 30 }))));
@@ -790,7 +792,7 @@ try {
         await Page.setViewportSize(ImageViewport);
     });
     await scenario('unsupported, malformed and corrupt image ZIPs fail instead of becoming inoperable ready books', async () => {
-        for(const Book of ['images-unsupported', 'atonce-images-unsupported', 'images-broken', 'images-corrupt', 'atonce-images-corrupt']) {
+        for(const Book of ['images-unsupported', 'atonce-images-unsupported', 'images-broken', 'images-corrupt', 'atonce-images-corrupt', 'images-invalid-name']) {
             const Bad = await Page.evaluate(Book => window.openReader({ book: `/epubs/${Book}.zip`, 'book-key': Book }), Book);
             await Page.waitForFunction(Index => window.readers[Index].Frame.contentWindow.Bibi?.API?.getState().status == 'error', Bad);
             const Error = await Page.evaluate(async Index => {
@@ -799,6 +801,12 @@ try {
             assert.equal(Error?.code, 'LOAD_FAILED', Book);
             if(Book.includes('unsupported')) assert.match(Error.message, /Unsupported Book Format/);
             assert.equal((await Page.evaluate(Index => window.readers[Index].api.getState(), Bad)).operable, false);
+            if(Book == 'images-invalid-name') {
+                const Frame = await readerFrame(Bad);
+                assert.ok((await Frame.locator('#bibi-notifier').textContent()).includes(UnsafeImageName));
+                assert.equal(await Frame.locator('#bibi-notifier img').count(), 0, 'A filename in an error must remain text, not markup.');
+                assert.equal(await Frame.evaluate(() => window.__zipInjected), undefined);
+            }
             await remove(Bad);
         }
     });
