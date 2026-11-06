@@ -26,6 +26,7 @@ And you can embed it in other webpages (like YouTube videos).
 
 * Standalone PDF and image ZIP reading directions are saved per book when `keep-settings` is enabled and restored before the first layout. Saved choices take precedence over PDF detection or the configured default.
 * Direction preferences use the same book/user/revision identity as reading positions. `keep-settings: no` disables direction saving and restoration without disabling reading-position restoration; EPUB and Zine directions are unchanged.
+* Image ZIP preloading follows complete two-pane openings in both reading directions, starting when the book opens and refreshing after image dimensions change the pairing. Already decoded pages are not reloaded or cleared when pending loads are reprioritized.
 
 The reader and `zzz` packages are versioned `2.3.2`; `bun run archive` generates `Bibi-v2.3.2.zip`.
 
@@ -224,6 +225,8 @@ Pages follow natural path order (`1`, `2`, `10`), including images in subfolders
 Each image is an ordinary fixed-layout spine item, fitted without changing its aspect ratio. Existing preset defaults determine the initial reading direction and display mode. The last control in **View Mode** switches **Left-to-right reading** / **Right-to-left reading**, with click, Enter or Space, just as for standalone PDFs. It retains the current page and view mode. With `keep-settings` enabled, the chosen direction is saved per book alongside its reading position and restored when reopened. It does not change EPUB or Zine reading directions.
 
 Range-capable delivery reads the ZIP directory without expanding every image, then fetches and decodes pages around the current position. This deferral remains enabled when `allow-placeholders` is false. Without Range support the ZIP is downloaded and expanded at once, but decoding still follows page loading. Extensionless routes require `extract-if-necessary` to include `""`; cookie/CORS rules are the same as for EPUB ZIPs.
+
+Two-pane preloading fetches and decodes both halves of each nearby opening together. Cached images remain displayed while an uncached mate loads; paging does not reload the cached half. Turning faster than fetching or decoding can complete can still expose an unloaded page.
 
 Reading positions use the unchanged schemaVersion 1 API and spine-item progress. Hosts should continue supplying stable `book-key` and `content-hash` values for revision-aware save/restore.
 
