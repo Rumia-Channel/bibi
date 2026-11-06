@@ -22,6 +22,15 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.2
+
+* Standalone PDF and image ZIP reading directions are saved per book when `keep-settings` is enabled and restored before the first layout. Saved choices take precedence over PDF detection or the configured default.
+* Direction preferences use the same book/user/revision identity as reading positions. `keep-settings: no` disables direction saving and restoration without disabling reading-position restoration; EPUB and Zine directions are unchanged.
+* Image ZIP preloading follows complete two-pane openings in both reading directions, starting when the book opens and refreshing after image dimensions change the pairing. Already decoded pages are not reloaded or cleared when pending loads are reprioritized.
+
+The reader and `zzz` packages are versioned `2.3.2`; `bun run archive` generates `Bibi-v2.3.2.zip`.
+
+
 ### v2.3.1
 
 This patch opens image-only ZIP archives as books, without EPUB conversion:
@@ -213,9 +222,11 @@ A ZIP needs no EPUB metadata when it contains supported bitmap images (`.png`, `
 
 Pages follow natural path order (`1`, `2`, `10`), including images in subfolders. Directories, non-image files, hidden paths, `__MACOSX`, `Thumbs.db` and `desktop.ini` are not pages. An EPUB container takes precedence over Zine metadata, which takes precedence over image detection; malformed metadata does not silently fall back to an image book.
 
-Each image is an ordinary fixed-layout spine item, fitted without changing its aspect ratio. Existing preset defaults determine reading direction and display mode. The last control in **View Mode** switches **Left-to-right reading** / **Right-to-left reading**, with click, Enter or Space, just as for standalone PDFs. It retains the current page and view mode, applies only to the current session, and does not change EPUB or Zine reading directions.
+Each image is an ordinary fixed-layout spine item, fitted without changing its aspect ratio. Existing preset defaults determine the initial reading direction and display mode. The last control in **View Mode** switches **Left-to-right reading** / **Right-to-left reading**, with click, Enter or Space, just as for standalone PDFs. It retains the current page and view mode. With `keep-settings` enabled, the chosen direction is saved per book alongside its reading position and restored when reopened. It does not change EPUB or Zine reading directions.
 
 Range-capable delivery reads the ZIP directory without expanding every image, then fetches and decodes pages around the current position. This deferral remains enabled when `allow-placeholders` is false. Without Range support the ZIP is downloaded and expanded at once, but decoding still follows page loading. Extensionless routes require `extract-if-necessary` to include `""`; cookie/CORS rules are the same as for EPUB ZIPs.
+
+Two-pane preloading fetches and decodes both halves of each nearby opening together. Cached images remain displayed while an uncached mate loads; paging does not reload the cached half. Turning faster than fetching or decoding can complete can still expose an unloaded page.
 
 Reading positions use the unchanged schemaVersion 1 API and spine-item progress. Hosts should continue supplying stable `book-key` and `content-hash` values for revision-aware save/restore.
 
@@ -236,7 +247,7 @@ The text of a page is a text layer: it can be selected and it can be searched. T
 
 A PDF is fetched like any other book, so the `request-with-credentials` option applies to it. The `accept-pdf` option of a preset says whether a PDF may be opened; it is `yes` by default.
 
-For standalone PDFs, the last item of **View Mode** switches **Left-to-right reading** / **Right-to-left reading** (Japanese: **左読み（左 → 右）** / **右読み（右 → 左）**). It starts from the detected/default direction and overrides page order and navigation for the current reading session, including documents without text. The current page and the selected view mode are retained. Enter or Space also activates the focused toggle. Reopening the PDF uses automatic detection again; this override is not saved and does not affect EPUB writing-mode settings.
+For standalone PDFs, the last item of **View Mode** switches **Left-to-right reading** / **Right-to-left reading** (Japanese: **左読み（左 → 右）** / **右読み（右 → 左）**). It starts from the detected/default direction, including documents without text. The current page and the selected view mode are retained. Enter or Space also activates the focused toggle. With `keep-settings` enabled, the override is saved per book using the same storage identity as reading positions and takes precedence over automatic detection when reopened. Disabling `keep-settings` uses detection/defaults again and does not save direction changes. EPUB writing-mode settings are unaffected.
 
 #### PDF writing-mode analysis
 

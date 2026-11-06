@@ -422,7 +422,7 @@ I.Turner = { create: () => {
             const List = I.PageObserver.Current.List?.length ? I.PageObserver.Current.List : I.PageObserver.IntersectingPages?.length ? I.PageObserver.IntersectingPages : null;
             return List?.[Dir > 0 ? 0 : List.length - 1]?.Page?.Item || null;
         },
-        filterOrders: (Orders) => Orders.filter(Items => Items && (Items = Items.filter(Item => Item?.Turned != 'Up')).length),
+        filterOrders: (Orders) => Orders.map(Items => Items?.filter(Item => Item && Item.Turned != 'Up')).filter(Items => Items?.length),
         stringifyOrders: (Orders) => Orders.map(Items => Items ? Items.map(Item => Item ? Item.Index : '').join('+') : '').join('-'),
         turnItems: (Opt = {}) => {
             if(R.DoNotTurn || (!S['allow-placeholders'] && !R.HasPDFItems && B.Type != 'ImageZIP')) return;
@@ -431,9 +431,14 @@ I.Turner = { create: () => {
             const OItem = Opt.Origin || Turner.getTurningOriginItem(Dir); if(!OItem) return;
             let NewOrders = [];
             if(R.Orientation == 'landscape') {
-                const i = OItem.Spread.Index;
-                // [0, Dir, Dir * -1, 2].forEach(Distance => { const Spread = R.Spreads[i + Distance]; if(Spread) Spread.Items.forEach(Item => NewOrders.push([Item])); }); // one by one
-                [0, Dir, Dir * -1, 2].forEach(Distance => { const Spread = R.Spreads[i + Distance]; if(Spread) NewOrders.push([...Spread.Items]); });
+                const Opening = Spread => R.TwoPane && Spread.TwoPaneGroup || [Spread];
+                const Current = Opening(OItem.Spread);
+                const Before = R.Spreads[Current[0].Index - 1], After = R.Spreads[Current[Current.length - 1].Index + 1];
+                const Previous = Before && Opening(Before), Next = After && Opening(After);
+                const Further = Next && R.Spreads[Next[Next.length - 1].Index + 1];
+                // Two-pane openings can span two spine spreads: preload both halves in the same batch.
+                [Current, Dir > 0 ? Next : Previous, Dir > 0 ? Previous : Next, Further && Opening(Further)]
+                    .forEach(Group => { if(Group) NewOrders.push(Group.flatMap(Spread => Spread.Items)); });
             } else {
                 NewOrders.push([OItem]);
                 const PItem = OItem.SpreadPair; if(PItem) NewOrders.push([PItem]);
@@ -447,10 +452,9 @@ I.Turner = { create: () => {
             const ProcessID = Turner.TurningProcessID = O.id(); //// Set after ^
             /* ==== */ O.log('I.Turner.turnItems > NewOrders:', NewOrders.map(Items => Items.map(Item => Item.Index).join(',')));
             Turner.TurningOrders = NewOrders, Turner.PastTurningOrdersString = NewOrdersString;
-            if(Turner.ItemsNowTurning) Turner.ItemsNowTurning.forEach(Item => !Turner.TurningOrders[0].includes(Item) && Turner.turnItem(Item, false));
+            if(Turner.ItemsNowTurning) Turner.ItemsNowTurning.forEach(Item => Item.Turned != 'Up' && !Turner.TurningOrders[0].includes(Item) && Turner.turnItem(Item, false));
             (function turn() {
                 const Items = Turner.ItemsNowTurning = Turner.TurningOrders.shift();
-                // if(Items) Promise.all(Items.map((Item, i) => new Promise(resolve => setTimeout(() => Turner.turnItem(Item, true).finally(resolve), 69 * i)))).then(() => ProcessID == Turner.TurningProcessID && turn()); // delay in spread
                 if(Items) Promise.all(Items.map(Item => Turner.turnItem(Item, true))).then(() => ProcessID == Turner.TurningProcessID && turn());
             })();
         },
@@ -477,7 +481,10 @@ I.Turner = { create: () => {
             () => Turner.turnItem(Item, true)
         )
     };
-    E.bind('bibi:started', () => E.add('bibi:scrolled', () => Turner.turnItems()));
+    E.bind('bibi:started', () => {
+        E.add(['bibi:scrolled', 'bibi:laid-out'], () => Turner.turnItems());
+        Turner.turnItems();
+    });
     E.dispatch('bibi:created-turner');
 }};
 

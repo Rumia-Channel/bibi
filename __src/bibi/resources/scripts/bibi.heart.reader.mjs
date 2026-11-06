@@ -772,6 +772,7 @@ R.requestTwoPaneRegroup = () => { // reveal/resize convergence: regroup is signa
                 R.layOutStage();
                 try { I.PageObserver.updateCurrent(); } catch(Err) {}
                 R.snapTwoPaneView();
+                I.Turner.turnItems(); // image dimensions can change the opening that must be preloaded
             }
         } finally {
             R.TwoPaneRelaying = false;
@@ -997,7 +998,11 @@ R.changeView = (Par) => { if(!Par) return false;
         S.update(Setting);
         if(!L.Opened) L.play();
     }
-    if(S['keep-settings']) I.Oven.Biscuits.memorize('Book', { RVM: Par.Mode, FBL: Par.FullBreadthLayoutInScroll });
+    if(S['keep-settings']) {
+        const BookSettings = { RVM: Par.Mode, FBL: Par.FullBreadthLayoutInScroll };
+        if(B.Type == 'PDF' || B.Type == 'ImageZIP') BookSettings.PPD = B.PPD;
+        I.Oven.Biscuits.memorize('Book', BookSettings);
+    }
 };
 
 
