@@ -264,7 +264,7 @@ Bibi.preset({
         - [AND] The extension of the file is ".epub".
         - [AND] The "extract-if-necessary" option includes ".epub" or "*".
         - [AND] The MIME-Type sent from the browser is empty or "application/epub+zip".
-    * [OR] The file is a BibiZine.
+    * [OR] The file is a BibiZine or an image ZIP book.
         - [AND] The extension of the file is ".zip".
         - [AND] The "extract-if-necessary" includes ".zip" or "*".
         - [AND] The MIME-Type sent from the browser is empty, "application/zip", "application/x-zip", or "application/x-zip-compressed".
@@ -274,7 +274,7 @@ Bibi.preset({
 
     ### Note:
     * Extension of the file is required even if "extract-if-necessary" is "" (or includes "*").
-    * An empty MIME-Type is accepted because browsers may not know the file association. The ZIP contents must still form a valid EPUB or BibiZine.
+    * An empty MIME-Type is accepted because browsers may not know the file association. ZIP contents must form a valid EPUB, BibiZine or supported image book.
     * A PDF is not extracted: it is read by pdf.js, so its pages become the pages of the book.
 
 

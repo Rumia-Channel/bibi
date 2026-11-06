@@ -425,7 +425,7 @@ I.Turner = { create: () => {
         filterOrders: (Orders) => Orders.filter(Items => Items && (Items = Items.filter(Item => Item?.Turned != 'Up')).length),
         stringifyOrders: (Orders) => Orders.map(Items => Items ? Items.map(Item => Item ? Item.Index : '').join('+') : '').join('-'),
         turnItems: (Opt = {}) => {
-            if(R.DoNotTurn || (!S['allow-placeholders'] && !R.HasPDFItems)) return;
+            if(R.DoNotTurn || (!S['allow-placeholders'] && !R.HasPDFItems && B.Type != 'ImageZIP')) return;
             if(R.PDFEvicted) { R.PDFEvicted = false, Turner.PastTurningOrdersString = ''; } // a rasterized page was freed: its item must be turned up again
             const Dir = (I.ScrollObserver.History.length > 1) && (I.ScrollObserver.History[1] * C.L_AXIS_D > I.ScrollObserver.History[0] * C.L_AXIS_D) ? -1 : 1;
             const OItem = Opt.Origin || Turner.getTurningOriginItem(Dir); if(!OItem) return;
@@ -455,7 +455,7 @@ I.Turner = { create: () => {
             })();
         },
         turnItem: async (Item, Up) => {
-            if(R.DoNotTurn || (!S['allow-placeholders'] && Item.Type != 'PDF') || !Item || Item.TurningUp === (Up = !!Up)) return;
+            if(R.DoNotTurn || !Item || (!S['allow-placeholders'] && Item.Type != 'PDF' && B.Type != 'ImageZIP') || Item.TurningUp === (Up = !!Up)) return;
             Item.TurningUp = Up;
             const ProcessID = Item.TurningProcessID = O.id();
             await Promise.resolve(Item.Turning);
@@ -1603,7 +1603,7 @@ I.Menu = { create: () => {
             } }));
             const DirectionGroup = Section.addButtonGroup({
                 Buttons: [{
-                    id: 'bibi-button-pdf-reading-direction',
+                    id: 'bibi-button-reading-direction',
                     Type: 'toggle',
                     Labels: {
                         default: { default: `Left-to-right reading`, ja: `左読み（左 → 右）` },
@@ -1625,11 +1625,11 @@ I.Menu = { create: () => {
                 if(!Event.repeat) E.dispatch(DirectionButton, 'bibi:singletapped');
             });
             const UpdateDirection = () => {
-                const PDFBook = B.Type == 'PDF';
+                const DirectionBook = B.Type == 'PDF' || B.Type == 'ImageZIP';
                 const ViewModes = !S['fix-reader-view-mode'] && S['available-reader-view-modes'].length > 1;
                 Section.ButtonGroups[0].style.display = ViewModes ? '' : 'none';
-                Section.style.display = ViewModes || PDFBook ? '' : 'none';
-                DirectionGroup.style.display = PDFBook ? '' : 'none';
+                Section.style.display = ViewModes || DirectionBook ? '' : 'none';
+                DirectionGroup.style.display = DirectionBook ? '' : 'none';
                 I.setUIState(DirectionButton, B.PPD == 'rtl' ? 'active' : 'default');
                 DirectionButton.setAttribute('aria-checked', String(B.PPD == 'rtl'));
             };

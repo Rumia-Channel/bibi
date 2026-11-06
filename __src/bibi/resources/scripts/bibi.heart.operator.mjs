@@ -169,8 +169,12 @@ O.src = (Source) => {
 
 O.RangeLoader = null;
 
+// The path of a resource inside the archive: a book may be wrapped in a folder, and the resources of the
+// book are stored relative to that folder. The prefix is added only when the archive itself is asked for a file.
+O.archivePath = (Path) => (B.ArchiveRoot || '') + Path;
+
 O.cancelExtraction = (Source) => Promise.allSettled(
-    (Source.Resources || []).concat(Source).map(Res => Res.Retlieved || O.RangeLoader?.abort(Res.Path))
+    (Source.Resources || []).concat(Source).map(Res => Res.Retlieved || O.RangeLoader?.abort(O.archivePath(Res.Path)))
 ).then(() =>
     E.dispatch('bibi:canceled-extraction', Source)
 );
@@ -180,7 +184,7 @@ O.extract = (Source) => {
     if(Source.Retlieving) return Source.Retlieving;
     if(Source.Content) return Promise.resolve(Source);
     if(Source.URI) return O.download(Source);
-    return Source.Retlieving = O.RangeLoader.getBuffer(Source.Path).then(ABuf => {
+    return Source.Retlieving = O.RangeLoader.getBuffer(O.archivePath(Source.Path)).then(ABuf => {
         if(O.isBin(Source)) Source.DataType = 'Blob', Source.Content = new Blob([ABuf], { type: Source['media-type'] });
         else                Source.DataType = 'Text', Source.Content = new TextDecoder('utf-8').decode(new Uint8Array(ABuf));
         Source.Retlieved = true;
@@ -268,8 +272,8 @@ O.file = (Source, Opt = {}) => new Promise((resolve, reject) => {
 
 
 // A resource is binary when its name says so, or when its declared media type says so (an EPUB may name a PDF without an extension).
-O.isBin = (Source) => /\.(aac|gif|jpe?g|m4[av]|mp([34]|e?g)|ogg|[ot]tf|pdf|png|web[mp]|woff2?)$/i.test(Source.Path.split('?')[0])
-    || /^(application\/(pdf|zip|octet-stream|font-woff2?)|font\/)/i.test(Source['media-type'] || '');
+O.isBin = (Source) => /\.(aac|avif|bmp|gif|jpe?g|m4[av]|mp([34]|e?g)|ogg|[ot]tf|pdf|png|web[mp]|woff2?)$/i.test(Source.Path.split('?')[0])
+    || /^(application\/(pdf|zip|octet-stream|font-woff2?)|font\/|image\/(avif|bmp|gif|jpeg|png|webp)$)/i.test(Source['media-type'] || '');
 
 // A media type that carries text (and can therefore be decoded from bytes).
 O.isTextMediaType = MediaType => /^(text\/|application\/(xhtml\+xml|xml|javascript|ecmascript|json)|image\/svg\+xml)/i.test(MediaType || '')
@@ -307,6 +311,8 @@ O.MediaTypes = {
     'png'     :       'image/png',
     'svg'     :       'image/svg+xml',
     'webp'    :       'image/webp',
+    'avif'    :       'image/avif',
+    'bmp'     :       'image/bmp',
     'css'     :        'text/css',
     'js'      :        'text/javascript',
     'html?'   :        'text/html',
@@ -322,7 +328,7 @@ O.getMediaType = (FileName) => {
 O.getItemType = (MediaType) => { switch(MediaType?.replace?.(/^([^\/]+\/)?([^\+]*)(\+.+)?$/, '$2')) {
     case 'html': case 'xhtml': case 'xml':            return 'MarkupDocument';
     case 'svg':                                       return 'SVG';
-    case 'gif': case 'jpeg': case 'png': case 'webp': return 'BitmapImage';
+    case 'avif': case 'bmp': case 'gif': case 'jpeg': case 'png': case 'webp': return 'BitmapImage';
     case 'pdf':                                       return 'PDF';
 } return ''; };
 

@@ -22,6 +22,20 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.1
+
+This patch opens image-only ZIP archives as books, without EPUB conversion:
+
+* ZIP entries identify EPUB, BibiZine, or image-book content, in that order. Invalid archives and archives without supported content fail explicitly.
+* PNG, JPEG, GIF, WebP, AVIF and BMP pages use the existing fixed-layout renderer, natural filename order and subfolder support. Directories, non-images, hidden paths and OS auxiliary files are excluded.
+* Range delivery lists the archive first and fetches images on demand, even with UI placeholders disabled. Servers without Range support and local ZIP files use full extraction.
+* Image ZIPs share the PDF left-to-right / right-to-left toggle. Direction changes preserve the current page and view mode; the configured default applies when reopened.
+* The fixed reader shell no longer becomes a horizontal scroll container during direction changes; paired pages stay within the viewport.
+* The schemaVersion 1 position/host APIs, revision identity and credential policy are unchanged. Filenames remain literal ZIP entry names and are never inserted as unescaped markup.
+
+The reader and `zzz` packages are versioned `2.3.1`; `bun run archive` generates `Bibi-v2.3.1.zip`.
+
+
 ### v2.3.0
 
 This release adds PDF support without changing the schemaVersion 1 reading-position or host-navigation APIs:
@@ -192,6 +206,19 @@ Landscape illustrations can still use the full opening. Links to an adopted illu
 Small inline images retain publisher-defined spacing across relayouts; only adopted illustrations have their foreign wrapper margins reset. Fractional-width horizontal-text panes use normal pagination rather than orthogonal-flow gutters.
 Native horizontal-text figures are not converted into picture panes. Fitted single-picture covers remain centered when opened or revisited, even inside a reflowable book.
 Standalone picture classification uses intrinsic media dimensions even when the EPUB sets the image width to `100%`. Paired pages share a stage-height opening; focusing either member keeps both pages in view.
+
+### Image ZIP books
+
+A ZIP needs no EPUB metadata when it contains supported bitmap images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, case-insensitive). Open it through `?book=/books/comic.zip` or the local file picker. It remains a ZIP: no conversion or renamed extension is required. Image decoding support follows the browser.
+
+Pages follow natural path order (`1`, `2`, `10`), including images in subfolders. Directories, non-image files, hidden paths, `__MACOSX`, `Thumbs.db` and `desktop.ini` are not pages. An EPUB container takes precedence over Zine metadata, which takes precedence over image detection; malformed metadata does not silently fall back to an image book.
+
+Each image is an ordinary fixed-layout spine item, fitted without changing its aspect ratio. Existing preset defaults determine reading direction and display mode. The last control in **View Mode** switches **Left-to-right reading** / **Right-to-left reading**, with click, Enter or Space, just as for standalone PDFs. It retains the current page and view mode, applies only to the current session, and does not change EPUB or Zine reading directions.
+
+Range-capable delivery reads the ZIP directory without expanding every image, then fetches and decodes pages around the current position. This deferral remains enabled when `allow-placeholders` is false. Without Range support the ZIP is downloaded and expanded at once, but decoding still follows page loading. Extensionless routes require `extract-if-necessary` to include `""`; cookie/CORS rules are the same as for EPUB ZIPs.
+
+Reading positions use the unchanged schemaVersion 1 API and spine-item progress. Hosts should continue supplying stable `book-key` and `content-hash` values for revision-aware save/restore.
+
 
 ### PDF documents
 
