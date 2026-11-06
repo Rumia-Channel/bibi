@@ -426,6 +426,10 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
         // --------------------------------------------------------------------------------
         B.PPD = Spine['page-progression-direction'] = _Spine.getAttribute('page-progression-direction');
         if(!B.PPD || !/^(ltr|rtl)$/.test(B.PPD)) B.PPD = S['default-page-progression-direction']; // default;
+        if(S['keep-settings'] && (B.Type == 'PDF' || B.Type == 'ImageZIP')) {
+            const Direction = I.Oven.Biscuits.remember('Book', 'PPD');
+            if(Direction == 'ltr' || Direction == 'rtl') B.PPD = Direction;
+        }
         // --------------------------------------------------------------------------------
         const RenditionPropertyRE = /^((rendition:)?(layout|orientation|spread|page-spread))-([a-z\-]+)$/;
         const      BibiPropertyRE = /^(bibi:(allow-placeholder|no-adjustment|no-padding))$/;

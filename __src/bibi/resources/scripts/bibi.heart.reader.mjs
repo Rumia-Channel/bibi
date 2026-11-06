@@ -997,7 +997,11 @@ R.changeView = (Par) => { if(!Par) return false;
         S.update(Setting);
         if(!L.Opened) L.play();
     }
-    if(S['keep-settings']) I.Oven.Biscuits.memorize('Book', { RVM: Par.Mode, FBL: Par.FullBreadthLayoutInScroll });
+    if(S['keep-settings']) {
+        const BookSettings = { RVM: Par.Mode, FBL: Par.FullBreadthLayoutInScroll };
+        if(B.Type == 'PDF' || B.Type == 'ImageZIP') BookSettings.PPD = B.PPD;
+        I.Oven.Biscuits.memorize('Book', BookSettings);
+    }
 };
 
 
