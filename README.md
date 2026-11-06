@@ -22,7 +22,7 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
-### v2.3.2 (unreleased)
+### v2.3.2
 
 * Standalone PDF and image ZIP reading directions are saved per book when `keep-settings` is enabled and restored before the first layout. Saved choices take precedence over PDF detection or the configured default.
 * Direction preferences use the same book/user/revision identity as reading positions. `keep-settings: no` disables direction saving and restoration without disabling reading-position restoration; EPUB and Zine directions are unchanged.
