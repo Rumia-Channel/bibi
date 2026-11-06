@@ -492,7 +492,7 @@ try {
                     await Toggle.focus();
                     await Toggle.press('Enter');
                 }
-                await Frame.waitForFunction(Direction => S.PPD == Direction && !R.LayingOut && !O.Busy, Expected);
+                await Frame.waitForFunction(Direction => S.PPD == Direction && !I.OpenedSubpanel && !R.LayingOut && !O.Busy, Expected);
                 assert.equal((await position(Reader)).layout.pageIndex, Before, 'Changing direction must retain the current source page.');
                 assert.equal(await Toggle.getAttribute('aria-checked'), String(Expected == 'rtl'));
                 const LeftToRight = await Frame.evaluate(() => R.Items[1].Box.getBoundingClientRect().left < R.Items[2].Box.getBoundingClientRect().left);
@@ -512,7 +512,7 @@ try {
                 const PreviousDirection = await Frame.evaluate(() => S.PPD);
                 await Frame.locator('#bibi-menu .bibi-icon-config').click();
                 await Frame.locator('#bibi-button-reading-direction').press('Space');
-                await Frame.waitForFunction(Direction => S.PPD != Direction && Bibi.API.getState().operable, PreviousDirection);
+                await Frame.waitForFunction(Direction => S.PPD != Direction && !I.OpenedSubpanel && Bibi.API.getState().operable, PreviousDirection);
                 assert.equal(await Frame.evaluate(() => S.RVM), Mode, 'Direction overrides must not change the chosen scroll mode.');
                 assert.equal((await position(Reader)).layout.pageIndex, Before, 'A scrolled PDF must retain its current page.');
             }
