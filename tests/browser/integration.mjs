@@ -792,6 +792,7 @@ try {
     await scenario('unsupported, malformed and corrupt image ZIPs fail instead of becoming inoperable ready books', async () => {
         for(const Book of ['images-unsupported', 'atonce-images-unsupported', 'images-broken', 'images-corrupt', 'atonce-images-corrupt']) {
             const Bad = await Page.evaluate(Book => window.openReader({ book: `/epubs/${Book}.zip`, 'book-key': Book }), Book);
+            await Page.waitForFunction(Index => window.readers[Index].Frame.contentWindow.Bibi?.API?.getState().status == 'error', Bad);
             const Error = await Page.evaluate(async Index => {
                 try { await window.readers[Index].api.ready; } catch(Error) { return { code: Error.code, message: Error.message }; }
             }, Bad);
