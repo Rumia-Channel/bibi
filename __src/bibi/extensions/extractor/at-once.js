@@ -1,13 +1,14 @@
 'use strict';
 
 import JSZip from 'jszip/dist/jszip.min.js';
+import { classifyEntries, isExcludedPath, Errors } from '../../resources/scripts/bibi.heart.zip.mjs';
 
 Bibi.x({
 
     id: 'Extractor_at-once',
     description: 'Utilities for Zipped Books. (Method: at-once)',
     author: 'Satoru Matsushima (@satorumurmur)',
-    version: '1.2.0'
+    version: '1.3.0'
 
 })(() => {
 
@@ -33,45 +34,25 @@ Bibi.x({
 
     const extract = (BookDataArchive) => new Promise((resolve, reject) => {
         if(I.Catcher.Input) I.Catcher.style.opacity = 0;
-        const FilesToBeExtract = [];
-        for(let FileName in BookDataArchive.files) {
-            if(
-                BookDataArchive.files[FileName].dir ||
-                /(^|\/)\./.test(FileName) ||
-                /\.(db|php|p[lm]|cgi|r[bu])(\/|$)/i.test(FileName) ||
-                /^mimetype$/i.test(FileName) ||
-                !BookDataArchive.files[FileName]._data.compressedContent
-            ) {
-                delete BookDataArchive.files[FileName];
-                continue;
-            }
-            FilesToBeExtract.push(FileName);
+        // Identify the book before expanding any entries.
+        const Names = [];
+        for(const FileName in BookDataArchive.files) {
+            const File = BookDataArchive.files[FileName];
+            if(File.dir) continue;
+            if(!File._data || (File.unsafeOriginalName && File.unsafeOriginalName != FileName)) continue;
+            Names.push(FileName);
         }
-        if(!FilesToBeExtract.length) return reject(Bibi.ErrorMessages.DataInvalid);
-        let FolderName = '', FolderNameRE = undefined;
-        const PathsToBeChecked = [];
-        if(B.Type != 'Zine') PathsToBeChecked.push(B.Container.Source.Path); // EPUB or unknown.
-        if(B.Type != 'EPUB') PathsToBeChecked.push( B.ZineData.Source.Path); // Zine or unknown.
-        if(!PathsToBeChecked.filter(PathToBeChecked => FilesToBeExtract.includes(PathToBeChecked)).length) {
-            PathsToBeChecked.forEach(PathToBeChecked => {
-                if(!PathToBeChecked) return;
-                if(FolderName) return;
-                const RE = new RegExp('^(.+?\\/)' +  PathToBeChecked.replace(/\//g, '\\/').replace(/\./g, '\\.') + '$');
-                for(let l = FilesToBeExtract.length, i = 0; i < l; i++) {
-                    const FileName = FilesToBeExtract[i];
-                    if(RE.test(FileName)) {
-                        FolderName = FileName.replace(RE, '$1');
-                        FolderNameRE = new RegExp('^' + FolderName.replace(/\//g, '\\/').replace(/\./g, '\\.'));
-                        break;
-                    }
-                }
-            });
-        }
-        let RootFileFound = false;
-             if(B.Type) RootFileFound = FilesToBeExtract.includes(FolderName + PathsToBeChecked[0]);
-        else if(FilesToBeExtract.includes(FolderName + B.Container.Source.Path)) B.Type = 'EPUB', RootFileFound = true;
-        else if(FilesToBeExtract.includes(FolderName +  B.ZineData.Source.Path)) B.Type = 'Zine', RootFileFound = true;
-        if(!RootFileFound) return reject(`${ B.Type ? (B.Type == 'EPUB' ? B.Container.Source.Path : B.ZineData.Source.Path).split('/').slice(-1)[0] : '' } Not Contained`);
+        const Classified = classifyEntries(Names);
+        if(!Classified.Type) return reject(Errors.Unsupported);
+        B.Type = Classified.Type;
+        B.ArchiveRoot = Classified.ArchiveRoot;
+        B.ImagePaths = Classified.ImagePaths;
+        const Targets = (Classified.Type == 'ImageZIP' ?
+            Classified.ImagePaths.map(Path => ({ Name: Classified.ArchiveRoot + Path, Path: Path })) :
+            Names.filter(Name => Name.startsWith(Classified.ArchiveRoot) && !isExcludedPath(Name))
+                .map(Name => ({ Name, Path: Name.slice(Classified.ArchiveRoot.length) }))
+        );
+        if(!Targets.length) return reject(Errors.Unsupported);
         const FileCount = { Particular: 0 };
         const FileTypesToBeCounted = {
             'Meta XML':   'xml|opf|ncx',
@@ -83,7 +64,7 @@ Bibi.x({
             'JavaScript': 'js',
             'JSON':       'json',
             'SVG':        'svg',
-            'Bitmap':     'gif|jpe?g|png',
+            'Bitmap':     'gif|jpe?g|png|webp|avif|bmp',
             'Font':       'woff2?|otf|ttf',
             'Audio':      'aac|m4a|mp3|ogg',
             'Video':      'mp4|m4v|webm|ogv',
@@ -96,16 +77,15 @@ Bibi.x({
         // Only a file whose extension says it carries text is decoded as text: every other file is kept as bytes
         // and decoded later, if and when its media type says that it is text.
         const TextExtensionsRE = /\.(xml|opf|ncx|ya?ml|html?|xht(ml?)?|smil|pls|css|js|json|svg|md|txt)$/i;
-        FilesToBeExtract.forEach(FileName => {
-            if(FolderNameRE) FileName = FileName.replace(FolderNameRE, '');
-            const IsBin = O.isBin({ Path: FileName }) || !TextExtensionsRE.test(FileName);
+        Targets.forEach(({ Name, Path }) => {
+            const IsBin = O.isBin({ Path: Path }) || !TextExtensionsRE.test(Path);
             Promises.push(
-                BookDataArchive.file(FolderName + FileName).async(IsBin ? 'blob' : 'string').then(FileContent => {
-                    B.Package.Manifest[FileName] = IsBin ?
-                        { Path: FileName, DataType: 'Blob', Content: FileContent } :
-                        { Path: FileName, DataType: 'Text', Content: FileContent.trim() };
+                BookDataArchive.file(Name).async(IsBin ? 'blob' : 'string').then(FileContent => {
+                    B.Package.Manifest[Path] = IsBin ?
+                        { Path: Path, DataType: 'Blob', Content: FileContent } :
+                        { Path: Path, DataType: 'Text', Content: FileContent.trim() };
                     for(const FileType in FileTypesToBeCounted) {
-                        if(new RegExp('\\.(' + FileTypesToBeCounted[FileType] + ')$', 'i').test(FileName)) {
+                        if(new RegExp('\\.(' + FileTypesToBeCounted[FileType] + ')$', 'i').test(Path)) {
                             if(!FileCount[FileType]) FileCount[FileType] = 1; else FileCount[FileType]++;
                             FileCount.Particular++;
                             break;
@@ -124,7 +104,7 @@ Bibi.x({
                 const Count_Others = Total - FileCount.Particular;
                 O.log(`${ Count_Others } ${ Count_Others > 1 ? 'Others' : 'Another' }`);
             }
-            O.log(`Extracted. (${ Total } File${ Total > 1 ? 's' : '' })`, '</g>');
+            O.log(`Extracted. (${ Total } File${ Total > 1 ? 's' : '' })`, '</g:>');
             resolve();
         }).catch(reject);
     });

@@ -5,6 +5,9 @@ import { B } from './bibi.heart.book.mjs';
 import { PDF } from './bibi.heart.pdf.mjs';
 import { Conc } from './bibi.instruments/Conc.mjs';
 
+const escapeXML = Text => String(Text).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+    .replace(/[&<>"']/g, Ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[Ch]));
+
 //==============================================================================================================================================
 //----------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -61,7 +64,9 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
     // A local file is a PDF when its name or its media type says so: a PDF is not a ZIP, so it is not extracted but read by pdf.js.
     const PDFType = BookDataFormat == 'File' ? O.getPDFType(BookInfo.BookData.name, BookInfo.BookData.type) : '';
     B.Type = !S['book'] ? (PDFType == 'PDF' ? 'PDF' : '') : S['zine'] ? 'Zine' : (BookDataFormat == 'URI' && O.isPDFPath(BookInfo.Book) ? 'PDF' : 'EPUB');
-    if(B.Type != 'EPUB' && B.Type != 'PDF') B.ZineData = { Source: { Path: 'zine.yaml' } };
+    B.ZineData = { Source: { Path: 'zine.yaml' } };
+    B.ArchiveRoot = '';
+    B.ImagePaths = [];
     PDF.reset(); // another book is opened: nothing of the previous one may be reused (a local PDF is known by its file name only)
     if(BookDataFormat == 'URI') {
         // Online
@@ -76,7 +81,7 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
         const InitErrors = [], initialize_as = (FileOrFolder) => ({
             Promised: (
                 FileOrFolder == 'folder' ? O.download(RootSource).then(() => (B.PathDelimiter = '/') && '') :
-                O.RangeLoader            ?  O.extract(RootSource).then(() => 'on-the-fly') :
+                O.RangeLoader            ? O.openZippedBook().then(() => 'on-the-fly') :
                                  O.loadZippedBookData(  B.Path  ).then(() => 'at-once')
             ).then(ExtractionPolicy => {
                 B.ExtractionPolicy = ExtractionPolicy;
@@ -154,7 +159,7 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
         }
         O.loadZippedBookData(BookData).then(() => {
             switch(B.Type) {
-                case 'EPUB': case 'Zine':
+                case 'EPUB': case 'Zine': case 'ImageZIP':
                     B.ExtractionPolicy = 'at-once';
                     return resolve(`${ B.Type } ${ FileOrData }`);
                 default:
@@ -166,6 +171,7 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
     delete S['book-data'];
     delete S['book-data-mimetype'];
     return (B.Type == 'Zine' ? X.Zine.loadZineData() :
+            B.Type == 'ImageZIP' ? L.loadImageZIPBook() :
             B.Type == 'PDF'  ? Promise.resolve() : // the package of a PDF book is already built by L.loadPDFBook
                                L.loadContainer().then(L.loadPackage)).then(() => E.dispatch('bibi:initialized-book')).then(() => InitializedAs);
 });
@@ -215,6 +221,36 @@ ${ ItemRefs.join('\n') }
 </spine>
 </package>`;
     return L.loadPackage.process(O.parseDOM(OPF, 'text/xml'));
+};
+
+
+// Image entries remain ordinary bitmap spine items. Building the package reads no image bytes.
+L.loadImageZIPBook = () => {
+    const OPF = 'http://www.idpf.org/2007/opf', DC = 'http://purl.org/dc/elements/1.1/';
+    const Doc = document.implementation.createDocument(OPF, 'package');
+    const Package = Doc.documentElement;
+    Package.setAttribute('unique-identifier', 'BibiImageZIPIdentifier');
+    const append = (Parent, NS, Name, Attributes = {}, Text) => {
+        const Element = Parent.appendChild(Doc.createElementNS(NS, Name));
+        for(const [Name, Value] of Object.entries(Attributes)) Element.setAttribute(Name, Value);
+        if(Text !== undefined) Element.textContent = Text;
+        return Element;
+    };
+    let FileName = B.Path.split('/').pop();
+    try { FileName = decodeURIComponent(new URL(B.Path).pathname.split('/').pop()); } catch(_) {}
+    const Metadata = append(Package, OPF, 'metadata');
+    append(Metadata, DC, 'dc:identifier', { id: 'BibiImageZIPIdentifier' }, B.Path);
+    append(Metadata, DC, 'dc:title', {}, FileName.replace(/\.zip$/i, '') || 'Image ZIP');
+    append(Metadata, DC, 'dc:language', {}, 'en');
+    append(Metadata, OPF, 'meta', { property: 'rendition:layout' }, 'pre-paginated');
+    const Manifest = append(Package, OPF, 'manifest'), Spine = append(Package, OPF, 'spine');
+    B.Package.Source.Path = 'BibiImageZIP.opf';
+    B.ImagePaths.forEach((Path, Index) => {
+        const ID = 'BibiImageZIPItem-' + (Index + 1);
+        append(Manifest, OPF, 'item', { id: ID, href: Path, 'media-type': O.getMediaType(Path.toLowerCase()) });
+        append(Spine, OPF, 'itemref', { idref: ID });
+    });
+    return L.loadPackage.process(Doc);
 };
 
 
@@ -313,7 +349,8 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
                 else Source['href'] = '';
             }
             if(!Source['id'] || !Source['href'] || (!Source['media-type'] && B.Type == 'EPUB')) return false;
-            Source.Path = Source.External ? Source['href'] : O.rrr(PackageDir + '/' + Source['href']);
+            // ZIP entry names are not URLs: preserve literal #, ?, %, Unicode and spaces.
+            Source.Path = B.Type == 'ImageZIP' ? Source['href'] : Source.External ? Source['href'] : O.rrr(PackageDir + '/' + Source['href']);
             if(Manifest[Source.Path]) Source = Object.assign(Manifest[Source.Path], Source);
             if(!Source.Content) Source.Content = '';
             Source.Of = [];
@@ -720,15 +757,14 @@ L.preprocessResources = () => {
 
 
 L.loadSpread = (Spread, Opt = {}) => new Promise((resolve, reject) => {
-    // A PDF page is rasterized on demand: a document with hundreds of pages must not be rasterized all at once.
-    // The deferral is independent of the extraction policy and of "allow-placeholders": it is a memory guard, not a feature.
-    const HasPDF = Spread.Items.some(Item => Item.Type == 'PDF');
-    Spread.AllowPlaceholderItems = HasPDF ? Opt.AllowPlaceholderItems : (S['allow-placeholders'] && Opt.AllowPlaceholderItems);
+    // PDF rasterization and image ZIP decoding are deferred regardless of the UI placeholder setting.
+    const OnDemand = B.Type == 'ImageZIP' || Spread.Items.some(Item => Item.Type == 'PDF');
+    Spread.AllowPlaceholderItems = OnDemand ? Opt.AllowPlaceholderItems : (S['allow-placeholders'] && Opt.AllowPlaceholderItems);
     let LoadedItemsInSpread = 0, SkippedItemsInSpread = 0;
     Spread.Items.forEach(Item => {
         L.loadItem(Item, { AllowPlaceholder: Opt.AllowPlaceholderItems })
         .then(() =>  LoadedItemsInSpread++) // Loaded
-       .catch(() => SkippedItemsInSpread++) // Skipped
+       .catch(Err => { SkippedItemsInSpread++; if(B.Type == 'ImageZIP') reject(Err); })
         .then(() => {
             if(LoadedItemsInSpread + SkippedItemsInSpread == Spread.Items.length) /*(SkippedItemsInSpread ? reject : resolve)*/resolve(Spread);
         });
@@ -739,10 +775,10 @@ L.loadSpread = (Spread, Opt = {}) => new Promise((resolve, reject) => {
 L.loadItem = async (Item, Opt = {}) => {
     const ProcessID = Item.LoadingProcessID = O.id();
     await Promise.resolve(Item.Loading);
-    const IsPlaceholder = Opt.AllowPlaceholder ? (Item.Type == 'PDF' ? true : (S['allow-placeholders'] && Item.AllowPlaceholder)) : false;
+    const IsPlaceholder = Opt.AllowPlaceholder ? (Item.Type == 'PDF' || B.Type == 'ImageZIP' || (S['allow-placeholders'] && Item.AllowPlaceholder)) : false;
     const ItemBox = Item.Box;
     const classify = (ClassName, TF) => [Item, ItemBox].forEach(TF ? Ele => Ele.classList.add(ClassName) : Ele => Ele.classList.remove(ClassName));
-    let ContentURL;
+    let ContentURL, LoadError;
     return Item.Loading = new Promise((resolve, reject) => {
         Item.IsPlaceholder = IsPlaceholder;
         classify('loading', true);
@@ -765,6 +801,7 @@ L.loadItem = async (Item, Opt = {}) => {
         // Item.stamp('Loaded');
         E.dispatch('bibi:loaded-item', Item);
     }).catch(Reason => { // Placeholder (or Error)
+        if(B.Type == 'ImageZIP' && !IsPlaceholder && ProcessID == Item.LoadingProcessID) LoadError = Reason || Bibi.ErrorMessages.DataInvalid;
         O.log(`Item#${ String(Item.Index).padStart(3, 0) } is turned DOWN:`, Reason);
         classify('loaded', false);
         classify('placeholder', true);
@@ -785,12 +822,14 @@ L.loadItem = async (Item, Opt = {}) => {
         URL.revokeObjectURL(ContentURL);
         Item.removeEventListener('load', Item.onLoaded);
         delete Item.onLoaded;
-        if(Item.Type != 'PDF') delete Item.Source.Content; // a PDF's bytes are shared by every page of it: they are released once the document is parsed
+        // A PDF shares its bytes; an at-once image ZIP placeholder owns its bytes until its first blob URL.
+        if(Item.Type != 'PDF' && (B.Type != 'ImageZIP' || Item.Source.URI)) delete Item.Source.Content;
         delete Item.Source.Preprocessed;
         delete Item.Source.Retlieved;
         delete Item.SourceText;
         delete Item.LoadingProcessID;
         window.focus();
+        if(LoadError) throw LoadError;
         return Item;
     });
 };
@@ -912,9 +951,8 @@ L.fetchAndBuildItemSourceText = async (Item) => {
             } :
             Item.Type == 'BitmapImage' ? {
                 URI: true,
-                initialize_before: () => Item.SourceText = `<img class="bibi-spine-item-image" alt="" src="bibi:/${ Item.Source.Path }" />`,
                 finalize: () => {
-                    Item.SourceText = Item.SourceText.replace('bibi:/' + Item.Source.Path, Item.Source.URI); // URI is BlobURL or URI
+                    Item.SourceText = `<img class="bibi-spine-item-image" alt="" src="${ escapeXML(Item.Source.URI) }" />`;
                 }
             } :
             Item.Type == 'PDF' ? {
@@ -934,7 +972,9 @@ L.fetchAndBuildItemSourceText = async (Item) => {
             null
         ),
         async () => {
-            const ViewportMeta = Item.PrePaginated && (Item.Viewport = await O.getItemViewport(Item) || Item.Viewport || null)
+            const Viewport = Item.PrePaginated ? await O.getItemViewport(Item) : null;
+            if(B.Type == 'ImageZIP' && !Viewport) throw new Error('Invalid image: ' + Item.Source.Path);
+            const ViewportMeta = Item.PrePaginated && (Item.Viewport = Viewport || Item.Viewport || null)
                 ? `<meta name="viewport" content="width=${ Item.Viewport.Width }, height=${ Item.Viewport.Height }" />`
                 : `<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0" />`;
             if(Item.Type == 'MarkupDocument') {
@@ -947,7 +987,7 @@ L.fetchAndBuildItemSourceText = async (Item) => {
                         `<head>`,
                             ViewportMeta,
                             `<meta charset="utf-8" />`,
-                            `<title>${ B.FullTitle } - #${ Item.Index + 1 }/${ R.Items.length }</title>`,
+                            `<title>${ escapeXML(B.FullTitle) } - #${ Item.Index + 1 }/${ R.Items.length }</title>`,
                             (AdditionalHeader ? AdditionalHeader + '\n' : '') +
                         `</head>`,
                         `<body>`,

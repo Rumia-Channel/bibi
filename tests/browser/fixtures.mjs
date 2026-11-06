@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import zlib from 'node:zlib';
 
 export const LongText = '読書位置は画面のページ番号ではなく本文の文字に結び付ける。'.repeat(500);
 export const TailText = '終端への移動だけで読了にはしない。'.repeat(80);
@@ -135,4 +136,163 @@ export const createExtensionlessMarkupFixture = async () => {
     add('content/nav.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目次</title></head><body><nav epub:type="toc"><ol><li><a href="chapter#chapter">章</a></li></ol></nav></body></html>');
     add('content/chapter', xhtml('章', '<p id="chapter">拡張子のない XHTML を含む本です。</p>', false));
     return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
+
+
+// -- Image ZIP fixtures ------------------------------------------------------------------------------------------------
+
+// A minimal deterministic PNG encoder: the fixtures must be real images that a browser decodes, without any external asset.
+const CRC32Table = (() => {
+    const Table = new Int32Array(256);
+    for(let n = 0; n < 256; n++) {
+        let c = n;
+        for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+        Table[n] = c;
+    }
+    return Table;
+})();
+const CRC32 = Bytes => {
+    let c = 0xFFFFFFFF;
+    for(let i = 0; i < Bytes.length; i++) c = CRC32Table[(c ^ Bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+};
+const PNGChunk = (Type, Data) => {
+    const Length = Buffer.alloc(4), CRC = Buffer.alloc(4);
+    Length.writeUInt32BE(Data.length, 0);
+    CRC.writeUInt32BE(CRC32(Buffer.concat([Buffer.from(Type, 'latin1'), Data])), 0);
+    return Buffer.concat([Length, Buffer.from(Type, 'latin1'), Data, CRC]);
+};
+// An RGB PNG whose pixels are produced by PixelOf(x, y): the fixture images are therefore distinguishable by their content.
+const createPNG = (Width, Height, PixelOf) => {
+    const Raw = Buffer.alloc((Width * 3 + 1) * Height);
+    for(let y = 0; y < Height; y++) {
+        const RowStart = y * (Width * 3 + 1);
+        Raw[RowStart] = 0; // the filter type: none
+        for(let x = 0; x < Width; x++) {
+            const [R, G, B] = PixelOf(x, y);
+            const Offset = RowStart + 1 + x * 3;
+            Raw[Offset] = R, Raw[Offset + 1] = G, Raw[Offset + 2] = B;
+        }
+    }
+    const IHDR = Buffer.alloc(13);
+    IHDR.writeUInt32BE(Width, 0), IHDR.writeUInt32BE(Height, 4);
+    IHDR[8] = 8, IHDR[9] = 2, IHDR[10] = 0, IHDR[11] = 0, IHDR[12] = 0; // 8 bits, truecolor, no interlace
+    return Buffer.concat([
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+        PNGChunk('IHDR', IHDR),
+        PNGChunk('IDAT', zlib.deflateSync(Raw, { level: 9 })),
+        PNGChunk('IEND', Buffer.alloc(0))
+    ]);
+};
+// A deterministic pseudo-random pixel source: the images are incompressible enough that the archive stays large.
+const NoisePixel = Seed => (x, y) => {
+    let h = (x * 374761393 + y * 668265263 + Seed * 2246822519) >>> 0;
+    h = (h ^ (h >>> 13)) >>> 0, h = Math.imul(h, 1274126177) >>> 0;
+    return [(h >>> 16) & 0xFF, (h >>> 8) & 0xFF, h & 0xFF];
+};
+// A solid image with a distinctive corner, so that a decoded page can be identified by its size and by its corner color.
+const SolidPixel = (R, G, B) => (x, y) => (x < 8 && y < 8 ? [255 - R, 255 - G, 255 - B] : [R, G, B]);
+
+// A ZIP archive built from arbitrary entries: the fixtures that need bytes produced elsewhere (a JPEG drawn in a browser) use it.
+export const createZipFixture = async Entries => {
+    const Zip = new JSZip();
+    for(const [Name, Content] of Entries) Zip.file(Name, Content, { date: DateOfFixture });
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+};
+
+// The page paths that each image ZIP fixture must produce, in the natural order the reader must show them.
+// The paths are relative to the archive root: an archive whose pages live in one folder reports them relative to that folder.
+export const ImageZipFixturePaths = {
+    // The pages of the flat fixture, in their natural order (1, 2, 10 — not the lexicographic order 1, 10, 2).
+    Flat: ['1.png', '2.png', '10.png'],
+    // The pages of the fixture whose images live in subfolders.
+    Nested: ['part1/a.png', 'part1/b.png', 'part2/c.png'],
+    // The pages of the fixture whose names must be preserved literally. Their order is not asserted: only their literal names are.
+    Escaped: ['"quoted".png', '100% pure.png', 'first page.png', 'photo #1.png', 'photo?2.png', 'rock & roll.png', '日本語ページ.png'],
+    // The number of pages of the large fixture.
+    Large: 20
+};
+// The natural size of every page of the flat fixture, so that a decoded page can be identified by its dimensions.
+export const ImageZipFixtureSizes = { '1.png': [120, 180], '2.png': [200, 120], '10.png': [150, 150] };
+
+// The image ZIP fixture: the page images are named so that their natural order is 1, 2, 10 (not the lexicographic order 1, 10, 2),
+// and it holds the entries that must be excluded: a directory, a non-image file, and the auxiliary files that macOS and Windows add.
+export const createImageZipFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    add('1.png', createPNG(120, 180, SolidPixel(220, 40, 40)));
+    add('2.png', createPNG(200, 120, SolidPixel(40, 200, 40)));
+    add('10.png', createPNG(150, 150, SolidPixel(40, 40, 220)));
+    // Excluded: a directory entry, a non-image file, an OS auxiliary file, a hidden path, and a dotfile.
+    Zip.folder('empty-folder');
+    add('readme.txt', 'This file is not an image.');
+    add('__MACOSX/._1.png', 'resource fork');
+    add('Thumbs.db', 'thumbs');
+    add('desktop.ini', 'ini');
+    add('.hidden/secret.png', createPNG(10, 10, SolidPixel(0, 0, 0)));
+    add('.dotfile.png', createPNG(10, 10, SolidPixel(0, 0, 0)));
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+};
+
+// The image ZIP fixture whose page images live in subfolders: every image must be found, whatever its folder is.
+export const createNestedImageZipFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    add('part1/a.png', createPNG(120, 180, SolidPixel(200, 60, 60)));
+    add('part1/b.png', createPNG(120, 180, SolidPixel(60, 200, 60)));
+    add('part2/c.png', createPNG(120, 180, SolidPixel(60, 60, 200)));
+    add('notes.txt', 'not an image');
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+};
+
+// The image ZIP fixture whose page images have names that must be preserved literally: spaces, "#", "?", "%", "&", quotes and non-ASCII characters.
+export const createEscapedNameImageZipFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    add('first page.png', createPNG(120, 180, SolidPixel(200, 60, 60)));
+    add('photo #1.png', createPNG(120, 180, SolidPixel(60, 200, 60)));
+    add('photo?2.png', createPNG(120, 180, SolidPixel(60, 60, 200)));
+    add('100% pure.png', createPNG(120, 180, SolidPixel(200, 200, 60)));
+    add('rock & roll.png', createPNG(120, 180, SolidPixel(60, 200, 200)));
+    add('"quoted".png', createPNG(120, 180, SolidPixel(200, 60, 200)));
+    add('日本語ページ.png', createPNG(120, 180, SolidPixel(120, 120, 120)));
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+};
+
+// The image ZIP fixture that is large enough to prove that the reader fetches only what it needs: the images are noise, so the
+// archive cannot be compressed to a fraction of its size.
+export const createLargeImageZipFixture = async (PageCount = 30, Width = 320, Height = 480) => {
+    const Zip = new JSZip();
+    for(let Index = 1; Index <= PageCount; Index++) {
+        const Name = String(Index).padStart(3, '0') + '.png';
+        Zip.file(Name, createPNG(Width, Height, NoisePixel(Index)), { date: DateOfFixture });
+    }
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 1 } });
+};
+
+// A ZIP that holds no supported image at all: the reader must refuse it with a clear error.
+export const createUnsupportedImageZipFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    add('readme.txt', 'This archive holds no image.');
+    add('data/values.csv', 'a,b,c');
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+};
+
+// A ZIP whose first page image cannot be decompressed: the ZIP listing stays valid, so the failure must be reported as a broken image.
+export const createCorruptImageZipFixture = async () => {
+    const Zip = new JSZip();
+    Zip.file('1.png', createPNG(120, 180, SolidPixel(220, 40, 40)), { date: DateOfFixture });
+    Zip.file('2.png', createPNG(200, 120, SolidPixel(40, 200, 40)), { date: DateOfFixture });
+    const Bytes = Buffer.from(await Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } }));
+    // The local file header of the first entry precedes its compressed data: the reserved DEFLATE block type corrupts the image only.
+    const Header = new DataView(Bytes.buffer, Bytes.byteOffset, Bytes.byteLength);
+    const DataStart = 30 + Header.getUint16(26, true) + Header.getUint16(28, true);
+    Bytes[DataStart] = 7;
+    return Bytes;
+};
+
+// A BibiZine packaged as a ZIP: its "zine.yaml" must be detected without the "zine" query.
+export const createZineImageZipFixture = async () => {
+    const Zip = new JSZip(), add = (Name, Content) => Zip.file(Name, Content, { date: DateOfFixture });
+    add('zine.yaml', 'title: 画像ジン\nlanguage: ja\nspine:\n  - page1.html\n  - page2.html\n');
+    add('page1.html', xhtml('一ページ目', '<p id="zine-page-1">ジンの一ページ目です。</p>', false));
+    add('page2.html', xhtml('二ページ目', '<p id="zine-page-2">ジンの二ページ目です。</p>', false));
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 };

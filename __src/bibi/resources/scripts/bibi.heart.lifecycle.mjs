@@ -607,11 +607,10 @@ Bibi.loadBook = (BookInfo) => Promise.resolve().then(() => {
     // Bibi.StartOption.addResetter();
     O.HTML.classList.add('loading-items');
     let LoadedItems = 0;
-    return Promise.all(R.Spreads.map(Spread => new Promise(resolve => L.loadSpread(Spread, { AllowPlaceholderItems: Spread.Index != Bibi.StartOption.TargetSpreadIndex }).then(() => {
+    return Promise.all(R.Spreads.map(Spread => L.loadSpread(Spread, { AllowPlaceholderItems: Spread.Index != Bibi.StartOption.TargetSpreadIndex }).then(() => {
         I.notify(`Loading Items... <span class="sotto">${ LoadedItems += Spread.Items.length }/${ R.Items.length }</span>`);
-        setTimeout(() => resolve(), 69);
-        // !Bibi.StartOption.Reset ? R.layOutSpreadAndItsItems(Spread).then(resolve) : resolve();
-    })))).then(async () => {
+        return new Promise(resolve => setTimeout(resolve, 69));
+    }))).then(async () => {
         O.log(`Loaded. (${ R.Items.length } in ${ R.Spreads.length })`, '</g>');
         I.notify(`Processing...`);
         await new Promise(resolve => setTimeout(resolve, 69));
