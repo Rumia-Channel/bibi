@@ -22,6 +22,14 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.3 (unreleased)
+
+* Portrait illustrations already placed at the following prose's head can move into a preceding vacant pane when later loading, text settings, or resizing changes the prose layout.
+* Both prose flows are repaginated after the move; the original illustration spine links and CFIs still reach the picture, and its emptied source remains collapsed.
+
+The reader and `zzz` packages are versioned `2.3.3`; `bun run archive` generates `Bibi-v2.3.3.zip`.
+
+
 ### v2.3.2
 
 * Standalone PDF and image ZIP reading directions are saved per book when `keep-settings` is enabled and restored before the first layout. Saved choices take precedence over PDF detection or the configured default.
@@ -209,6 +217,7 @@ In paged mode on viewports at least 4:3 wide, portrait illustrations use one pan
 Vertical-text pages can share the other pane with prose without wrapping prose on both sides of a picture.
 A standalone portrait fills the preceding prose's vacant pane when it fits. If that opening is already occupied, the portrait opens the following prose instead: portrait on the right and text on the left for right-to-left books.
 Eligibility uses the rendered prose's occupied width and page bands, not a character-count threshold. Pairing is recomputed after relayout until the pane groups settle, and illustration zones are reused across resizes.
+An illustration already placed at the following prose's head is reconsidered when later layout reveals a preceding vacancy. Moving it also repaginates its former prose flow, so the old picture zone does not leave a blank opening.
 Reflowable books may declare individual illustration pages `pre-paginated`, even with `spread-none` and a centered page spread; those standalone portraits remain eligible. An adopted illustration's emptied source page is removed from the physical scroll flow. Pane widths use the current page band, not the auto-sized body's previous image width.
 This is atomic pane placement, not unrestricted floating: landscape illustrations, small inline images, wholly fixed-layout books, covers, explicit multi-page spreads, captioned figures, and headings/navigation without prose do not opt into portrait/prose adoption.
 Landscape illustrations can still use the full opening. Links to an adopted illustration's original EPUB spine entry remain usable.
