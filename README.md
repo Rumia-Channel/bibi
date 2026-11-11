@@ -22,7 +22,7 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
-### v2.3.3 (unreleased)
+### v2.3.3
 
 * Portrait illustrations already placed at the following prose's head can move into a preceding vacant pane when later loading, text settings, or resizing changes the prose layout.
 * Both prose flows are repaginated after the move; the original illustration spine links and CFIs still reach the picture, and its emptied source remains collapsed.
