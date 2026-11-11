@@ -19,6 +19,13 @@ export const createReflowFixture = async (Vertical = false, IllustrationFlow = f
     return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
 };
 
+export const createLatePortraitFixture = async () => {
+    const Zip = await JSZip.loadAsync(await createReflowFixture(true, true));
+    Zip.file('content/long.xhtml', xhtml('先行本文',
+        `<p style="break-after:column">${'先行する本文。'.repeat(1000)}</p><p id="long">挿絵の直前にある本文。</p>`, false), { date: DateOfFixture });
+    return Zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 9 } });
+};
+
 export const createLazyFixture = async () => {
     const Zip = await JSZip.loadAsync(await createReflowFixture());
     let Package = await Zip.file('content/package.opf').async('string'), Items = '', Spine = '';
