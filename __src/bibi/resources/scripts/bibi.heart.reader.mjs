@@ -530,9 +530,12 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
         const Solo = Sp.Items.length == 1 ? Sp.Items[0] : null;
         if(!Solo || !Solo.Loaded || !Solo.Body || !Solo.contentDocument) return null; // placeholders carry a fake body: never donate into or out of them
         if(canDonateSoloPicture(B, Sp)) {
-            const Media = R.renderPrePaginatedItem.getSingleMediaElement(Solo);
-            if(Media && !Media.BibiAdoptedPicture && !Media.closest('figure')?.querySelector('figcaption')) {
-                const Aspect = R.getSingleMediaAspect(Solo);
+            const Adopted = Solo.BibiDonationDonor && Solo.BibiDonatedAtHead === true && Solo.BibiDonatedTo === Sp.Index + 1
+                ? R.Spreads[Solo.BibiDonatedTo]?.Items[0]?.Body?.querySelector('[data-bibi-adopted-from="' + Solo.Index + '"]') : null;
+            const Media = Adopted ? Adopted.querySelector('img, svg') : R.renderPrePaginatedItem.getSingleMediaElement(Solo);
+            if(Media && (!Media.BibiAdoptedPicture || Adopted) && !Media.closest('figure')?.querySelector('figcaption')) {
+                // A following-head placement is provisional: late prose layout can reveal a vacant preceding pane.
+                const Aspect = Adopted ? svgNaturalSize(Media) || (Media.naturalWidth > 0 ? [Media.naturalWidth, Media.naturalHeight] : null) : R.getSingleMediaAspect(Solo);
                 return { donor: true, portrait: !!(Aspect && Aspect[1] > Aspect[0]) };
             }
         }
@@ -569,10 +572,11 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
         if(!Donor.Body || !Recip.Body || !Recip.contentDocument) return;
         if(Donor.BibiDonatedTo === to) { try { if(Recip.Body.querySelector(':scope [data-bibi-adopted-from="' + Donor.Index + '"]')) return; } catch(Err) {} } // settled: copy present, nothing to do (no churn across sweeps)
         if((Donor.BibiAdoptCount || 0) > 8) return; // reload storm guard: stop re-adopting into documents that keep dropping the copy (degrades to inline/pillar, never loops)
-        let Tar = R.renderPrePaginatedItem.getSingleMediaElement(Donor);
+        const PreviousRecipient = Donor.BibiDonationDonor ? R.Spreads[Donor.BibiDonatedTo] : null;
+        let Tar = PreviousRecipient ? PreviousRecipient.Items[0]?.Body?.querySelector('[data-bibi-adopted-from="' + Donor.Index + '"]') : R.renderPrePaginatedItem.getSingleMediaElement(Donor);
         if(!Tar || Tar.BibiAdoptedPicture) return;
-        let Guard = 0; // climb through textless single-child wrappers (p > img): adopt the paragraph, not the bare picture
-        while(Tar.parentElement && Tar.parentElement !== Donor.Body && Guard++ < 8
+        let Guard = 0; // retain an adopted root and its original-source anchors when moving it again
+        while(!PreviousRecipient && Tar.parentElement && Tar.parentElement !== Donor.Body && Guard++ < 8
             && Tar.parentElement.firstElementChild === Tar && !Tar.parentElement.firstElementChild.nextElementSibling
             && !((Tar.parentElement.innerText || '').trim())) Tar = Tar.parentElement;
         const Host = Recip.Body.querySelector('div.main') || Recip.Body;
@@ -591,6 +595,7 @@ R.donateSoloPictures = () => { // move standalone illustrations into adjacent te
         Donor.BibiDonatedTo = to; Donor.BibiDonatedAtHead = atHead; Donor.BibiAdoptCount = (Donor.BibiAdoptCount || 0) + 1;
         adopted++;
         recipients.add(R.Spreads[to]);
+        if(PreviousRecipient) recipients.add(PreviousRecipient); // remove the old picture zone from its former prose flow as well
         recipients.add(R.Spreads[from]); // collapse the emptied source as well; otherwise its stale page becomes a blank opening
     });
     return { adopted, recipients: [...recipients] };

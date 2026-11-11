@@ -5,7 +5,7 @@ import os from 'node:os';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { createReflowFixture, createLazyFixture, createOpeningFixture, createPDFFixture, createPDFEmbeddedFixture, createPDFBrokenFixture, createPDFExtensionlessFixture, createExtensionlessMarkupFixture, createImageZipFixture, createNestedImageZipFixture, createEscapedNameImageZipFixture, createLargeImageZipFixture, createUnsupportedImageZipFixture, createCorruptImageZipFixture, createZineImageZipFixture, createZipFixture, ImageZipFixturePaths, ImageZipFixtureSizes, LongText, TailText } from './fixtures.mjs';
+import { createReflowFixture, createLatePortraitFixture, createLazyFixture, createOpeningFixture, createPDFFixture, createPDFEmbeddedFixture, createPDFBrokenFixture, createPDFExtensionlessFixture, createExtensionlessMarkupFixture, createImageZipFixture, createNestedImageZipFixture, createEscapedNameImageZipFixture, createLargeImageZipFixture, createUnsupportedImageZipFixture, createCorruptImageZipFixture, createZineImageZipFixture, createZipFixture, ImageZipFixturePaths, ImageZipFixtureSizes, LongText, TailText } from './fixtures.mjs';
 import { sendBook } from './book-server.mjs';
 import { verifyDistribution } from '../../zzz/distribution.mjs';
 
@@ -21,6 +21,7 @@ const [ImageZip, NestedImageZip, EscapedNameImageZip, LargeImageZip, Unsupported
     createLargeImageZipFixture(ImageZipFixturePaths.Large), createUnsupportedImageZipFixture(), createZineImageZipFixture()
 ]);
 const Content = new Map([['/epubs/reflow.epub', Reflow], ['/epubs/reflow', Reflow], ['/epubs/vertical.epub', Vertical], ['/epubs/flow.epub', IllustrationFlow], ['/epubs/lazy.epub', Lazy], ['/epubs/opening.epub', Opening], ['/epubs/fixed.epub', Fixed], ['/epubs/document.pdf', PDFDocument], ['/epubs/embedded.epub', EmbeddedPDF], ['/epubs/linked.epub', LinkedPDF], ['/epubs/broken.epub', BrokenPDF], ['/epubs/extensionless.epub', ExtensionlessPDF], ['/epubs/suffixless.epub', SuffixlessPDF], ['/epubs/extensionless-markup.epub', ExtensionlessMarkup], ['/epubs/large.pdf', LargePage], ['/epubs/malicious.pdf', MaliciousPDF], ['/epubs/widetext.pdf', WideTextPDF], ['/epubs/multiline.pdf', MultiLinePDF], ['/epubs/atonce-extensionless.epub', ExtensionlessPDF], ['/epubs/atonce-suffixless.epub', SuffixlessPDF], ['/epubs/atonce-markup.epub', ExtensionlessMarkup]]);
+Content.set('/epubs/late-portrait.epub', await createLatePortraitFixture());
 // The image ZIP fixtures: they are served as "application/zip", so the reader must classify them by their content, not by their name.
 Content.set('/epubs/images.zip', ImageZip);
 Content.set('/epubs/atonce-images.zip', ImageZip);
@@ -332,6 +333,28 @@ try {
         await Page.waitForFunction(Before => window.states.slice(Before).some(Event => Event.state.operable), StateCount);
         await restore(Reader, { cfi: '/6/4!/4/2/2' });
         assert.match((await position(Reader)).location.cfi, /^\/6\/4!/);
+        await remove(Reader);
+    });
+    await scenario('a late preceding vacancy reclaims a portrait without losing its original CFI', async () => {
+        await Page.setViewportSize({ width: 1280, height: 900 });
+        Reader = await open({ book: '/epubs/late-portrait.epub', 'book-key': 'late-portrait', 'base-fontsize': 16 });
+        await restore(Reader, { cfi: '/6/4!/4/2/2' });
+        const Frame = await readerFrame(Reader);
+        const pictureBox = async () => {
+            for(const Child of Frame.childFrames()) {
+                const Picture = Child.locator('img[alt="縦長の挿絵"]');
+                if(await Picture.count()) return Picture.boundingBox();
+            }
+        };
+        const Before = await pictureBox();
+        assert.ok(Before && Before.x >= 640 && Before.x + Before.width <= 1280, JSON.stringify(Before));
+        await Frame.evaluate(() => I.TextSetter.change({ FlowDirection: 'uni-vertical' }));
+        await restore(Reader, { cfi: '/6/6!/4/2/1:0' });
+        await restore(Reader, { cfi: '/6/4!/4/2/2' });
+        const After = await pictureBox(), Prose = await textVisible(Reader, 'long', 0);
+        assert.ok(After && After.x >= 0 && After.x + After.width <= 640 && After.y >= 0 && After.y + After.height <= 900, JSON.stringify(After));
+        assert.ok(Prose.Left >= 640 && Prose.Left + Prose.Rectangle.width <= 1280 && Prose.Top >= 0 && Prose.Top + Prose.Rectangle.height <= 900, JSON.stringify(Prose));
+        await Page.screenshot({ path: path.join(Temp, 'portrait-late-vacancy.png') });
         await remove(Reader);
     });
     await scenario('paged vertical text stays inside the reader viewport below the menubar', async () => {
