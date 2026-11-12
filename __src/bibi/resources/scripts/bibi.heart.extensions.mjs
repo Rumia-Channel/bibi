@@ -21,9 +21,13 @@ X.list = () => {
     } else {
         if(S['accept-local-file'] || S['accept-blob-converted-data']) ReadyForExtraction = ReadyForBibiZine = true;
     }
-    return Promise.resolve().then(() => {
+    return Promise.resolve().then(async () => {
         if(!ReadyForExtraction) return X.Extractor = null;
-        if(!X.Extractor) return (S['book'] ? O.tryRangeRequest(S['book']).then(() => 'on-the-fly') : Promise.reject()).catch(() => 'at-once').then(_ => SystemExtensions.push(X.Extractor = extension('extractor/' + _ + '.js')))
+        if(!X.Extractor) {
+            const Probe = S['book'] ? await O.tryRangeRequest(S['book']) : { RangeSupported: false };
+            if(Probe.BookData) X.PreloadedBookData = { URL: S['book'], Data: Probe.BookData };
+            SystemExtensions.push(X.Extractor = extension('extractor/' + (Probe.RangeSupported ? 'on-the-fly' : 'at-once') + '.js'));
+        }
     }).then(() => {
         if(ReadyForBibiZine) SystemExtensions.push(extension('zine.js'));
         if(!S['allow-scripts-in-content']) SystemExtensions.push(extension('sanitizer.js'));

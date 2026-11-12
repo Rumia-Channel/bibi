@@ -27,7 +27,12 @@ Bibi.x({
     .then(extract);
 
     const load = (BookData) => ( // resolve(ArrayBuffer)
-        typeof BookData == 'string' ? fetch(BookData, { credentials: S['request-with-credentials'] ? 'include' : 'same-origin' }).then(Res => Res.ok ? Res.arrayBuffer() : Promise.reject()).catch(() => Promise.reject(Bibi.ErrorMessages.Unidentified)) :
+        typeof BookData == 'string' ? fetch(BookData, { credentials: S['request-with-credentials'] ? 'include' : 'same-origin' }).then(Res => {
+            if(Res.ok) return Res.arrayBuffer();
+            const Error = new globalThis.Error(`${ Res.status } ${ Res.statusText }`.trim());
+            Error.status = Res.status;
+            throw Error;
+        }).catch(Err => Promise.reject(Err && typeof Err.status == 'number' ? Err : Bibi.ErrorMessages.Unidentified)) :
         BookData.size ? BookData.arrayBuffer().catch(() => Promise.reject(Bibi.ErrorMessages.DataInvalid)) :
         Promise.reject(Bibi.ErrorMessages.DataInvalid)
     ).then(ArrayBuffer => JSZip.loadAsync(ArrayBuffer).catch(Err => Promise.reject(Bibi.ErrorMessages.DataInvalid)));

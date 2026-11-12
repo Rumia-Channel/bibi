@@ -72,6 +72,9 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
         // Online
         if(O.Local) return reject(`Bibi can't open books via ${ D['book'] ? 'data-bibi-book' : 'URL' } on local mode`);
         B.Path = BookInfo.Book;
+        const Preloaded = X.PreloadedBookData;
+        delete X.PreloadedBookData;
+        const ArchiveData = Preloaded && Preloaded.URL == B.Path ? Preloaded.Data : B.Path;
         if(B.Type == 'PDF') {
             if(!S['accept-pdf']) return reject_failedToOpenTheBook('PDF is set to unacceptable');
             const Source = { 'id': 'BibiPDFItem', 'href': O.rrr(B.Path), 'media-type': 'application/pdf', 'Path': O.rrr(B.Path), 'URI': B.Path };
@@ -82,17 +85,23 @@ L.initializeBook = (BookInfo = {}) => new Promise((resolve, reject) => {
             Promised: (
                 FileOrFolder == 'folder' ? O.download(RootSource).then(() => (B.PathDelimiter = '/') && '') :
                 O.RangeLoader            ? O.openZippedBook().then(() => 'on-the-fly') :
-                                 O.loadZippedBookData(  B.Path  ).then(() => 'at-once')
+                                 O.loadZippedBookData(ArchiveData).then(() => 'at-once')
             ).then(ExtractionPolicy => {
                 B.ExtractionPolicy = ExtractionPolicy;
                 //O.log(`Succeed to Open as ${ B.Type } ${ FileOrFolder }.`);
                 resolve(`${ B.Type } ${ FileOrFolder }`);
             }).catch(Err => {
-                InitErrors.push(Err = (/404/.test(String(Err)) ? Bibi.ErrorMessages.NotFound : String(Err).replace(/^Error: /, '')));
-                O.log(`Failed as ${ /^[aiueo]/i.test(B.Type) ? 'an' : 'a' } ${ B.Type } ${ FileOrFolder }: ` + Err);
-                return Promise.reject();
+                const Message = /404/.test(String(Err)) ? Bibi.ErrorMessages.NotFound : String(Err).replace(/^Error: /, '');
+                InitErrors.push(Message);
+                O.log(`Failed as ${ /^[aiueo]/i.test(B.Type) ? 'an' : 'a' } ${ B.Type } ${ FileOrFolder }: ` + Message);
+                return Promise.reject(Err);
             }),
-            or:        function(fun) { return this.Promised.catch(fun); },
+            or: function(fun) {
+                return this.Promised.catch(Err =>
+                    Err && typeof Err.status == 'number' && Err.status != 404 ?
+                        reject_failedToOpenTheBook(Err.message) : fun()
+                );
+            },
             or_reject: function(fun) { return this.or(() => reject_failedToOpenTheBook(
                 InitErrors.length < 2 || InitErrors[0] == InitErrors[1] ? InitErrors[0] :
                 InitErrors[0] == Bibi.ErrorMessages.Unidentified && InitErrors[1] == Bibi.ErrorMessages.CORSBlocked ? InitErrors[1] :
