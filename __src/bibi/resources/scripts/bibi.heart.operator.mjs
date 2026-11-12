@@ -226,15 +226,32 @@ O.download = (Source) => {
     });
 };
 
-O.tryRangeRequest = (RemotePath, Bytes = '0-0') => new Promise((resolve, reject) => {
-    if(typeof RemotePath != 'string' || !/^https?:\/\//.test(RemotePath) || !S['trustworthy-origins'].includes(new URL(RemotePath).origin)) return reject();
-    const XHR = new XMLHttpRequest();
-    XHR.onloadend = () => XHR.status != 206 ? reject() : resolve();
-    XHR.open('GET', RemotePath, true);
-    if(S['request-with-credentials']) XHR.withCredentials = true;
-    XHR.setRequestHeader('Range', 'bytes=' + Bytes);
-    XHR.send(null);
-});
+O.tryRangeRequest = async (RemotePath, Bytes = '0-0') => {
+    const NoRange = { RangeSupported: false };
+    if(typeof RemotePath != 'string' || !/^https?:\/\//.test(RemotePath) || !S['trustworthy-origins'].includes(new URL(RemotePath).origin)) return NoRange;
+    let Response;
+    try {
+        Response = await fetch(RemotePath, {
+            headers: { Range: 'bytes=' + Bytes },
+            credentials: S['request-with-credentials'] ? 'include' : 'same-origin'
+        });
+    } catch(_) {
+        // A Range request may be blocked where an ordinary GET is allowed.
+        return NoRange;
+    }
+    if(Response.status == 200) {
+        // The server ignored Range: these are already the complete book bytes.
+        return { RangeSupported: false, BookData: await Response.blob() };
+    }
+    await Response.body?.cancel();
+    if(Response.status == 206) return { RangeSupported: true };
+    if(Response.status >= 500 || [401, 403, 429].includes(Response.status)) {
+        const Error = new globalThis.Error(`${ Response.status } ${ Response.statusText }`.trim());
+        Error.status = Response.status;
+        throw Error;
+    }
+    return NoRange;
+};
 
 O.file = (Source, Opt = {}) => new Promise((resolve, reject) => {
     Source = O.src(Source);

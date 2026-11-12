@@ -22,6 +22,15 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.4
+
+* A server that ignores a Range probe and returns the complete EPUB is downloaded only once. Its response bytes are passed directly to full extraction, including credentialed cross-origin redirects and dynamically generated EPUBs without a Content-Length.
+* Authentication, rate-limit, and server errors retain their HTTP status. A failed EPUB request is no longer retried as a folder that conceals the original failure behind a misleading 404.
+* Received book bytes exist only within the current browser reading operation; no persistent book cache is added.
+
+The reader and `zzz` packages are versioned `2.3.4`; `bun run archive` generates `Bibi-v2.3.4.zip`.
+
+
 ### v2.3.3
 
 * Portrait illustrations already placed at the following prose's head can move into a preceding vacant pane when later loading, text settings, or resizing changes the prose layout.
