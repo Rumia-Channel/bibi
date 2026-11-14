@@ -1,0 +1,198 @@
+@use "sass:string";
+@use "../../resources/styles/&globals" as *;
+@use "../_dress-codes/@parts" as *;
+
+
+
+
+// ================================================================================
+// + Touch Devices: Enlarged Hit Areas & Safe-Area Fixes
+// --------------------------------------------------------------------------------
+//
+// Applied when `html.touch` is present (iOS / Android, or any device whose primary
+// pointer is coarse — e.g. iPadOS in desktop mode, dual-screen foldables).
+// Finger targets aim at >= 44px (Apple HIG) / 48dp (Android Material).
+// Visual sizes (icons, bars) stay the same; only tappable regions grow.
+//
+// NOTE: `html` is the root element — selectors nesting `html.X &` inside an
+// `html.touch` block compile to impossible `html.X html.touch …` descendant
+// selectors. All rules below are therefore written flat.
+
+
+// - Shared Hit-Area Size
+// --------------------------------------------------------------------------------
+
+$Touch-HitArea_MinSize: 44px;
+
+
+// - Style Checker (drives --bibi-menu-base-height / --bibi-slider-size / I.Menu.Height)
+// --------------------------------------------------------------------------------
+
+html.touch div#bibi-style-checker {
+	@include size($Slider_Size, $Touch-HitArea_MinSize + 4px);
+}
+
+
+// - Menu Buttons
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-menu-l, .bibi-extramenu-l,
+	div#bibi-menu-r, .bibi-extramenu-r {
+		ul {
+			li {
+				@include size($Touch-HitArea_MinSize);
+				.bibi-button {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					@include size(100%);
+				}
+			}
+		}
+	}
+}
+
+
+// - Subpanel Buttons
+// --------------------------------------------------------------------------------
+
+html.touch {
+	.bibi-subpanel {
+		.bibi-button {
+			min-height: $Touch-HitArea_MinSize;
+			.bibi-button-iconbox { margin-top: ($Touch-HitArea_MinSize - $Subpanel-Icon_Size) * 0.5; }
+			.bibi-button-label   { margin-top: ($Touch-HitArea_MinSize - $Subpanel-Button-FontSize) * 0.5 - 0.5px; }
+		}
+		.bibi-buttongroup-tiled .bibi-button .bibi-button-label { margin-top: ($Touch-HitArea_MinSize - 12px) * 0.5 - 0.5px; }
+	}
+	#bibi-subpanel_bookmarks .bibi-remove-bookmark {
+		@include size($Touch-HitArea_MinSize);
+	}
+}
+
+
+html.touch {
+	div#bibi-panel-bookinfo-navigation nav a {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+}
+html.touch.nav-ttb div#bibi-panel-bookinfo-navigation nav a { min-height: $Touch-HitArea_MinSize; }
+html.touch.nav-rtl div#bibi-panel-bookinfo-navigation nav a { min-width:  $Touch-HitArea_MinSize; }
+html.touch.nav-ttb div#bibi-panel-bookinfo { padding-bottom: calc(#{ $Panel_PaddingAfter } + env(safe-area-inset-bottom, 0)); }
+
+
+// - Slider
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-slider-history {
+		.bibi-buttongroup .bibi-buttonbox .bibi-button#bibi-slider-history-button {
+			@include size($Touch-HitArea_MinSize);
+		}
+	}
+}
+// Keep the whole track clear of the home indicator / gesture bar.
+html.touch.appearance-horizontal div#bibi-slider-thumb { min-width:  $Touch-HitArea_MinSize; }
+html.touch.appearance-vertical   div#bibi-slider-thumb { min-height: $Touch-HitArea_MinSize; }
+html.touch.appearance-vertical div#bibi-slider-history .bibi-button#bibi-slider-history-button { top:   ($Slider_Size - $Touch-HitArea_MinSize) * 0.5; }
+html.touch.appearance-ltr      div#bibi-slider-history .bibi-button#bibi-slider-history-button { left:  ($Slider_Size - $Touch-HitArea_MinSize) * 0.5; }
+html.touch.appearance-rtl      div#bibi-slider-history .bibi-button#bibi-slider-history-button { right: ($Slider_Size - $Touch-HitArea_MinSize) * 0.5; }
+html.touch.appearance-horizontal div#bibi-slider { bottom: env(safe-area-inset-bottom, 0); }
+html.touch.appearance-vertical   div#bibi-slider { right:  env(safe-area-inset-right,  0); }
+
+
+// - Nombre
+// --------------------------------------------------------------------------------
+
+html.touch.view-paged      div#bibi-nombre { bottom: calc(2px + env(safe-area-inset-bottom, 0)); }
+html.touch.view-horizontal div#bibi-nombre { bottom: calc(#{ $TEMPORARY__Scrollbar-Track_Size + 2px } + env(safe-area-inset-bottom, 0)); }
+html.touch.view-vertical   div#bibi-nombre { right:  calc(#{ $TEMPORARY__Scrollbar-Track_Size + 2px } + env(safe-area-inset-right,  0)); }
+
+
+// - Help Bar
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-help {
+		bottom: env(safe-area-inset-bottom, 0);
+	}
+}
+html.touch.slider-opened.view-paged div#bibi-help,
+html.touch.slider-opened.view-horizontal div#bibi-help {
+	bottom: calc(#{ $Slider_Size } + env(safe-area-inset-bottom, 0)) !important;
+}
+
+// - Notifier (clear the status bar / camera island)
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-notifier > div {
+		top: env(safe-area-inset-top, 0);
+	}
+}
+
+
+// - PoweredBy Bar & Logo Link
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-poweredby {
+		height: calc(#{ $PoweredBy_Height } + env(safe-area-inset-bottom, 0));
+		p a {
+			height: $Touch-HitArea_MinSize;
+			bottom: env(safe-area-inset-bottom, 0);
+		}
+	}
+}
+
+
+// - Veil & Panel Frame Strips (must match the taller touch menu)
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-veil {
+		&:before { height: var(--bibi-menu-offset, #{ $Touch-HitArea_MinSize + 4px }); }
+		&:after  { height: calc(#{ $PoweredBy_Height } + env(safe-area-inset-bottom, 0)); }
+	}
+	div#bibi-panel {
+		&:before { height: var(--bibi-menu-offset, #{ $Touch-HitArea_MinSize + 4px }); }
+		&:after  { height: calc(#{ $PoweredBy_Height } + env(safe-area-inset-bottom, 0)); }
+	}
+	div#bibi-panel-bookinfo {
+		margin-top:    var(--bibi-menu-offset, #{ $Touch-HitArea_MinSize + 4px });
+		margin-bottom: calc(#{ $PoweredBy_Height } + env(safe-area-inset-bottom, 0));
+		height: calc(100% - var(--bibi-menu-offset, #{ $Touch-HitArea_MinSize + 4px }) - #{ $PoweredBy_Height } - env(safe-area-inset-bottom, 0));
+	}
+}
+html.touch:not(.book-full-height) div#bibi-veil-cover {
+	height: calc(100% - var(--bibi-menu-offset, #{ $Touch-HitArea_MinSize + 4px }));
+}
+
+
+// - Search Bar
+// --------------------------------------------------------------------------------
+
+html.touch {
+	div#bibi-search > div#bibi-search-bar {
+		padding-top: env(safe-area-inset-top, 0);
+		height: calc(#{ $Touch-HitArea_MinSize + 4px } + env(safe-area-inset-top, 0));
+		> * {
+			height: $Touch-HitArea_MinSize;
+			line-height: $Touch-HitArea_MinSize;
+		}
+		.bibi-buttonbox {
+			height: 100%;
+			min-width: $Touch-HitArea_MinSize;
+			> .bibi-button {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				@include size(100%);
+			}
+		}
+		> form#bibi-search-form > input#bibi-search-form-input { font-size: 16px; } // avoid iOS focus-zoom
+	}
+}
