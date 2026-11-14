@@ -22,6 +22,18 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.6
+
+* Horizontal EPUB TOC blocks are centered without centering individual headings or changing the link hierarchy.
+* Page taps use the rendered reader bounds and client coordinates, not a potentially stale window width. Solo landscape pages use outer thirds; actual paired pages retain outer sixths.
+* The outermost reader pixels now accept page taps; only coordinates outside the reader or inside an occupied scrollbar are excluded. Custom host presets without double/triple-tap actions should set `recognize-repeated-taps-separately: true`, as the default preset already does, to avoid the 300ms multi-tap wait and discarded rapid page taps.
+* WebKit uses dynamic CSS viewport width instead of freezing `visualViewport.width` into a pixel width, and refreshes layout on page restoration and foreground return. Resize events arriving during pagination are retained and applied after that layout finishes.
+* Targeted touch/layout regressions run with `BIBI_TEST_BROWSER=webkit,chromium node tests/browser/ipad-layout.mjs` after a build (install the requested Playwright browsers first). Inspection of 2.3.5 on a real iPadOS 18.7.2 Safari tab and standalone PWA confirmed the multi-tap delay and extreme-edge rejection, but did not reproduce the reported black region. Desktop WebKit does not substitute for device verification of that symptom.
+* Append `buildstamp=1` to the reader URL to show window/visual/body/stage sizes, standalone mode, scrollbars, and the latest tap coordinates. Before/after screenshots distinguish a reader-layout mismatch from a WebKit paint-area failure without requiring remote Web Inspector.
+
+The reader and `zzz` packages are versioned `2.3.6`; `bun run archive` generates `Bibi-v2.3.6.zip`.
+
+
 ### v2.3.5
 
 * Touch devices get 44px hit areas for menu, subpanel, table-of-contents, search bar, slider history, and PoweredBy controls. Tap tolerance and flick distance are unified to a 10px pointer-jitter budget so small finger drift still turns pages.

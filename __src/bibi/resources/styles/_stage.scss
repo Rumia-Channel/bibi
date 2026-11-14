@@ -49,6 +49,8 @@ html {
 	position: absolute; @include offset(0, 0, auto); // for InAppBrowsers
 	&.InternetExplorer { position: static; }
 	@include size(100%);
+	// Let WebKit follow live viewport geometry; do not pin a possibly stale visualViewport.width in pixels.
+	&.WebKit { width: 100dvw; }
 	font-family: sans-serif;
 	// @____Bibi:Dress__('-') &.iOS     { font-family: $HTML_FontFamily__iOS; }
 	// @____Bibi:Dress__('-') &.macOS   { font-family: $HTML_FontFamily__macOS; }

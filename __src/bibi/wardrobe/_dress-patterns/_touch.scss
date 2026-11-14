@@ -178,6 +178,9 @@ html.touch:not(.book-full-height) div#bibi-veil-cover {
 html.touch {
 	div#bibi-search > div#bibi-search-bar {
 		padding-top: env(safe-area-inset-top, 0);
+		// The absolutely positioned closer is now 44px wide + 4px gap; reserve it
+		// so it cannot overlap the last in-flow control ("next result").
+		padding-right: calc(env(safe-area-inset-right, 0) + #{ $Touch-HitArea_MinSize + 6px });
 		height: calc(#{ $Touch-HitArea_MinSize + 4px } + env(safe-area-inset-top, 0));
 		> * {
 			height: $Touch-HitArea_MinSize;

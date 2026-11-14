@@ -84,6 +84,16 @@ html {
 	}
 }
 
+// Center the TOC block, not each heading; retain its hierarchy and natural line breaks.
+html.bibi-horizontal-text {
+	nav[*|type~="toc"], [role="doc-toc"] {
+		width: fit-content;
+		max-width: 100%;
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+
 html.bibi-columned {
 	img, svg, video, picture, image, iframe {
 		break-inside: avoid;

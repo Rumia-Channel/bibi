@@ -69,30 +69,28 @@ E.aBCD = (Eve) => { // add Bibi's Collections of Data (formerly: add Bibi-Coord/
     return Object.assign(Eve, BCD);
 };
 
-    E.aBCD.getCoord = (Eve) => { let Coord = { X: 0, Y: 0 };
-        if(/^touch/.test(Eve.type)) {
-            Coord.X = Eve.changedTouches[0].pageX;
-            Coord.Y = Eve.changedTouches[0].pageY;
-        } else {
-            Coord.X = Eve.pageX;
-            Coord.Y = Eve.pageY;
-        }
+    E.aBCD.getCoord = (Eve) => {
+        const Point = /^touch/.test(Eve.type) ? Eve.changedTouches[0] : Eve;
+        const Coord = { X: Point.clientX, Y: Point.clientY };
         const Doc = Eve.target.ownerDocument;
-        if(Doc == document) {
-            Coord.X -= O.Body.scrollLeft;
-            Coord.Y -= O.Body.scrollTop;
-        } else {
+        if(Doc != document) {
             const Item = Doc.documentElement.Item;
             const Rect = Item.getBoundingClientRect();
-            // Events already use the iframe viewport's CSS pixels, not the original EPUB page size.
-            // The iframe's actual rectangle also includes reader zoom and the scroll frame offset.
-            Coord.X = Rect.left + (Item.clientLeft + Coord.X - Doc.defaultView.scrollX) * Rect.width / Item.offsetWidth;
-            Coord.Y = Rect.top + (Item.clientTop + Coord.Y - Doc.defaultView.scrollY) * Rect.height / Item.offsetHeight;
+            // Client coordinates and the iframe rectangle share viewport space, even after Safari pans the root.
+            Coord.X = Rect.left + (Item.clientLeft + Coord.X) * Rect.width / Item.offsetWidth;
+            Coord.Y = Rect.top + (Item.clientTop + Coord.Y) * Rect.height / Item.offsetHeight;
         }
         return Coord;
     };
 
-    E.aBCD.getDivision = Coord => getPageTapDivision(Coord, window.innerWidth, window.innerHeight, R.Stage?.Width ? R.Stage.Width / (R.TwoPane ? 2 : 1) : window.innerWidth, S['flipper-width']);
+    E.aBCD.getDivision = Coord => {
+        const Bounds = O.Body.getBoundingClientRect();
+        const Paired = R.Current?.Pages.some(Page =>
+            Page.Spread.PaneWidthFactor == 0.5 ||
+            Page.Item.Spreaded && (Page.Item.SpreadPair || Page.Item.Reflowable && !Page.Item.OnlySingleSVG && !Page.Item.OnlySingleImg && Page.Item['rendition:page-spread'] != 'center')
+        );
+        return getPageTapDivision({ X: Coord.X - Bounds.left, Y: Coord.Y - Bounds.top }, Bounds.width, Bounds.height, Bounds.width / (Paired ? 2 : 1), S['flipper-width']);
+    };
 
 
 

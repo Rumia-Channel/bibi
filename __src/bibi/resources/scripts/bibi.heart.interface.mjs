@@ -496,13 +496,16 @@ I.ResizeObserver = { create: () => {
     const ResizeObserver = I.ResizeObserver = {
         Resizing: false,
         TargetPageAfterResizing: null,
-        onResize: (Eve) => { if(R.LayingOut || !L.Opened) return;
+        onResize: (Eve) => {
+            if(!L.Opened) return;
+            if(R.LayingOut) { ResizeObserver.PendingEvent = Eve; return; }
             if(!ResizeObserver.Resizing) {
                 ResizeObserver.TargetAfterResizing = R.getElement();
                 ResizeObserver.onResizeStart(Eve);
             };
             clearTimeout(ResizeObserver.Timer_onResizeEnd);
             ResizeObserver.Timer_onResizeEnd = setTimeout(() => {
+                if(R.LayingOut) { ResizeObserver.PendingEvent = Eve; return; }
                 R.layOutBook({
                     Reset: true,
                     Destination: ResizeObserver.TargetAfterResizing
@@ -536,6 +539,19 @@ I.ResizeObserver = { create: () => {
         }
     };
     E.bind('bibi:opened', () => ResizeObserver.addEventListener(ResizeObserver.onResize));
+    E.add('bibi:laid-out', () => {
+        if(!ResizeObserver.PendingEvent) return;
+        const Eve = ResizeObserver.PendingEvent;
+        ResizeObserver.PendingEvent = null;
+        // Let the current resize finish restoring its position before measuring again.
+        setTimeout(() => ResizeObserver.onResize(Eve), 0);
+    });
+    if(sML.UA.WebKit) {
+        window.addEventListener('pageshow', ResizeObserver.onResize);
+        document.addEventListener('visibilitychange', Eve => {
+            if(!document.hidden) ResizeObserver.onResize(Eve);
+        });
+    }
     E.dispatch('bibi:created-resize-observer');
 }};
 
@@ -1203,10 +1219,11 @@ I.Tracer = { create: () => {
             if(I.OpenedSubpanel) return false;
             if(I.Panel && I.Panel.UIState == 'active') return false;
             //if(BibiEvent.Coord.Y < I.Menu.Height/* * 1.5*/) return false;
-            const Buf = 3;
-                 if(BibiEvent.Coord.X <= Buf || BibiEvent.Coord.Y <= Buf) return false;
-            else if(S.ARA == 'horizontal') { if(BibiEvent.Coord.X >= window.innerWidth  - Buf || BibiEvent.Coord.Y >= window.innerHeight - O.Scrollbars.Height - Buf) return false; }
-            else if(S.ARA == 'vertical'  ) { if(BibiEvent.Coord.Y >= window.innerHeight - Buf || BibiEvent.Coord.X >= window.innerWidth  - O.Scrollbars.Width  - Buf) return false; }
+            const Bounds = O.Body.getBoundingClientRect();
+            const X = BibiEvent.Coord.X - Bounds.left, Y = BibiEvent.Coord.Y - Bounds.top;
+            const Width = Bounds.width - (S.ARA == 'vertical' ? O.Scrollbars.Width : 0);
+            const Height = Bounds.height - (S.ARA == 'horizontal' ? O.Scrollbars.Height : 0);
+            if(X < 0 || Y < 0 || X >= Width || Y >= Height) return false;
             if(BibiEvent.target.ownerDocument.documentElement == O.HTML) {
                 if(BibiEvent.target == O.HTML || BibiEvent.target == O.Body || BibiEvent.target == I.Menu) return true;
                 if(/^(bibi-main|bibi-arrow|bibi-help|bibi-poweredby)/.test(BibiEvent.target.id)) return true;
@@ -4129,7 +4146,29 @@ I.BuildStamp = { create: () => { // ?buildstamp=1 overlay: proves which bundle a
         sML.appendCSSRule('div#bibi-buildstamp', 'position:fixed;left:8px;bottom:8px;z-index:99999999999;background:rgba(0,0,0,.78);color:#7fff9f;font:12px/1.6 monospace;padding:8px 10px;border-radius:6px;pointer-events:none;white-space:pre;');
         let V = '';
         try { V = new URL(Bibi.Script.src).searchParams.get('v') || '(no ?v= on script URL)'; } catch(Err) { V = '(unreadable script URL)'; }
-        Badge.textContent = location.host + '\nbundle: code #' + V;
+        let LastTap = '-';
+        const size = (W, H) => Math.round(W) + 'x' + Math.round(H);
+        const update = () => {
+            const VV = window.visualViewport, Body = O.Body.getBoundingClientRect();
+            Badge.textContent = [
+                location.host + '\nbundle: code #' + V,
+                'standalone: ' + !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches),
+                'window: ' + size(innerWidth, innerHeight) + ' screen: ' + size(screen.width, screen.height),
+                'visual: ' + (VV ? size(VV.width, VV.height) + ' scale:' + VV.scale.toFixed(2) + ' offset:' + Math.round(VV.offsetLeft) + ',' + Math.round(VV.offsetTop) : '-'),
+                'body: ' + size(Body.width, Body.height) + ' stage: ' + size(R.Stage.Width, R.Stage.Height),
+                'scroll: ' + window.scrollX + ',' + window.scrollY + ' bars: ' + size(O.Scrollbars.Width, O.Scrollbars.Height),
+                'tap: ' + LastTap
+            ].join('\n');
+        };
+        E.add('bibi:singletapped', Eve => {
+            LastTap = Math.round(Eve.Coord.X) + ',' + Math.round(Eve.Coord.Y) + ' ' + Eve.Division.X + '/' + Eve.Division.Y;
+            update();
+        });
+        E.add(['bibi:laid-out', 'bibi:resized', 'bibi:focused-on'], update);
+        I.ResizeObserver.addEventListener(update);
+        window.addEventListener('pageshow', update);
+        document.addEventListener('visibilitychange', update);
+        update();
     });
 }};
 
