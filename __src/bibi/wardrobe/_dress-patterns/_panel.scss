@@ -37,7 +37,7 @@ div#bibi-panel-bookinfo {
 			$Panel_PaddingBefore
 			string.unquote('max(#{ $Panel_PaddingEnd   }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 			$Panel_PaddingAfter
-			string.unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+			string.unquote('max(#{ $Panel_PaddingStart }, env(safe-area-inset-left, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 	html.nav-rtl & {
 		padding: $Panel_PaddingStart $Panel_PaddingBefore $Panel_PaddingEnd $Panel_PaddingAfter;
@@ -45,7 +45,7 @@ div#bibi-panel-bookinfo {
 			$Panel_PaddingStart
 			string.unquote('max(#{ $Panel_PaddingBefore }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })')
 			$Panel_PaddingEnd
-			string.unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-right, 0) + #{ $Menu-ButtonGroup_Padding })');
+			string.unquote('max(#{ $Panel_PaddingAfter  }, env(safe-area-inset-left, 0) + #{ $Menu-ButtonGroup_Padding })');
 	}
 }
 
