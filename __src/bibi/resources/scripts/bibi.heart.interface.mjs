@@ -55,6 +55,9 @@ I.initialize = () => {
     });
 };
 
+I.TapSlop = 10; // px: pointer-jitter budget shared by tap tolerance and flick minimum distance
+
+
 
 I.Oven = { create: () => {
     const Oven = I.Oven = {
@@ -596,7 +599,7 @@ I.TouchObserver = { create: () => {
                         this.care(BibiEvent);
                         if(!this.TapLandingBibiEvent) return;
                         if((BibiEvent.timeStamp - this.TapLandingBibiEvent.timeStamp) < TimeLimit.D2U) {
-                            if(Math.abs(BibiEvent.Coord.X - this.TapLandingBibiEvent.Coord.X) < 3 && Math.abs(BibiEvent.Coord.Y - this.TapLandingBibiEvent.Coord.Y) < 3) {
+                            if(Math.hypot(BibiEvent.Coord.X - this.TapLandingBibiEvent.Coord.X, BibiEvent.Coord.Y - this.TapLandingBibiEvent.Coord.Y) < I.TapSlop) {
                                 const TapAccumulation = !this.TapFloatingBibiEvent ? [] : [...this.TapFloatingBibiEvent.TapAccumulation];
                                 TapAccumulation.push(this.TapFloatingBibiEvent = this.TapLandingBibiEvent.TapFloatingBibiEvent = Object.assign(BibiEvent, {
                                     IsTapFloatingBibiEvent: true,
@@ -805,7 +808,7 @@ I.FlickObserver = { create: () => {
                         cb = Mv.getProgress(BibiEvent) >= 1 ? (Mv.AxisSwitcherReadied ? I.AxisSwitcher.switchAxis : I.orthogonal('touchmove') == 'utilities' ? I.Utilities.toggleGracefuly : undefined) : I.AxisSwitcher?.reset;
                     }
                     const Distance = Mv.getDistance(BibiEvent);
-                    if(!cb && Distance >= 5) {
+                    if(!cb && Distance >= I.TapSlop) {
                         // Moved (== not Tap)
                         BibiEvent.preventDefault();
                         const Duration = BibiEvent.timeStamp - MvS.TimeStamp;

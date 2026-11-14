@@ -22,6 +22,16 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.5
+
+* Touch devices get 44px hit areas for menu, subpanel, table-of-contents, search bar, slider history, and PoweredBy controls. Tap tolerance and flick distance are unified to a 10px pointer-jitter budget so small finger drift still turns pages.
+* Panels, sliders, the help bar, nombre, notifier, and the PoweredBy bar now clear device safe areas (notches, home indicators, gesture bars) on phones and tablets.
+* Coarse-pointer devices that the UA does not expose as iOS/Android — iPadOS in desktop mode, dual-screen foldables, touchscreen laptops — receive the touch UI via `pointer: coarse` media queries.
+* The left padding of the book-info panel uses the correct `env(safe-area-inset-left)` inset on `nav-ttb`, and the after padding uses `inset-left` on `nav-rtl`.
+
+The reader and `zzz` packages are versioned `2.3.5`; `bun run archive` generates `Bibi-v2.3.5.zip`.
+
+
 ### v2.3.4
 
 * A server that ignores a Range probe and returns the complete EPUB is downloaded only once. Its response bytes are passed directly to full extraction, including credentialed cross-origin redirects and dynamically generated EPUBs without a Content-Length.

@@ -358,6 +358,9 @@ Bibi.initialize = async () => {
                 O.Head.appendChild(sML.create('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'white' }));
             }
         }
+        if(!O.TouchOS && (matchMedia('(pointer: coarse)').matches || matchMedia('(any-pointer: coarse)').matches && navigator.maxTouchPoints > 1)) { // Coarse-pointer devices that the UA does not expose as iOS/Android (iPadOS desktop mode, dual-screen Android foldables, touchscreen laptops)
+            O.HTML.classList.add('touch');
+        }
         O.HTML.classList.add('default-lang-' + (O.Language = (NLs => { // Language
             if(U['ui-language']) return U['ui-language'];
             if(Array.isArray(navigator.languages)) NLs = NLs.concat(navigator.languages);
