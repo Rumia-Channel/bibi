@@ -64,6 +64,15 @@ try {
             await turn(1180 * 3 / 4, -1);
             console.log('PASS ' + Engine + ' solo landscape page uses outer thirds for forward and backward touch');
 
+            await atPage(0);
+            await Page.touchscreen.tap(1, 400);
+            await Page.touchscreen.tap(1, 400);
+            await Page.waitForFunction(() => R.getPage().IndexInItem === 2);
+            await Page.touchscreen.tap(1179, 400);
+            await Page.touchscreen.tap(1179, 400);
+            await Page.waitForFunction(() => R.getPage().IndexInItem === 0);
+            console.log('PASS ' + Engine + ' repeated taps at the outermost pixel turn once per tap in both directions');
+
             await Page.addStyleTag({ content: 'html#bibi { width:75% !important; }' });
             await Page.evaluate(() => window.dispatchEvent(new Event('resize')));
             await Page.waitForFunction(() => R.Stage.Width === 885 && Bibi.API.getState().operable);

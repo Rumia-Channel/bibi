@@ -1219,11 +1219,11 @@ I.Tracer = { create: () => {
             if(I.OpenedSubpanel) return false;
             if(I.Panel && I.Panel.UIState == 'active') return false;
             //if(BibiEvent.Coord.Y < I.Menu.Height/* * 1.5*/) return false;
-            const Buf = 3, Bounds = O.Body.getBoundingClientRect();
+            const Bounds = O.Body.getBoundingClientRect();
             const X = BibiEvent.Coord.X - Bounds.left, Y = BibiEvent.Coord.Y - Bounds.top;
-                 if(X <= Buf || Y <= Buf) return false;
-            else if(S.ARA == 'horizontal') { if(X >= Bounds.width - Buf || Y >= Bounds.height - O.Scrollbars.Height - Buf) return false; }
-            else if(S.ARA == 'vertical'  ) { if(Y >= Bounds.height - Buf || X >= Bounds.width - O.Scrollbars.Width - Buf) return false; }
+            const Width = Bounds.width - (S.ARA == 'vertical' ? O.Scrollbars.Width : 0);
+            const Height = Bounds.height - (S.ARA == 'horizontal' ? O.Scrollbars.Height : 0);
+            if(X < 0 || Y < 0 || X >= Width || Y >= Height) return false;
             if(BibiEvent.target.ownerDocument.documentElement == O.HTML) {
                 if(BibiEvent.target == O.HTML || BibiEvent.target == O.Body || BibiEvent.target == I.Menu) return true;
                 if(/^(bibi-main|bibi-arrow|bibi-help|bibi-poweredby)/.test(BibiEvent.target.id)) return true;
