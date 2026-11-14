@@ -161,7 +161,8 @@ try {
         for(const Book of ['fixed', 'reflow', 'vertical']) {
             await Page.setViewportSize({ width: 1280, height: 900 }); await open({ book: '/epubs/' + Book + '.epub', iipp: 1 });
             if(Book !== 'fixed') await Page.evaluate(() => Bibi.API.restorePosition({ cfi: '/6/2!/4/2/4/1:6000' }));
-            const TwoPane = await Page.evaluate(() => R.TwoPane); const Width = await Page.evaluate(() => R.Stage.Width); const Y = 450;
+            const TwoPane = Book !== 'vertical'; // the vertical prose fixture fills one page, even on a landscape viewport
+            const Width = await Page.evaluate(() => R.Stage.Width); const Y = 450;
             const Band = Width / (TwoPane ? 6 : 3);
             const Before = await position(); await Page.mouse.click(Band + 15, Y); await pause(350); assert.deepEqual(await position(), Before, 'Outside the page-sized edge band must not flip.');
             await Page.mouse.click(Width - Band / 2, Y, { delay: 60 });
