@@ -57,6 +57,10 @@ I.initialize = () => {
 
 I.TapSlop = 10; // px: pointer-jitter budget shared by tap tolerance and flick minimum distance
 
+// iPad PWA touch origins can be clipped while pointerup reports the real landscape coordinate.
+// In paged view, let WebKit recognize clicks instead of inferring taps or swipes from that delta.
+I.usesNativeReaderClicks = () => !!(sML.OS.iPadOS && sML.UA.WebKit && S.RVM == 'paged' && (navigator.standalone || matchMedia('(display-mode: standalone)').matches));
+
 
 
 I.Oven = { create: () => {
@@ -587,8 +591,16 @@ I.TouchObserver = { create: () => {
         },
         observeElementTap: (Ele, Opt = {}) => {
             if(!Ele.BibiTapObserver) {
+                const IsHTML = Ele == Ele.ownerDocument.documentElement;
                 Ele.addEventListener(E['pointerdown'], Eve => Ele.BibiTapObserver.onPointerDown(E.aBCD(Eve)));
                 Ele.addEventListener(E['pointerup'],   Eve => Ele.BibiTapObserver.onPointerUp(  E.aBCD(Eve)));
+                if(IsHTML) {
+                    Ele.addEventListener('click', Eve => Ele.BibiTapObserver.onClick(Eve));
+                    Ele.addEventListener('pointercancel', () => {
+                        delete Ele.BibiTapObserver.TapLandingBibiEvent;
+                        delete Ele.BibiTapObserver.NativeTapBibiEvent;
+                    });
+                }
                 Ele.BibiTapObserver = {
                     Staccato: 0,
                     staccato: function(fn) {
@@ -598,10 +610,17 @@ I.TouchObserver = { create: () => {
                     },
                     care: Opt.PreventDefault ? (Opt.StopPropagation ? _ => _.preventDefault() || _.stopPropagation() : _ => _.preventDefault()) : (Opt.StopPropagation ? _ => _.stopPropagation() : () => {}),
                     onPointerDown: function(BibiEvent) {
+                        delete this.NativeTapBibiEvent;
+                        this.NativeClick = IsHTML && I.usesNativeReaderClicks() && BibiEvent.pointerType == 'touch';
+                        if(this.NativeClick && BibiEvent.isPrimary === false) { delete this.TapLandingBibiEvent; return; }
                         if((typeof BibiEvent.buttons == 'number' && BibiEvent.buttons !== 1) || BibiEvent.ctrlKey) return;
                         this.care(BibiEvent);
                         clearTimeout(this.Timer_fireTap);
                         this.TapLandingBibiEvent = Object.assign(BibiEvent, { IsTapLandingBibiEvent: true });
+                        if(this.NativeClick) {
+                            if(this.TapFloatingBibiEvent && BibiEvent.timeStamp - this.TapFloatingBibiEvent.timeStamp >= TimeLimit.U2D) delete this.TapFloatingBibiEvent;
+                            return; // Preventing touch/pointer defaults here would suppress the native click.
+                        }
                         if(!this.TapFloatingBibiEvent) return;
                         if((BibiEvent.timeStamp - this.TapFloatingBibiEvent.timeStamp) < TimeLimit.U2D) {
                             this.TapFloatingBibiEvent.TapLandingBibiEvent.preventDefault();
@@ -613,26 +632,42 @@ I.TouchObserver = { create: () => {
                     },
                     onPointerUp: function(BibiEvent) {
                         this.care(BibiEvent);
-                        if(!this.TapLandingBibiEvent) return;
-                        if((BibiEvent.timeStamp - this.TapLandingBibiEvent.timeStamp) < TimeLimit.D2U) {
-                            if(Math.hypot(BibiEvent.Coord.X - this.TapLandingBibiEvent.Coord.X, BibiEvent.Coord.Y - this.TapLandingBibiEvent.Coord.Y) < I.TapSlop) {
-                                const TapAccumulation = !this.TapFloatingBibiEvent ? [] : [...this.TapFloatingBibiEvent.TapAccumulation];
-                                TapAccumulation.push(this.TapFloatingBibiEvent = this.TapLandingBibiEvent.TapFloatingBibiEvent = Object.assign(BibiEvent, {
-                                    IsTapFloatingBibiEvent: true,
-                                    TapLandingBibiEvent: this.TapLandingBibiEvent,
-                                    TapAccumulation: TapAccumulation
-                                }));
-                                this.onTap(this.TapFloatingBibiEvent, 'IsStaccato');
-                                const fire = () => {
-                                    if(this.TapFloatingBibiEvent) this.onTap(this.TapFloatingBibiEvent);
-                                    delete this.TapFloatingBibiEvent;
-                                };
-                                if(S['recognize-repeated-taps-separately']) fire(); else this.Timer_fireTap = setTimeout(fire, TimeLimit.U2D);
-                            } else {
-                                delete this.TapFloatingBibiEvent;
-                            }
+                        const Landing = this.TapLandingBibiEvent;
+                        if(!Landing) return;
+                        if(this.NativeClick) {
+                            if(BibiEvent.pointerId == Landing.pointerId && BibiEvent.isPrimary !== false) this.NativeTapBibiEvent = BibiEvent;
+                            return;
+                        }
+                        if((BibiEvent.timeStamp - Landing.timeStamp) < TimeLimit.D2U) {
+                            if(Math.hypot(BibiEvent.Coord.X - Landing.Coord.X, BibiEvent.Coord.Y - Landing.Coord.Y) < I.TapSlop) this.recognizeTap(BibiEvent, Landing);
+                            else delete this.TapFloatingBibiEvent;
                         }
                         delete this.TapLandingBibiEvent;
+                    },
+                    onClick: function(Eve) {
+                        const Landing = this.TapLandingBibiEvent, Released = this.NativeTapBibiEvent;
+                        delete this.TapLandingBibiEvent;
+                        delete this.NativeTapBibiEvent;
+                        if(!this.NativeClick || !I.usesNativeReaderClicks() || !Landing || !Released || Eve.defaultPrevented || !Eve.detail) return;
+                        if(O.isPointableContent(Eve.target) || I.RangeFinder.Selecting || !Ele.ownerDocument.getSelection()?.isCollapsed) return;
+                        const BibiEvent = E.aBCD(Eve);
+                        BibiEvent.Coord = Released.Coord;
+                        BibiEvent.Division = E.aBCD.getDivision(Released.Coord);
+                        this.recognizeTap(BibiEvent, Landing);
+                    },
+                    recognizeTap: function(BibiEvent, Landing) {
+                        const TapAccumulation = !this.TapFloatingBibiEvent ? [] : [...this.TapFloatingBibiEvent.TapAccumulation];
+                        TapAccumulation.push(this.TapFloatingBibiEvent = Landing.TapFloatingBibiEvent = Object.assign(BibiEvent, {
+                            IsTapFloatingBibiEvent: true,
+                            TapLandingBibiEvent: Landing,
+                            TapAccumulation: TapAccumulation
+                        }));
+                        this.onTap(this.TapFloatingBibiEvent, 'IsStaccato');
+                        const fire = () => {
+                            if(this.TapFloatingBibiEvent) this.onTap(this.TapFloatingBibiEvent);
+                            delete this.TapFloatingBibiEvent;
+                        };
+                        if(S['recognize-repeated-taps-separately']) fire(); else this.Timer_fireTap = setTimeout(fire, TimeLimit.U2D);
                     },
                     onTap: function(BibiEvent, IsStaccato) {
                         if(IsStaccato) {
@@ -677,6 +712,7 @@ I.TouchObserver = { create: () => {
             });
             return Ele;
         },
+        getClickCoord: Eve => I.usesNativeReaderClicks() && Eve.target.ownerDocument.documentElement.BibiTapObserver?.NativeTapBibiEvent?.Coord || E.aBCD.getCoord(Eve),
         PointerEventNames: O.TouchOS ? [['touchstart', 'mousedown'], ['touchend', 'mouseup'], ['touchmove', 'mousemove']] : document.onpointermove !== undefined ? ['pointerdown', 'pointerup', 'pointermove'] : ['mousedown', 'mouseup', 'mousemove'],
         PreviousPointerCoord: { X: 0, Y: 0 },
         activateHTML: (HTML) => {
@@ -768,6 +804,7 @@ I.FlickObserver = { create: () => {
         },
         onTouchStart: (BibiEvent) => {
             if(!L.Opened) return;
+            if(I.usesNativeReaderClicks() && BibiEvent.type == 'touchstart') return;
             //if(S.RVM != 'paged' && O.TouchOS) return;
             if(BibiEvent.touches && BibiEvent.touches.length != 1) return;
             if(FlickObserver.Movement?.Last.BibiEvent) return FlickObserver.onTouchEnd();

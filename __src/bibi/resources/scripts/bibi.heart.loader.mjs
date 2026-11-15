@@ -504,7 +504,7 @@ L.loadPackage = () => O.openDocument(B.Package.Source).then(L.loadPackage.proces
                 let Spread = null;
                 if(Item.PrePaginated && Item['rendition:page-spread'] == SpreadAfter && Item.Index > 0) {
                     const PreviousItem = R.Items[Item.Index - 1];
-                    if(Item.PrePaginated && PreviousItem['rendition:page-spread'] == SpreadBefore) {
+                    if(PreviousItem.PrePaginated && PreviousItem['rendition:page-spread'] == SpreadBefore) {
                         PreviousItem.SpreadPair = Item;
                         Item.SpreadPair = PreviousItem;
                         Spread = Item.Spread = PreviousItem.Spread;
