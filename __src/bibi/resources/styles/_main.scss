@@ -203,8 +203,8 @@ main#bibi-main {
 						align-items: center;
 					}
 					&.pre-paginated {
-						div.spread-box.pre-paginated.spreaded.single-item-spread-right & { transform: translateX( 50%); }
-						div.spread-box.pre-paginated.spreaded.single-item-spread-left  & { transform: translateX(-50%); }
+						div.spread-box.pre-paginated.spreaded.single-item-spread-right:not(.two-pane-paired) & { transform: translateX( 50%); }
+						div.spread-box.pre-paginated.spreaded.single-item-spread-left:not(.two-pane-paired)  & { transform: translateX(-50%); }
 					}
 					html.book-pre-paginated & {
 						&:after {

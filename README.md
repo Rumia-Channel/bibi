@@ -22,6 +22,17 @@ And you can embed it in other webpages (like YouTube videos).
 
 
 
+### v2.3.7
+
+* In iPad standalone PWAs, paged reading uses native `click` recognition and the released pointer's reader coordinates. This avoids rejecting taps when WebKit clips the pressed point to a different coordinate.
+* Touch swipes no longer turn pages or cross volume boundaries in that mode. Native text selection, EPUB links, and center-tap menus remain available without a transparent overlay. Ordinary Safari tabs, desktop input, and scrolling views retain their existing gesture behavior.
+* EPUB left/right spread hints now join only two fixed-layout items. A reflowable credit/text page can no longer force a following fixed image into an oversized, clipped spread.
+* Half-width paired panes no longer receive the legacy single-page 50% side translation a second time; fitted images stay inside their assigned pane.
+* `node tests/browser/ipad-pwa-input.mjs` exercises clipped image-page taps, stray movement, cancellation, selection, links, and mixed/fixed spread bounds after a build; it requires Playwright WebKit. The existing repeated-tap preset policy remains unchanged.
+
+The reader and `zzz` packages are versioned `2.3.7`; `bun run archive` generates `Bibi-v2.3.7.zip`.
+
+
 ### v2.3.6
 
 * Horizontal EPUB TOC blocks are centered without centering individual headings or changing the link hierarchy.
