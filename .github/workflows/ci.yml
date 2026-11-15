@@ -56,7 +56,7 @@ jobs:
       - run: bun test
       - run: bun audit
       - run: bun run build
-      - run: bunx playwright install --with-deps chromium
+      - run: bunx playwright install --with-deps chromium webkit
       - name: Install Japanese vertical fixture font
         run: sudo apt-get install --yes fonts-noto-cjk
       - run: bun run test:browser

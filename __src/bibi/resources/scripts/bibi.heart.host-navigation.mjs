@@ -3,7 +3,7 @@ import { getHostNavigationConfig, validateHostNavigation } from './bibi.heart.ho
 
 const failure = (code, message) => Object.assign(new Error(message), { code });
 let Config = null, Context = null, Refresh = null, Navigating = false, Boundary = null, ErrorState = null;
-let Page = null, Heading = null, Description = null, Action = null, ErrorBox = null, ReturnButton = null;
+let Page = null, Heading = null, Description = null, Action = null, Hint = null, ErrorBox = null, ReturnButton = null;
 let Observed = null, SavedBook = null, Touch = null, LastWheel = 0, PointerSuppressedUntil = 0, NavigationGeneration = 0;
 let RefreshController = null, RefreshGeneration = 0;
 const HandledKeys = new Set();
@@ -36,6 +36,7 @@ function render() {
     Description.textContent = Target ? Target.title + (Target.status === 'missing-file' ? '（EPUB 未登録）' : Target.status === 'unsupported-format' ? '（対応する EPUB ではありません）' : '') : '';
     Action.textContent = Heading.textContent;
     Action.disabled = Navigating || !!Refresh;
+    Hint.textContent = I.usesNativeReaderClicks() ? 'さらに外側をタップすると移動します。本文方向をタップすると読書に戻れます。' : 'さらに外側へスクロールすると移動します。本文方向の操作で読書に戻れます。';
 }
 
 function ensureReturnButton() {
@@ -161,12 +162,11 @@ function show(Distance) {
         Action.type = 'button';
         isolateButton(Action);
         Action.addEventListener('click', Event => { Event.stopPropagation(); if(performance.now() >= PointerSuppressedUntil) navigate(Boundary === 'head' ? 'previous' : 'next'); });
-        const Hint = Page.appendChild(document.createElement('p'));
+        Hint = Page.appendChild(document.createElement('p'));
         Hint.className = 'bibi-host-navigation-hint';
-        Hint.textContent = 'さらに外側へスクロールすると移動します。本文方向の操作で読書に戻れます。';
         Page.addEventListener('click', Event => {
             if(interactive(Event.target) || performance.now() < PointerSuppressedUntil) return;
-            const Division = E.aBCD.getDivision({ X: Event.clientX, Y: Event.clientY });
+            const Division = E.aBCD.getDivision(I.TouchObserver.getClickCoord(Event));
             const Direction = Division.X !== 'center' ? Division.X : Division.Y !== 'middle' ? Division.Y : null;
             if(Direction) advance(C.d2d(Direction, true), Event);
         });
@@ -225,7 +225,7 @@ function onKeyUp(Event) {
     }
 }
 function onTouchStart(Event) {
-    if(!operable() || interactive(Event.target) || Event.touches.length !== 1) { Touch = null; return; }
+    if(!operable() || I.usesNativeReaderClicks() || interactive(Event.target) || Event.touches.length !== 1) { Touch = null; return; }
     Touch = { x: Event.touches[0].clientX, y: Event.touches[0].clientY, head: !!Boundary || isBoundary(-1), foot: !!Boundary || isBoundary(1), scrollLeft: R.Main.scrollLeft, scrollTop: R.Main.scrollTop, distance: 0, blocked: false };
 }
 function onTouchMove(Event) {
